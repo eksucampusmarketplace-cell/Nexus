@@ -15,11 +15,17 @@ DATABASE_URL = os.getenv(
     "postgresql+asyncpg://nexus:nexus_secret@localhost:5432/nexus",
 )
 
+# Pool settings - configurable for Supabase/managed databases with connection limits
+# Supabase transaction pooler works best with smaller pool sizes
+DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "5"))
+DATABASE_MAX_OVERFLOW = int(os.getenv("DATABASE_MAX_OVERFLOW", "5"))
+
 engine = create_async_engine(
     DATABASE_URL,
     echo=os.getenv("ENVIRONMENT") == "development",
-    pool_size=20,
-    max_overflow=0,
+    pool_size=DATABASE_POOL_SIZE,
+    max_overflow=DATABASE_MAX_OVERFLOW,
+    pool_pre_ping=True,  # Verify connections before use
 )
 
 AsyncSessionLocal = async_sessionmaker(
