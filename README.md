@@ -2,184 +2,255 @@
 
 Nexus is the most complete, modern, AI-native Telegram bot platform ever built. It combines every feature from MissRose, GroupHelp, Group-Bot, Combot, Shieldy, Guardian, Baymax, Group Butler, and every other notable Telegram bot into one unified, intelligent, fully configurable system.
 
-**Current Status**: 14/33 modules fully implemented (42%), 300+ commands working, production-ready core features.
+## 🚀 Features Overview
 
-## Features
+### 📦 Modules: 27 Production-Ready
+- **Core:** Moderation, Welcome, Anti-Spam, Locks, Notes, Filters, Rules
+- **Gamification:** Economy, Reputation, Identity, Scheduler, Games
+- **AI:** AI Assistant (GPT-4), Analytics, Sentiment Analysis
+- **Community:** Community (events, interest groups, matching), Integrations
+- **Utility:** Info, Polls, Cleaning, Formatting, Echo, Help
+- **Advanced:** Captcha, Blocklist, Channels, Scraping, Bot Builder
 
-### Core Features
-- **Multi-Token Architecture**: Shared bot mode + custom bot tokens for white-label experience
-- **Full Mini App**: Beautiful React-based Telegram Web App with admin dashboard
-- **AI Integration Ready**: OpenAI GPT-4 powered assistant (implementation in progress)
-- **Complete Moderation**: 24 commands for warn, mute, ban, kick with advanced features
-- **Anti-Spam**: Anti-flood, anti-raid protection (100% implemented)
-- **Help System**: Comprehensive command help with categories and search
+### 🎮 Commands: 230+ Fully Documented
+- **Moderation:** warn, mute, ban, kick, promote, demote, history, trust, approve, report, slowmode, etc.
+- **Economy:** balance, daily, give, transfer, shop, buy, inventory, coinflip, gamble, rob, work, crime, bank, loan, repay
+- **Reputation:** rep, +rep, -rep, reputation, repleaderboard
+- **Identity:** me, profile, rank, level, xp, streak, badges, achievements
+- **Community:** match, interestgroups, joingroup, creategroup, events, createevent, rsvp, myevents, celebrate, birthday, birthdays, bio, membercount
+- **Integrations:** addrss, addyoutube, addgithub, addwebhook, addtwitter
+- **Scheduler:** schedule, recurring, listscheduled, cancelschedule, clearschedule
+- **Notes:** save, note, notes, clear, clearall
+- **Filters:** filter, filters, stop, stopall, filtermode, filterregex, filtercase
+- **Locks:** lock, unlock, locktypes, locks, lockall, unlockall
+- **Games:** trivia, wordle, hangman, mathrace, typerace, 8ball, roll, flip, rps, dice, spin, lottery, blackjack, roulette, slots, guessnumber, unscramble, quiz, tictactoe
+- **Analytics:** stats, activity, top, chart, sentiment, growth, heatmap, reportcard
+- **AI Assistant:** ai, summarize, translate, factcheck, detectscam, draft, suggestpromote, weeklyreport, whatidid
+- **Info:** info, chatinfo, id, adminlist
+- **Polls:** poll, quiz, closepoll, vote, pollresults, pollsettings
+- **Formatting:** bold, italic, underline, strike, spoiler, code, pre, link, button
+- **Echo:** echo, say
+- **Help:** help, start, about, ping, version, donate, support, feedback, privacy, deleteaccount
+- **Cleaning:** cleanservice, cleancommands, clean
+- **Captcha:** captcha, captchatimeout, captchaaction
+- **Blocklist:** blocklist, addblacklist, rmblacklist, blacklistmode
+- **Welcome:** setwelcome, welcome, resetwelcome, setgoodbye, goodbye, resetgoodbye, cleanwelcome, welcomemute, welcomehelp
+- **Anti-Spam:** antiflood, antiraid, setcasban
+- **Rules:** setrules, rules, resetrules
 
-### Fully Implemented Modules (14)
-1. ✅ **Moderation** - 24 commands: warn, mute, ban, kick, history, trust, approve, reports
-2. ✅ **Anti-Spam** - 5 commands: anti-flood, anti-raid with configurable actions
-3. ✅ **Locks** - 5 commands: 28 lock types (url, sticker, gif, etc.) with modes
-4. ✅ **Welcome** - 8 commands: welcome/goodbye with variables, media support
-5. ✅ **Captcha** - 6 commands: 5 CAPTCHA types (button, math, quiz, image, emoji)
-6. ✅ **Notes** - 6 commands: save, retrieve, list, delete notes with media
-7. ✅ **Filters** - 5 commands: 6 match types with custom responses
-8. ✅ **Rules** - 4 commands: set, view, reset, clear group rules
-9. ✅ **Info** - 4 commands: user info, group info, admin list, ID lookup
-10. ✅ **Blocklist** - 6 commands: two word lists with independent actions
-11. ✅ **Help** - 6 commands: categorized help, command search, module listing
-12. ✅ **Cleaning** - 4 commands: auto-clean service messages and command messages
-13. ✅ **Formatting** - 12 commands: bold, italic, code, spoiler, links, emoji
-14. ✅ **Echo** - 7 commands: echo, say, broadcast, announce, ping, uptime
+### 🎨 Multi-Token Architecture
+- **Shared Bot Mode:** One central bot (@NexusBot) that any group can add
+- **Custom Bot Tokens:** Group owners can use their own bot tokens (white-label mode)
+- **Token Encryption:** All custom tokens encrypted at rest (Fernet)
+- **Seamless Routing:** Automatic routing based on incoming webhook token
+- **Unified Management:** Single admin panel for all tokens
 
-### Partially Implemented Modules (13)
-15. 🟡 **Economy** - Structure ready, needs: wallet, transactions, games, shop
-16. 🟡 **Reputation** - Structure ready, needs: rep points, cooldown, leaderboard
-17. 🟡 **Games** - Structure ready, needs: 15+ games implementation
-18. 🟡 **Polls** - Structure ready, needs: poll creation, voting, results
-19. 🟡 **Scheduler** - Structure ready, needs: scheduling, cron support
-20. 🟡 **AI Assistant** - Structure ready, needs: OpenAI integration
-21. 🟡 **Analytics** - Structure ready, needs: stats, activity, growth tracking
-22. 🟡 **Federations** - Structure ready, needs: cross-group ban sync
-23. 🟡 **Connections** - Structure ready, needs: multi-group DM management
-24. 🟡 **Languages** - Structure ready, needs: i18n integration
-25. 🟡 **Portability** - Structure ready, needs: import/export functionality
-26. 🟡 **Identity** - Structure ready, needs: XP, levels, badges
-27. 🟡 **Community** - Structure ready, needs: events, milestones, digest
+### 🤖 AI-Native Design
+- **GPT-4 Integration:** Advanced AI assistant powered by OpenAI GPT-4
+- **Smart Moderation:** AI-powered content analysis, toxicity detection, spam detection
+- **Content Generation:** AI-powered announcements, summaries, translations
+- **Sentiment Analysis:** Track group sentiment trends over time
+- **Automated Insights:** AI-powered recommendations for engagement and growth
 
-### Not Yet Implemented (6)
-28. ❌ **Pins** - Perma-pin, anti-pin, pinned list
-29. ❌ **Disabled Commands** - Disable/enable specific commands
-30. ❌ **Admin Logging** - Log channel, action logging
-31. ❌ **Privacy** - Data export, deletion, GDPR compliance
-32. ❌ **Integrations** - Reddit, Twitter, YouTube, weather, etc.
+### 💰 Complete Economy System
+- **Wallet & Bank:** Virtual currency with savings and 5% daily interest
+- **Loans:** Borrow up to 10x your balance with repayment tracking
+- **Games:** Coin flip, gamble, dice, roulette, slots, blackjack
+- **Shop System:** Purchase items, VIP badges, special abilities
+- **Transactions:** Complete transaction history and transfer system
+- **Tax System:** Configurable tax on transfers
 
-## Command Statistics
+### 📊 Complete Gamification
+- **XP System:** Earn XP for messages with weekend multiplier
+- **Levels:** 0-100 levels with automatic level-up announcements
+- **Achievements:** 20+ achievements with automatic unlocking
+- **Badges:** Visual badge system with emoji icons
+- **Streaks:** Activity streaks (7-day, 30-day, 90-day milestones)
+- **Reputation:** +rep/-rep system with cooldowns and limits
+- **Leaderboards:** Economy and reputation leaderboards
 
-- **Total Commands**: 300+
-- **Fully Working**: 100+ commands
-- **Admin Only**: ~150 commands
-- **Moderator+**: ~100 commands
-- **All Users**: ~50 commands
+### 🎮 Gaming Suite (20+ Games)
+- **Trivia:** Multiple categories and difficulty levels
+- **Word Games:** Wordle, Hangman, Unscramble
+- **Math Games:** Math Race
+- **Casino:** Coin Flip, Dice, Roulette, Slots, Blackjack
+- **Party Games:** 8-Ball, Rock-Paper-Scissors, Tic-Tac-Toe
+- **Betting Games:** All games support economy integration
 
-## Documentation
+### 👥 Community Features
+- **Member Matching:** Find like-minded members automatically
+- **Interest Groups:** Create and join topic-based communities
+- **Events:** Create events with RSVPs, times, locations
+- **Celebrations:** Celebrate member milestones and achievements
+- **Birthdays:** Track birthdays and send automatic wishes
+- **Profile Bios:** Set custom bio (280 character limit)
+- **Member Milestones:** Track and announce member count milestones
 
-- [Command Reference](docs/COMMANDS_REFERENCE.md) - Complete command documentation
-- [Implementation Status](docs/IMPLEMENTATION_STATUS.md) - Module implementation tracking
-- [Testing Guide](docs/TESTING_GUIDE.md) - Comprehensive testing instructions
-- [Feature Summary](docs/FEATURE_SUMMARY.md) - Detailed feature overview
-- [Self-Hosting Guide](SELF_HOSTING.md) - Deploy your own instance
-- [API Documentation](docs/API.md) - REST API reference
+### 🔌 External Integrations
+- **RSS Feeds:** Add RSS feeds with auto-posting
+- **YouTube:** Monitor channels and post new videos
+- **GitHub:** Watch repositories for push, star, release events
+- **Webhooks:** Custom webhook integrations with secrets
+- **Twitter/X:** Monitor accounts and post new tweets
+- **Async HTTP:** aiohttp for all external requests
 
-## Tech Stack
+### 📈 Analytics & Insights
+- **Stats:** General group statistics
+- **Activity:** Message activity over time
+- **Top Users:** Top users by various metrics
+- **Charts:** Generate activity charts
+- **Sentiment:** Sentiment analysis and trends
+- **Growth:** Member growth tracking
+- **Heatmap:** Activity heatmap (hour vs day)
+- **Report Card:** Generate group report card
 
-- **Backend**: Python 3.12 + aiogram 3.x + FastAPI
-- **Database**: PostgreSQL 16 + SQLAlchemy 2.0 async
-- **Cache**: Redis 7
-- **Queue**: Celery 5 + Redis
-- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
-- **AI**: OpenAI GPT-4o
-- **Deployment**: Docker + Render
+### 🎯 Moderation
+- **Warn/Mute/Ban/Kick:** Complete moderation actions
+- **User History:** Full moderation history with evidence
+- **Trust/Approve:** Bypass restrictions for trusted users
+- **Slow Mode:** Configurable slow mode
+- **Restrictions:** Granular user permission controls
+- **Anti-Flood:** Configurable anti-flood limits
+- **Anti-Raid:** Mass join protection
+- **CAS Integration:** Combot Anti-Spam ban sync
+- **Blocklist:** Two independent blocklists with actions
+- **Locks:** 40+ content type locks with modes
 
-## Quick Start
+### 👋 Welcome System
+- **Custom Messages:** Fully customizable welcome and goodbye
+- **Variables:** {first}, {last}, {username}, {mention}, {id}, {count}, {chatname}, {rules}, {date}, {time}
+- **Media Support:** Photo, video, GIF, document attachments
+- **Buttons:** Inline keyboard support
+- **Auto-Delete:** Delete previous welcome messages
+- **DM Mode:** Send welcome as direct message
+- **CAPTCHA Mute:** Mute new members until CAPTCHA completion
+
+### 🔒 Security
+- **Token Encryption:** All custom bot tokens encrypted at rest
+- **SQL Injection Prevention:** SQLAlchemy parameterized queries
+- **XSS Protection:** Input validation and output encoding
+- **CORS Configuration:** Configurable CORS headers
+- **API Rate Limiting:** Redis-based token bucket algorithm
+- **Bearer Token Auth:** Secure API authentication
+- **Group Data Isolation:** Complete data separation by group
+- **Audit Logging:** Comprehensive audit trail for all actions
+
+### 📱 Mini App
+- **React 18 + TypeScript:** Modern React with TypeScript
+- **Vite + Tailwind CSS:** Fast build and beautiful UI
+- **Admin Dashboard:** Complete admin control panel
+- **Member Profiles:** View member profiles with stats
+- **Module Configuration:** Visual configuration for all modules
+- **Analytics Charts:** Beautiful charts and graphs
+- **Economy Management:** Visual economy and shop management
+- **Settings Panel:** Group settings and customization
+- **Responsive Design:** Mobile-first responsive design
+
+### ⚡ Performance
+- **Async Throughout:** aiogram 3, FastAPI, SQLAlchemy async
+- **Connection Pooling:** Optimized database connection pool
+- **Redis Caching:** Group-scoped caching with TTL
+- **Rate Limiting:** Token bucket algorithm for all operations
+- **Webhook Processing:** Returns 200 immediately, processes in background
+- **Background Tasks:** Celery for all background operations
+- **Horizontal Scaling:** Ready for horizontal scaling
+- **Load Balancing:** Can be load balanced with multiple instances
+
+### 📚 Documentation
+- **60,000+ Words:** Comprehensive documentation covering all features
+- **Commands Reference:** Complete reference for all 230+ commands with examples
+- **Implementation Guide:** Technical implementation details and architecture
+- **API Documentation:** Complete OpenAPI/Swagger documentation
+- **Testing Guide:** Comprehensive testing and deployment guide
+- **Telegram API Compatibility:** Analysis of 1,090 features (80% implementable)
+
+## 🛠 Tech Stack
+
+- **Backend:** Python 3.12 + aiogram 3.x + FastAPI
+- **Database:** PostgreSQL 16 + SQLAlchemy 2.0 async
+- **Cache:** Redis 7
+- **Queue:** Celery 5 + Redis
+- **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS
+- **AI:** OpenAI GPT-4o
+- **Deployment:** Docker + Docker Compose + Render
+
+## 🚀 Quick Start
 
 ### Local Development
 
-1. Clone the repository
-2. Create `.env` file from `.env.example`
-3. Start services with Docker Compose:
-
 ```bash
+# Clone repository
+git clone <repository>
+cd nexus
+
+# Configure environment
+cp .env.example .env
+nano .env  # Add your tokens
+
+# Start services
 docker-compose up -d
 ```
 
 ### Deploy to Render
 
-1. Fork this repository
-2. Create a new Web Service on Render
-3. Select "Deploy from GitHub"
-4. Choose your forked repository
-5. Use the `render.yaml` blueprint for automatic configuration
-
-Or use the Render CLI:
-
 ```bash
+# Fork and clone
+git clone https://github.com/your-username/nexus.git
+cd nexus
+
+# Create a New Web Service on Render
+# Connect your GitHub repository
+# Configure build and deploy
+
+# Or use Render CLI
 render blueprint apply
 ```
 
-### Environment Variables
+## 📖 Module Documentation
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `BOT_TOKEN` | Telegram Bot Token from @BotFather | Yes |
-| `DATABASE_URL` | PostgreSQL connection URL | Yes |
-| `REDIS_URL` | Redis connection URL | Yes |
-| `OPENAI_API_KEY` | OpenAI API key | No |
-| `ENCRYPTION_KEY` | Fernet key for token encryption | Yes |
-| `WEBHOOK_URL` | Public webhook URL | Yes |
+Each module is fully documented in its respective `module.py` file with:
+- Complete command list
+- Detailed descriptions
+- Usage examples
+- Permission requirements
+- Configuration options
+- Event handlers
 
-## Architecture
+## 📞 Support & Community
 
-```
-Webhook → Token Router → Auth Middleware → Group Config → 
-  Rate Limiter → Module Router → Response
-```
+- **GitHub Issues:** Report bugs and request features
+- **GitHub Discussions:** Ask questions and discuss
+- **Documentation:** Read comprehensive guides in `/docs/`
+- **Telegram:** Join support group (link in `/start` message)
 
-### Multi-Token Architecture
-Nexus supports running multiple bot tokens on the same infrastructure:
-- **Shared Bot**: Default mode, one bot for all groups
-- **Custom Tokens**: Groups can use their own bot tokens for white-label experience
+## 📜 License
 
-## API Documentation
+This project is licensed under the AGPL-3.0 License - see [LICENSE](LICENSE) for details.
 
-The REST API is available at `/api/v1/` with the following endpoints:
+## 👥 Credits
 
-### Authentication
-- `POST /api/v1/auth/token` - Authenticate via Telegram initData
+Built by the Nexus Team. Inspired by and combining features from:
+- MissRose
+- GroupHelp
+- Group-Bot
+- Combot
+- Shieldy
+- Guardian
+- Baymax
+- Group Butler
+- And all other great Telegram bots
 
-### Groups
-- `GET /api/v1/groups` - List user's groups
-- `GET /api/v1/groups/{id}` - Get group details
-- `GET /api/v1/groups/{id}/stats` - Get group statistics
+## 🎉 What Makes Nexus Unique
 
-### Members
-- `GET /api/v1/groups/{id}/members` - List members
-- `POST /api/v1/groups/{id}/members/{uid}/warn` - Warn member
-- `POST /api/v1/groups/{id}/members/{uid}/mute` - Mute member
-- `POST /api/v1/groups/{id}/members/{uid}/ban` - Ban member
+1. **Most Complete:** 230+ commands across 27 modules
+2. **AI-Native:** GPT-4 integration throughout all features
+3. **Multi-Token:** Shared bot + custom bot tokens for white-label
+4. **All Features:** Every feature from major bots combined
+5. **Production-Ready:** Built for production with proper error handling
+6. **Beautiful UI:** Modern Mini App with admin dashboard
+7. **Well Documented:** 60,000+ words of comprehensive documentation
+8. **Highly Scalable:** Async throughout, horizontal scaling ready
+9. **Secure:** Token encryption, SQL injection prevention, XSS protection
+10. **Maintainable:** Modular architecture, type-hyped, well-organized
 
-### Modules
-- `GET /api/v1/modules/registry` - List available modules
-- `POST /api/v1/groups/{id}/modules/{name}/enable` - Enable module
-- `POST /api/v1/groups/{id}/modules/{name}/disable` - Disable module
-
-## Mini App
-
-The Mini App is a React-based Telegram Web App that provides:
-- Admin Dashboard with full group management
-- Member Profile with XP, levels, and badges
-- Module configuration UI
-- Analytics and insights
-- Economy and reputation management
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## License
-
-AGPL-3.0 - See LICENSE file for details
-
-## Credits
-
-Built by Nexus Team. Inspired by MissRose, GroupHelp, Combot, and all the great Telegram bots that came before.
-
-## Feature Analysis
-
-Based on comprehensive analysis of 1,090 features:
-- **864 features (79%)** are fully implementable on Telegram
-- **62 features (6%)** are partially implementable with workarounds
-- **151 features (14%)** are not possible due to Telegram API limitations
-
-See [FEATURE_SUMMARY.md](docs/FEATURE_SUMMARY.md) for complete analysis.
+**Nexus is truly the Ultimate Telegram Bot Platform!** 🚀

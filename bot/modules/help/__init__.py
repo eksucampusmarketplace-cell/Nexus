@@ -1,5 +1,5 @@
-"""Help module - Complete command help system."""
+"""Help module - Comprehensive help system for all Nexus modules."""
 
-from .module import HelpModule
+from bot.modules.help.module import HelpModule
 
 __all__ = ["HelpModule"]
