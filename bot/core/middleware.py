@@ -5,6 +5,7 @@ from typing import Any, Callable, Coroutine, List, Optional
 
 from aiogram import Bot
 from aiogram.types import Update
+from aiogram.utils.markdown import hbold, hcode, hitalic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,6 +57,33 @@ class MiddlewarePipeline:
         """Add a module to handle events."""
         self._modules.append(module)
 
+    async def _handle_private_message(self, bot: Bot, update: Update) -> bool:
+        if not update.message or update.message.chat.type != "private":
+            return False
+
+        if not update.message.text:
+            return True
+
+        command = update.message.text.split()[0].lower()
+        command = command.split("@")[0]
+
+        if command in {"/start", "/help"}:
+            text = f"👋 {hbold('Welcome to Nexus Bot!')} 🚀\n\n"
+            text += f"{hbold('The Ultimate Telegram Bot Platform')} 🎉\n\n"
+            text += f"📚 {hcode('/help')} - View all commands\n"
+            text += f"📱 {hcode('/settings')} - Open settings panel\n"
+            text += "ℹ️ Use commands or open the Mini App for full control!\n\n"
+            text += f"💡 {hitalic('Type /help <command> for detailed information')}"
+
+            await bot.send_message(
+                chat_id=update.message.chat.id,
+                text=text,
+                reply_to_message_id=update.message.message_id,
+                parse_mode="HTML",
+            )
+
+        return True
+
     async def process_update(
         self,
         bot: Bot,
@@ -67,6 +95,9 @@ class MiddlewarePipeline:
 
         Returns True if the update was handled, False otherwise.
         """
+        if await self._handle_private_message(bot, update):
+            return True
+
         # Create database session
         async with AsyncSessionLocal() as session:
             # Build context
