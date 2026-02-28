@@ -46,6 +46,7 @@ const menuItems = [
   { icon: Flow, label: 'Bot Builder', path: 'bot-builder', color: 'text-rose-500' },
   { icon: Scissors, label: 'Advanced', path: 'advanced', color: 'text-teal-500' },
   { icon: Settings, label: 'Settings', path: 'settings', color: 'text-gray-500' },
+  { icon: Zap, label: 'Integrations', path: 'integrations', color: 'text-teal-500' },
 ]
 
 export default function AdminDashboard() {
@@ -53,10 +54,11 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const { currentGroup, setCurrentGroup, isLoading, setLoading } = useGroupStore()
   const { user } = useAuthStore()
-
+  
   useEffect(() => {
     const loadGroup = async () => {
       if (!groupId) return
+      
       setLoading(true)
       try {
         const [group, stats] = await Promise.all([
@@ -71,14 +73,14 @@ export default function AdminDashboard() {
         setLoading(false)
       }
     }
-
+  
     loadGroup()
   }, [groupId])
-
+  
   if (isLoading || !currentGroup) {
     return <Loading />
   }
-
+  
   return (
     <div className="py-6 animate-fade-in">
       {/* Header */}
@@ -93,7 +95,7 @@ export default function AdminDashboard() {
           </p>
         </div>
       </div>
-
+  
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <StatCard
@@ -124,7 +126,7 @@ export default function AdminDashboard() {
           trend="Stable"
         />
       </div>
-
+  
       {/* Quick Actions */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-white mb-3">Quick Actions</h2>
@@ -142,7 +144,7 @@ export default function AdminDashboard() {
           ))}
         </div>
       </div>
-
+  
       {/* Bot Status */}
       <Card
         title="Bot Status"

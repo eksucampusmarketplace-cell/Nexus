@@ -27,12 +27,13 @@ import RulesAndGreetings from './views/AdminDashboard/RulesAndGreetings'
 import ImportExport from './views/AdminDashboard/ImportExport'
 import CustomBotToken from './views/AdminDashboard/CustomBotToken'
 import Loading from './components/UI/Loading'
+import Integrations from './views/AdminDashboard/Integrations'
 
 function App() {
   const { isAuthenticated, isLoading, error, setAuth, setLoading } = useAuthStore()
   const { currentGroup, setCurrentGroup } = useGroupStore()
   const [initData, setInitData] = useState<string>('')
-
+  
   useEffect(() => {
     const init = async () => {
       setLoading(true)
@@ -41,7 +42,7 @@ function App() {
       const tg = (window as any).Telegram?.WebApp
       const initDataRaw = tg?.initData || ''
       setInitData(initDataRaw)
-
+  
       if (initDataRaw) {
         try {
           // Authenticate with backend
@@ -51,22 +52,22 @@ function App() {
           console.error('Auth error:', err)
         }
       }
-
+  
       setLoading(false)
     }
-
+  
     init()
   }, [])
-
+  
   if (isLoading) {
     return <Loading />
   }
-
+  
   // Check if opened from a specific group
   const tg = (window as any).Telegram?.WebApp
   const startParam = tg?.initDataUnsafe?.start_param
   const groupId = startParam ? parseInt(startParam) : null
-
+  
   return (
     <MainLayout>
       <Routes>
@@ -103,6 +104,7 @@ function App() {
         <Route path="/admin/:groupId/rules-greetings" element={<RulesAndGreetings />} />
         <Route path="/admin/:groupId/import-export" element={<ImportExport />} />
         <Route path="/admin/:groupId/custom-bot" element={<CustomBotToken />} />
+        <Route path="/admin/:groupId/integrations" element={<Integrations />} />
       </Routes>
     </MainLayout>
   )
