@@ -14,6 +14,13 @@ import {
   Scissors,
   Download,
   Flow,
+  AlertTriangle,
+  Hash,
+  Lock,
+  Ban,
+  FileText,
+  Upload,
+  Key,
 } from 'lucide-react'
 import { useGroupStore } from '../../stores/groupStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -25,12 +32,19 @@ import toast from 'react-hot-toast'
 
 const menuItems = [
   { icon: Users, label: 'Members', path: 'members', color: 'text-blue-500' },
+  { icon: AlertTriangle, label: 'Moderation', path: 'moderation', color: 'text-red-500' },
   { icon: Shield, label: 'Modules', path: 'modules', color: 'text-purple-500' },
-  { icon: BarChart3, label: 'Analytics', path: 'analytics', color: 'text-green-500' },
-  { icon: Calendar, label: 'Scheduler', path: 'scheduler', color: 'text-orange-500' },
-  { icon: Wallet, label: 'Economy', path: 'economy', color: 'text-yellow-500' },
-  { icon: Flow, label: 'Bot Builder', path: 'bot-builder', color: 'text-pink-500' },
-  { icon: Scissors, label: 'Advanced', path: 'advanced', color: 'text-cyan-500' },
+  { icon: Hash, label: 'Notes & Filters', path: 'notes-filters', color: 'text-cyan-500' },
+  { icon: Lock, label: 'Locks', path: 'locks', color: 'text-orange-500' },
+  { icon: Ban, label: 'Anti-Spam', path: 'antispam', color: 'text-yellow-500' },
+  { icon: FileText, label: 'Rules & Greetings', path: 'rules-greetings', color: 'text-green-500' },
+  { icon: BarChart3, label: 'Analytics', path: 'analytics', color: 'text-emerald-500' },
+  { icon: Calendar, label: 'Scheduler', path: 'scheduler', color: 'text-pink-500' },
+  { icon: Wallet, label: 'Economy', path: 'economy', color: 'text-amber-500' },
+  { icon: Upload, label: 'Import/Export', path: 'import-export', color: 'text-indigo-500' },
+  { icon: Key, label: 'Custom Bot', path: 'custom-bot', color: 'text-violet-500' },
+  { icon: Flow, label: 'Bot Builder', path: 'bot-builder', color: 'text-rose-500' },
+  { icon: Scissors, label: 'Advanced', path: 'advanced', color: 'text-teal-500' },
   { icon: Settings, label: 'Settings', path: 'settings', color: 'text-gray-500' },
 ]
 
@@ -114,7 +128,7 @@ export default function AdminDashboard() {
       {/* Quick Actions */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-white mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {menuItems.map((item) => (
             <Link
               key={item.path}
@@ -122,7 +136,7 @@ export default function AdminDashboard() {
               className="flex items-center gap-3 p-4 bg-dark-900 rounded-xl border border-dark-800 hover:border-dark-700 hover:bg-dark-800 transition-all"
             >
               <item.icon className={`w-5 h-5 ${item.color}`} />
-              <span className="font-medium text-white">{item.label}</span>
+              <span className="font-medium text-white text-sm">{item.label}</span>
               <ChevronRight className="w-4 h-4 text-dark-500 ml-auto" />
             </Link>
           ))}

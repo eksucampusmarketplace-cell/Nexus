@@ -3,7 +3,7 @@ services:
     name: nexus-api
     runtime: python
     plan: standard
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install --only-binary :all: -r requirements.txt
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
@@ -44,7 +44,7 @@ services:
     name: nexus-bot
     runtime: python
     plan: standard
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install --only-binary :all: -r requirements.txt
     startCommand: python -m bot.core
     envVars:
       - key: DATABASE_URL
@@ -85,7 +85,7 @@ services:
     name: nexus-worker
     runtime: python
     plan: standard
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install --only-binary :all: -r requirements.txt
     startCommand: celery -A worker.celery_app worker --loglevel=info --concurrency=4
     envVars:
       - key: DATABASE_URL
@@ -122,7 +122,7 @@ services:
     name: nexus-beat
     runtime: python
     plan: starter
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install --only-binary :all: -r requirements.txt
     startCommand: celery -A worker.celery_app beat --loglevel=info
     envVars:
       - key: DATABASE_URL

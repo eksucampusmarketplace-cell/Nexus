@@ -19,6 +19,13 @@ import Settings from './views/AdminDashboard/Settings'
 import Economy from './views/AdminDashboard/Economy'
 import BotBuilder from './views/AdminDashboard/BotBuilder'
 import AdvancedFeatures from './views/AdminDashboard/AdvancedFeatures'
+import ModerationQueue from './views/AdminDashboard/ModerationQueue'
+import NotesAndFilters from './views/AdminDashboard/NotesAndFilters'
+import Locks from './views/AdminDashboard/Locks'
+import AntiSpam from './views/AdminDashboard/AntiSpam'
+import RulesAndGreetings from './views/AdminDashboard/RulesAndGreetings'
+import ImportExport from './views/AdminDashboard/ImportExport'
+import CustomBotToken from './views/AdminDashboard/CustomBotToken'
 import Loading from './components/UI/Loading'
 
 function App() {
@@ -76,6 +83,8 @@ function App() {
           )
         } />
         <Route path="/profile/:groupId" element={<MemberProfile />} />
+        
+        {/* Admin Dashboard Routes */}
         <Route path="/admin/:groupId" element={<AdminDashboard />} />
         <Route path="/admin/:groupId/modules" element={<Modules />} />
         <Route path="/admin/:groupId/members" element={<Members />} />
@@ -85,6 +94,15 @@ function App() {
         <Route path="/admin/:groupId/settings" element={<Settings />} />
         <Route path="/admin/:groupId/bot-builder" element={<BotBuilder />} />
         <Route path="/admin/:groupId/advanced" element={<AdvancedFeatures />} />
+        
+        {/* New Feature Routes */}
+        <Route path="/admin/:groupId/moderation" element={<ModerationQueue />} />
+        <Route path="/admin/:groupId/notes-filters" element={<NotesAndFilters />} />
+        <Route path="/admin/:groupId/locks" element={<Locks />} />
+        <Route path="/admin/:groupId/antispam" element={<AntiSpam />} />
+        <Route path="/admin/:groupId/rules-greetings" element={<RulesAndGreetings />} />
+        <Route path="/admin/:groupId/import-export" element={<ImportExport />} />
+        <Route path="/admin/:groupId/custom-bot" element={<CustomBotToken />} />
       </Routes>
     </MainLayout>
   )
