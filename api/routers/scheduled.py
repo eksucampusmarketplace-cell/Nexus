@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routers.auth import get_current_user
 from shared.database import get_db
-from shared.models import Group, Member, ScheduledMessage
+from shared.models import Group, Member, ScheduledMessage, User
 from shared.schemas import ScheduledMessageCreate, ScheduledMessageResponse
 
 router = APIRouter()
