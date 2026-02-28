@@ -39,11 +39,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: PYTHONPATH
-        value: /opt/render/project/src
-      - key: CARGO_HOME
-        value: /opt/render/project/.cargo
-      - key: RUSTUP_HOME
-        value: /opt/render/project/.rustup
+        value: /opt/render/project
 
   - type: web
     name: nexus-bot
@@ -85,11 +81,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: PYTHONPATH
-        value: /opt/render/project/src
-      - key: CARGO_HOME
-        value: /opt/render/project/.cargo
-      - key: RUSTUP_HOME
-        value: /opt/render/project/.rustup
+        value: /opt/render/project
 
   - type: worker
     name: nexus-worker
@@ -127,11 +119,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: PYTHONPATH
-        value: /opt/render/project/src
-      - key: CARGO_HOME
-        value: /opt/render/project/.cargo
-      - key: RUSTUP_HOME
-        value: /opt/render/project/.rustup
+        value: /opt/render/project
 
   - type: worker
     name: nexus-beat
@@ -169,11 +157,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: PYTHONPATH
-        value: /opt/render/project/src
-      - key: CARGO_HOME
-        value: /opt/render/project/.cargo
-      - key: RUSTUP_HOME
-        value: /opt/render/project/.rustup
+        value: /opt/render/project
 
   - type: static
     name: nexus-mini-app
