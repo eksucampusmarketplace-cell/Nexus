@@ -26,13 +26,23 @@ import AntiSpam from './views/AdminDashboard/AntiSpam'
 import RulesAndGreetings from './views/AdminDashboard/RulesAndGreetings'
 import ImportExport from './views/AdminDashboard/ImportExport'
 import CustomBotToken from './views/AdminDashboard/CustomBotToken'
+import PollsCenter from './views/AdminDashboard/PollsCenter'
+import SecurityCenter from './views/AdminDashboard/SecurityCenter'
 import Loading from './components/UI/Loading'
+import Integrations from './views/AdminDashboard/Integrations'
+import GamificationHub from './views/AdminDashboard/GamificationHub'
+import CommunityHub from './views/AdminDashboard/CommunityHub'
+import GamesHub from './views/AdminDashboard/GamesHub'
+import BroadcastCenter from './views/AdminDashboard/BroadcastCenter'
+import AutomationCenter from './views/AdminDashboard/AutomationCenter'
+import FormattingTools from './views/AdminDashboard/FormattingTools'
+import AdvancedSearch from './views/AdminDashboard/AdvancedSearch'
 
 function App() {
   const { isAuthenticated, isLoading, error, setAuth, setLoading } = useAuthStore()
   const { currentGroup, setCurrentGroup } = useGroupStore()
   const [initData, setInitData] = useState<string>('')
-
+  
   useEffect(() => {
     const init = async () => {
       setLoading(true)
@@ -41,7 +51,7 @@ function App() {
       const tg = (window as any).Telegram?.WebApp
       const initDataRaw = tg?.initData || ''
       setInitData(initDataRaw)
-
+  
       if (initDataRaw) {
         try {
           // Authenticate with backend
@@ -51,22 +61,22 @@ function App() {
           console.error('Auth error:', err)
         }
       }
-
+  
       setLoading(false)
     }
-
+  
     init()
   }, [])
-
+  
   if (isLoading) {
     return <Loading />
   }
-
+  
   // Check if opened from a specific group
   const tg = (window as any).Telegram?.WebApp
   const startParam = tg?.initDataUnsafe?.start_param
   const groupId = startParam ? parseInt(startParam) : null
-
+  
   return (
     <MainLayout>
       <Routes>
@@ -103,6 +113,24 @@ function App() {
         <Route path="/admin/:groupId/rules-greetings" element={<RulesAndGreetings />} />
         <Route path="/admin/:groupId/import-export" element={<ImportExport />} />
         <Route path="/admin/:groupId/custom-bot" element={<CustomBotToken />} />
+        <Route path="/admin/:groupId/integrations" element={<Integrations />} />
+        
+        {/* New Unified Routes */}
+        <Route path="/admin/:groupId/security" element={<SecurityCenter />} />
+        <Route path="/admin/:groupId/polls" element={<PollsCenter />} />
+        
+        {/* New Hubs - High Priority */}
+        <Route path="/admin/:groupId/gamification" element={<GamificationHub />} />
+        <Route path="/admin/:groupId/community" element={<CommunityHub />} />
+        <Route path="/admin/:groupId/games" element={<GamesHub />} />
+        
+        {/* New Hubs - Medium Priority */}
+        <Route path="/admin/:groupId/broadcast" element={<BroadcastCenter />} />
+        <Route path="/admin/:groupId/automation" element={<AutomationCenter />} />
+        
+        {/* New Hubs - Low Priority */}
+        <Route path="/admin/:groupId/formatting" element={<FormattingTools />} />
+        <Route path="/admin/:groupId/search" element={<AdvancedSearch />} />
       </Routes>
     </MainLayout>
   )
