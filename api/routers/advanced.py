@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 import json
 import re
 
-from api.auth import get_current_user
+from api.routers.auth import get_current_user
 from shared.database import get_db
 from shared.models import (
     User, ScrapingJob, ScrapingResult, ChannelConfig, AutoForward,
