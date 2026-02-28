@@ -1,0 +1,42 @@
+{
+  "common": {
+    "hello": "Hello {name}!",
+    "goodbye": "Goodbye {name}!",
+    "success": "✅ Success!",
+    "error": "❌ Error occurred",
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search"
+  },
+  "moderation": {
+    "warned": "⚠️ {target} has been warned.\nReason: {reason}",
+    "muted": "🔇 {target} has been muted for {duration}.\nReason: {reason}",
+    "banned": "🚫 {target} has been banned.\nReason: {reason}",
+    "kicked": "👢 {target} has been kicked.\nReason: {reason}",
+    "unmuted": "🔊 {target} has been unmuted.",
+    "unbanned": "✅ {target} has been unbanned.",
+    "promoted": "⭐ {target} has been promoted to admin.",
+    "demoted": "📉 {target} has been demoted.",
+    "no_permission": "❌ You don't have permission to use this command.",
+    "user_not_found": "❌ User not found.",
+    "invalid_duration": "❌ Invalid duration format. Use: 1m, 1h, 1d, 1w",
+    "action_complete": "✅ Action completed successfully."
+  },
+  "welcome": {
+    "welcome_message": "Welcome {mention} to {chatname}!",
+    "goodbye_message": "Goodbye {mention}! We hope to see you again.",
+    "new_member": "👋 A new member has joined!",
+    "member_left": "👋 A member has left."
+  },
+  "errors": {
+    "rate_limited": "⏳ Please slow down. Rate limit exceeded.",
+    "flood_detected": "🌊 Flood detected. Please wait.",
+    "not_admin": "❌ This command requires admin privileges.",
+    "not_found": "🔍 Not found.",
+    "server_error": "😔 Something went wrong. Please try again."
+  }
+}
