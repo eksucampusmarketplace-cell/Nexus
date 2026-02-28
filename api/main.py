@@ -57,9 +57,11 @@ from api.routers import (
     auth,
     economy,
     federations,
+    filters,
     groups,
     members,
     modules,
+    polls,
     scheduled,
     webhooks,
     bot_builder,
@@ -72,6 +74,8 @@ app.include_router(members.router, prefix="/api/v1", tags=["members"])
 app.include_router(modules.router, prefix="/api/v1", tags=["modules"])
 app.include_router(analytics.router, prefix="/api/v1", tags=["analytics"])
 app.include_router(economy.router, prefix="/api/v1", tags=["economy"])
+app.include_router(filters.router, prefix="/api/v1", tags=["filters"])
+app.include_router(polls.router, prefix="/api/v1", tags=["polls"])
 app.include_router(federations.router, prefix="/api/v1", tags=["federations"])
 app.include_router(scheduled.router, prefix="/api/v1", tags=["scheduled"])
 app.include_router(bot_builder.router, prefix="/api/v1", tags=["Bot Builder"])
