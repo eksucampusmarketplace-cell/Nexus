@@ -38,7 +38,8 @@ engine = create_async_engine(
     echo=os.getenv("ENVIRONMENT") == "development",
     pool_size=DATABASE_POOL_SIZE,
     max_overflow=DATABASE_MAX_OVERFLOW,
-    pool_pre_ping=True,  # Verify connections before use
+    pool_pre_ping=True,
+    connect_args={"statement_cache_size": 0},
 )
 
 AsyncSessionLocal = async_sessionmaker(
