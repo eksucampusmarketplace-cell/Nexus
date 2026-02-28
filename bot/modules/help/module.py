@@ -200,6 +200,7 @@ class HelpModule(NexusModule):
     def _get_command_help(self, command_name: str) -> Optional[dict]:
         """Get detailed help for a command."""
         command_docs = {
+            # ========== MODERATION ==========
             "warn": {
                 "description": "Warn a user for violating group rules",
                 "usage": "/warn [@user] [reason]",
@@ -583,6 +584,193 @@ class HelpModule(NexusModule):
                 "aliases": [],
                 "permissions": "Admin"
             },
+
+            # ========== GAMES ==========
+            "trivia": {
+                "description": "Start a trivia game",
+                "usage": "/trivia [category] [difficulty] [questions]",
+                "examples": [
+                    "/trivia",
+                    "/trivia science hard",
+                    "/trivia history 10"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "wordle": {
+                "description": "Play Wordle - guess the 5-letter word",
+                "usage": "/wordle",
+                "examples": ["/wordle"],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "hangman": {
+                "description": "Play Hangman - guess the word letter by letter",
+                "usage": "/hangman",
+                "examples": ["/hangman"],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "rps": {
+                "description": "Play Rock Paper Scissors",
+                "usage": "/rps [rock|paper|scissors]",
+                "examples": [
+                    "/rps rock",
+                    "/rps paper",
+                    "/rps scissors"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "8ball": {
+                "description": "Magic 8-Ball prediction",
+                "usage": "/8ball <question>",
+                "examples": ["/8ball Will I win?"],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "dice": {
+                "description": "Roll dice",
+                "usage": "/dice [sides]",
+                "examples": [
+                    "/dice",
+                    "/dice 20"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "coinflip": {
+                "description": "Flip a coin",
+                "usage": "/coinflip",
+                "examples": ["/coinflip"],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "guessnumber": {
+                "description": "Guess the number game",
+                "usage": "/guessnumber [min] [max]",
+                "examples": [
+                    "/guessnumber",
+                    "/guessnumber 1 100"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+
+            # ========== POLLS ==========
+            "poll": {
+                "description": "Create a poll",
+                "usage": "/poll <question> [options...]",
+                "examples": [
+                    "/poll What should we eat? Pizza Burger Tacos",
+                    "/poll Should we have an event? Yes No Maybe"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "quizpoll": {
+                "description": "Create a quiz poll (one correct answer)",
+                "usage": "/quizpoll <question> <correct> [wrong...]",
+                "examples": [
+                    "/quizpoll What is 2+2? 4 3 5 6"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "closepoll": {
+                "description": "Close a poll",
+                "usage": "/closepoll (reply to poll)",
+                "examples": ["/closepoll"],
+                "aliases": [],
+                "permissions": "Admin"
+            },
+
+            # ========== AI ASSISTANT ==========
+            "ai": {
+                "description": "Ask AI anything",
+                "usage": "/ai <prompt>",
+                "examples": [
+                    "/ai What should we do for our event?",
+                    "/ai Explain quantum physics simply"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "summarize": {
+                "description": "Summarize last N messages",
+                "usage": "/summarize [count]",
+                "examples": [
+                    "/summarize",
+                    "/summarize 50"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "translate": {
+                "description": "Translate text",
+                "usage": "/translate <text> [language]",
+                "examples": [
+                    "/translate Hello es",
+                    "/translate Bonjour English"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "factcheck": {
+                "description": "Fact-check a claim",
+                "usage": "/factcheck <claim>",
+                "examples": [
+                    "/factcheck The moon is made of cheese"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+            "explain": {
+                "description": "Explain a concept",
+                "usage": "/explain <concept>",
+                "examples": [
+                    "/explain blockchain",
+                    "/explain quantum entanglement"
+                ],
+                "aliases": [],
+                "permissions": "All users"
+            },
+
+            # ========== ANALYTICS ==========
+            "stats": {
+                "description": "View group statistics",
+                "usage": "/stats",
+                "examples": ["/stats"],
+                "aliases": [],
+                "permissions": "Admin"
+            },
+            "activity": {
+                "description": "View activity metrics",
+                "usage": "/activity [day|week|month]",
+                "examples": [
+                    "/activity day",
+                    "/activity week"
+                ],
+                "aliases": [],
+                "permissions": "Admin"
+            },
+            "members": {
+                "description": "View member statistics",
+                "usage": "/members",
+                "examples": ["/members"],
+                "aliases": [],
+                "permissions": "Admin"
+            },
+            "top": {
+                "description": "View top members",
+                "usage": "/top [messages|xp|level|trust]",
+                "examples": [
+                    "/top messages",
+                    "/top xp"
+                ],
+                "aliases": [],
+                "permissions": "Admin"
+            },
         }
 
         return command_docs.get(command_name)
@@ -635,19 +823,19 @@ class HelpModule(NexusModule):
         commands_text += "/rep, /reputation, /repleaderboard\n\n"
 
         commands_text += "🎮 **Games:**\n"
-        commands_text += "/trivia, /quiz, /wordle, /hangman, /chess, /tictactoe, /rps, /8ball\n\n"
+        commands_text += "/trivia, /wordle, /hangman, /chess, /tictactoe, /rps, /8ball, /dice, /coinflip, /wheel, /memory, /guessnumber, /unscramble, /connect4, /battleship, /minesweeper, /sudoku, /mastermind, /riddle\n\n"
 
         commands_text += "📊 **Polls:**\n"
-        commands_text += "/poll, /strawpoll, /vote, /closepoll\n\n"
+        commands_text += "/poll, /strawpoll, /quizpoll, /closepoll, /anonymouspoll, /multiplepoll, /scheduledpoll\n\n"
 
         commands_text += "⏰ **Scheduler:**\n"
         commands_text += "/schedule, /recurring, /unschedule, /listschedules\n\n"
 
         commands_text += "🤖 **AI Assistant:**\n"
-        commands_text += "/ai, /summarize, /translate, /factcheck\n\n"
+        commands_text += "/ai, /summarize, /translate, /factcheck, /scam, /draft, /recommend, /sentiment, /explain, /rewrite, /analyze\n\n"
 
         commands_text += "📈 **Analytics:**\n"
-        commands_text += "/stats, /activity, /members, /growth, /heatmap\n\n"
+        commands_text += "/stats, /activity, /members, /growth, /heatmap, /top, /trends, /commands, /moderation, /engagement\n\n"
 
         commands_text += "🌐 **Federations:**\n"
         commands_text += "/newfed, /joinfed, /fban, /unfban, /fedinfo, /fedbans\n\n"
@@ -733,6 +921,39 @@ class HelpModule(NexusModule):
                     "/memory - Memory game",
                     "/guessnumber - Guess number",
                     "/unscramble - Unscramble word",
+                    "/connect4 - Connect Four",
+                    "/battleship - Play Battleship",
+                    "/minesweeper - Play Minesweeper",
+                    "/sudoku - Play Sudoku",
+                    "/mastermind - Mastermind code-breaking",
+                    "/riddle - Solve a riddle",
+                ]
+            },
+            "polls": {
+                "title": "📊 Polls Commands",
+                "commands": [
+                    "/poll - Create a poll",
+                    "/strawpoll - Quick straw poll",
+                    "/quizpoll - Create quiz poll",
+                    "/closepoll - Close a poll",
+                    "/anonymouspoll - Anonymous poll",
+                    "/multiplepoll - Multi-select poll",
+                    "/scheduledpoll - Schedule a poll",
+                ]
+            },
+            "analytics": {
+                "title": "📈 Analytics Commands",
+                "commands": [
+                    "/stats - Group statistics",
+                    "/activity - Activity metrics",
+                    "/members - Member statistics",
+                    "/growth - Member growth",
+                    "/heatmap - Activity heatmap",
+                    "/top - Top members",
+                    "/trends - Message trends",
+                    "/commands - Command usage",
+                    "/moderation - Moderation stats",
+                    "/engagement - Engagement metrics",
                 ]
             },
             "economy": {
@@ -757,10 +978,14 @@ class HelpModule(NexusModule):
                     "/ai - Ask AI anything",
                     "/summarize - Summarize messages",
                     "/translate - Translate text",
-                    "/factcheck - Fact check",
-                    "/scam - Check for scam",
+                    "/factcheck - Fact check claims",
+                    "/scam - Check for scams",
                     "/draft - AI draft announcement",
-                    "/recommendation - Get AI recommendations",
+                    "/recommend - Get AI recommendations",
+                    "/sentiment - Analyze sentiment",
+                    "/explain - Explain concepts",
+                    "/rewrite - Improve text",
+                    "/analyze - Analyze user behavior",
                 ]
             },
         }
@@ -779,7 +1004,7 @@ class HelpModule(NexusModule):
         else:
             await ctx.reply(
                 f"❌ Category '{category}' not found.\n\n"
-                f"Available categories: moderation, games, economy, ai",
+                f"Available categories: moderation, games, economy, polls, ai, analytics",
                 buttons=[[{"text": "📖 All Commands", "callback_data": "help_commands"}]]
             )
 
