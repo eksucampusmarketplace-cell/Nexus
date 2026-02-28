@@ -15,7 +15,7 @@
 - [x] Python 3.12.3 detected (compatible with Render's Python 3.12.2)
 - [x] requirements.txt syntax is valid
 - [x] Key dependencies at correct versions:
-  - [x] pydantic 2.10.3 (with pre-built pydantic-core)
+  - [x] pydantic 2.9.2 (compatible with aiogram 3.13.1)
   - [x] pydantic-settings 2.6.1
   - [x] fastapi 0.115.0
   - [x] aiogram 3.13.1

@@ -18,7 +18,7 @@ We made two key changes:
 Updated all Python packages to newer versions that have pre-built wheels for Python 3.12 on Linux:
 
 **Key Updates:**
-- `pydantic`: 2.5.3 → 2.10.3 (includes pre-built pydantic-core 2.26.0)
+- `pydantic`: 2.5.3 → 2.9.2 (includes pre-built pydantic-core, compatible with aiogram 3.13.1)
 - `pydantic-settings`: 2.1.0 → 2.6.1
 - `aiogram`: 3.4.1 → 3.13.1
 - `fastapi`: 0.109.2 → 0.115.0
@@ -68,7 +68,7 @@ Added Rust/Cargo directories to `.gitignore` to prevent committing build artifac
 
 ## Why This Works
 
-1. **Pre-built wheels eliminate compilation** - Pydantic 2.10.3 comes with pre-built `pydantic-core` wheels for Python 3.12 on Linux (musllinux and manylinux). No Rust compilation needed!
+1. **Pre-built wheels eliminate compilation** - Pydantic 2.9.2 comes with pre-built `pydantic-core` wheels for Python 3.12 on Linux (musllinux and manylinux). No Rust compilation needed!
 
 2. **Faster builds** - Pre-built wheels install much faster than compiling from source
 

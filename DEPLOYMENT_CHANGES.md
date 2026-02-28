@@ -6,7 +6,7 @@
 **Purpose:** Update all Python dependencies to versions with pre-built wheels for Python 3.12
 
 **Key Changes:**
-- pydantic: 2.5.3 → 2.10.3 (critical - eliminates pydantic-core compilation)
+- pydantic: 2.5.3 → 2.9.2 (critical - eliminates pydantic-core compilation, compatible with aiogram 3.13.1)
 - pydantic-settings: 2.1.0 → 2.6.1
 - aiogram: 3.4.1 → 3.13.1
 - fastapi: 0.109.2 → 0.115.0
@@ -135,7 +135,7 @@ All existing code is fully compatible with the new versions:
 
 ### Pydantic
 - Uses v2 syntax: `ConfigDict` (not `Config` class)
-- Already on v2, now on v2.10.3
+- Already on v2, now on v2.9.2
 - No migration needed
 
 ### aiogram
