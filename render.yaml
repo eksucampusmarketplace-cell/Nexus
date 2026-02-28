@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: standard
     pythonVersion: 3.12.2
-    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --only-binary :all: --no-cache-dir -r requirements.txt
+    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: CARGO_HOME
@@ -50,7 +50,7 @@ services:
     runtime: python
     plan: standard
     pythonVersion: 3.12.2
-    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --only-binary :all: --no-cache-dir -r requirements.txt
+    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt
     startCommand: python -m bot.core
     envVars:
       - key: CARGO_HOME
@@ -96,7 +96,7 @@ services:
     runtime: python
     plan: standard
     pythonVersion: 3.12.2
-    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --only-binary :all: --no-cache-dir -r requirements.txt
+    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt
     startCommand: celery -A worker.celery_app worker --loglevel=info --concurrency=4
     envVars:
       - key: CARGO_HOME
@@ -138,7 +138,7 @@ services:
     runtime: python
     plan: starter
     pythonVersion: 3.12.2
-    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --only-binary :all: --no-cache-dir -r requirements.txt
+    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt
     startCommand: celery -A worker.celery_app beat --loglevel=info
     envVars:
       - key: CARGO_HOME

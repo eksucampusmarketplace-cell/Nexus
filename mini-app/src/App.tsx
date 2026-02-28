@@ -26,6 +26,8 @@ import AntiSpam from './views/AdminDashboard/AntiSpam'
 import RulesAndGreetings from './views/AdminDashboard/RulesAndGreetings'
 import ImportExport from './views/AdminDashboard/ImportExport'
 import CustomBotToken from './views/AdminDashboard/CustomBotToken'
+import PollsCenter from './views/AdminDashboard/PollsCenter'
+import SecurityCenter from './views/AdminDashboard/SecurityCenter'
 import Loading from './components/UI/Loading'
 import Integrations from './views/AdminDashboard/Integrations'
 
@@ -105,6 +107,10 @@ function App() {
         <Route path="/admin/:groupId/import-export" element={<ImportExport />} />
         <Route path="/admin/:groupId/custom-bot" element={<CustomBotToken />} />
         <Route path="/admin/:groupId/integrations" element={<Integrations />} />
+        
+        {/* New Unified Routes */}
+        <Route path="/admin/:groupId/security" element={<SecurityCenter />} />
+        <Route path="/admin/:groupId/polls" element={<PollsCenter />} />
       </Routes>
     </MainLayout>
   )

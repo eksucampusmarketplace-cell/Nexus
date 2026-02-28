@@ -1,0 +1,47 @@
+  Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting beautifulsoup4==4.12.3 (from -r requirements.txt (line 30))
+  Downloading beautifulsoup4-4.12.3-py3-none-any.whl.metadata (3.8 kB)
+Collecting lxml==6.0.2 (from -r requirements.txt (line 31))
+  Downloading lxml-6.0.2-cp314-cp314-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl.metadata (3.6 kB)
+Collecting python-dateutil==2.9.0 (from -r requirements.txt (line 34))
+  Downloading python_dateutil-2.9.0-py2.py3-none-any.whl.metadata (8.3 kB)
+Collecting pytz==2024.2 (from -r requirements.txt (line 35))
+  Downloading pytz-2024.2-py2.py3-none-any.whl.metadata (22 kB)
+Collecting orjson==3.11.7 (from -r requirements.txt (line 36))
+  Downloading orjson-3.11.7-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (41 kB)
+Collecting structlog==24.4.0 (from -r requirements.txt (line 37))
+  Downloading structlog-24.4.0-py3-none-any.whl.metadata (7.3 kB)
+Collecting pytest==8.3.4 (from -r requirements.txt (line 40))
+  Downloading pytest-8.3.4-py3-none-any.whl.metadata (7.5 kB)
+Collecting pytest-asyncio==0.24.0 (from -r requirements.txt (line 41))
+  Downloading pytest_asyncio-0.24.0-py3-none-any.whl.metadata (3.9 kB)
+Collecting pytest-cov==6.0.0 (from -r requirements.txt (line 42))
+  Downloading pytest_cov-6.0.0-py3-none-any.whl.metadata (27 kB)
+Collecting factory-boy==3.3.1 (from -r requirements.txt (line 43))
+  Downloading factory_boy-3.3.1-py2.py3-none-any.whl.metadata (15 kB)
+Collecting faker==33.1.0 (from -r requirements.txt (line 44))
+  Downloading Faker-33.1.0-py3-none-any.whl.metadata (15 kB)
+Collecting black==24.10.0 (from -r requirements.txt (line 47))
+  Downloading black-24.10.0-py3-none-any.whl.metadata (79 kB)
+Collecting isort==5.13.2 (from -r requirements.txt (line 48))
+  Downloading isort-5.13.2-py3-none-any.whl.metadata (12 kB)
+Collecting mypy==1.13.0 (from -r requirements.txt (line 49))
+  Downloading mypy-1.13.0-py3-none-any.whl.metadata (2.1 kB)
+Collecting ruff==0.8.4 (from -r requirements.txt (line 50))
+  Downloading ruff-0.8.4-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (25 kB)
+Collecting aiofiles<24.2,>=23.2.1 (from aiogram==3.13.1->-r requirements.txt (line 2))
+  Downloading aiofiles-24.1.0-py3-none-any.whl.metadata (10 kB)
+INFO: pip is looking at multiple versions of aiogram to determine which version is compatible with other requirements. This could take a while.
+ERROR: Cannot install -r requirements.txt (line 2) and aiohttp>=3.10.11 because these package versions have conflicting dependencies.
+The conflict is caused by:
+    The user requested aiohttp>=3.10.11
+    aiogram 3.13.1 depends on aiohttp<3.11 and >=3.9.0
+Additionally, some packages in these conflicts have no matching distributions available for your environment:
+    aiohttp
+Menu
+To fix this you could try to:
+1. loosen the range of package versions you've specified
+2. remove package versions to allow pip to attempt to solve the dependency conflict
+ERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts
+==> Build failed 😞
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
