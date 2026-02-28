@@ -15,6 +15,19 @@ DATABASE_URL = os.getenv(
     "postgresql+asyncpg://nexus:nexus_secret@localhost:5432/nexus",
 )
 
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgresql://",
+        "postgresql+asyncpg://",
+        1,
+    )
+elif DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgres://",
+        "postgresql+asyncpg://",
+        1,
+    )
+
 # Pool settings - configurable for Supabase/managed databases with connection limits
 # Supabase transaction pooler works best with smaller pool sizes
 DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "5"))
