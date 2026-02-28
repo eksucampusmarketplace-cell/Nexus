@@ -11,6 +11,9 @@ import {
   MessageSquare,
   Zap,
   Bot,
+  Scissors,
+  Download,
+  Flow,
 } from 'lucide-react'
 import { useGroupStore } from '../../stores/groupStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -26,6 +29,8 @@ const menuItems = [
   { icon: BarChart3, label: 'Analytics', path: 'analytics', color: 'text-green-500' },
   { icon: Calendar, label: 'Scheduler', path: 'scheduler', color: 'text-orange-500' },
   { icon: Wallet, label: 'Economy', path: 'economy', color: 'text-yellow-500' },
+  { icon: Flow, label: 'Bot Builder', path: 'bot-builder', color: 'text-pink-500' },
+  { icon: Scissors, label: 'Advanced', path: 'advanced', color: 'text-cyan-500' },
   { icon: Settings, label: 'Settings', path: 'settings', color: 'text-gray-500' },
 ]
 

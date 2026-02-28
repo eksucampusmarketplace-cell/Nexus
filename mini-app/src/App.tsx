@@ -17,6 +17,8 @@ import Analytics from './views/AdminDashboard/Analytics'
 import Scheduler from './views/AdminDashboard/Scheduler'
 import Settings from './views/AdminDashboard/Settings'
 import Economy from './views/AdminDashboard/Economy'
+import BotBuilder from './views/AdminDashboard/BotBuilder'
+import AdvancedFeatures from './views/AdminDashboard/AdvancedFeatures'
 import Loading from './components/UI/Loading'
 
 function App() {
@@ -81,6 +83,8 @@ function App() {
         <Route path="/admin/:groupId/scheduler" element={<Scheduler />} />
         <Route path="/admin/:groupId/economy" element={<Economy />} />
         <Route path="/admin/:groupId/settings" element={<Settings />} />
+        <Route path="/admin/:groupId/bot-builder" element={<BotBuilder />} />
+        <Route path="/admin/:groupId/advanced" element={<AdvancedFeatures />} />
       </Routes>
     </MainLayout>
   )
