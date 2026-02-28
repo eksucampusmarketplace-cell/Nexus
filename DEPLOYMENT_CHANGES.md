@@ -12,7 +12,7 @@
 - fastapi: 0.109.2 → 0.115.0
 - uvicorn[standard]: 0.27.1 → 0.32.0
 - sqlalchemy[asyncio]: 2.0.27 → 2.0.36
-- asyncpg: 0.31.0 → 0.30.0
+- asyncpg: 0.31.0 (maintained - this is the correct version with pre-built wheels)
 - redis: 5.0.1 → 5.2.1
 - celery: 5.3.6 → 5.4.0
 - openai: 1.12.0 → 1.55.0
