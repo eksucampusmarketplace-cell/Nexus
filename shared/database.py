@@ -33,13 +33,24 @@ elif DATABASE_URL.startswith("postgres://"):
 DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "5"))
 DATABASE_MAX_OVERFLOW = int(os.getenv("DATABASE_MAX_OVERFLOW", "5"))
 
+# Check if we're using pgbouncer (Render, Supabase, etc.)
+# pgbouncer transaction pooling doesn't work with prepared statements or pool_pre_ping
+DATABASE_USE_PGBOUNCER = os.getenv("DATABASE_USE_PGBOUNCER", "true").lower() == "true"
+
 engine = create_async_engine(
     DATABASE_URL,
     echo=os.getenv("ENVIRONMENT") == "development",
     pool_size=DATABASE_POOL_SIZE,
     max_overflow=DATABASE_MAX_OVERFLOW,
-    pool_pre_ping=True,
-    connect_args={"statement_cache_size": 0},
+    # pool_pre_ping doesn't work well with pgbouncer transaction pooling
+    # It executes prepared statements that conflict with connection reuse
+    pool_pre_ping=not DATABASE_USE_PGBOUNCER,
+    connect_args={
+        # Critical: Disable prepared statement cache for pgbouncer compatibility
+        "statement_cache_size": 0,
+        # Force server-side parameter status check off for pgbouncer
+        "server_settings": {"jit": "off"} if DATABASE_USE_PGBOUNCER else {},
+    },
 )
 
 AsyncSessionLocal = async_sessionmaker(
