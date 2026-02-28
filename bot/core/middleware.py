@@ -1,5 +1,6 @@
 """Middleware pipeline for processing updates."""
 
+from dataclasses import dataclass
 from typing import Any, Callable, Coroutine, List, Optional
 
 from aiogram import Bot
@@ -8,20 +9,34 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.core.context import (
-    AIClient,
     BotIdentity,
     GroupProfile,
-    I18nClient,
     MemberProfile,
     NexusContext,
-    SchedulerClient,
 )
 from bot.core.module_base import EventType, NexusModule
-from bot.core.token_manager import token_manager
+from bot.core.prefix_parser import prefix_parser
 from shared.database import AsyncSessionLocal
 from shared.models import Group, Member, ModuleConfig, User
 from shared.redis_client import RateLimiter, get_group_redis
 from shared.schemas import Role
+
+
+@dataclass
+class ParsedMessage:
+    """Parsed message with command info."""
+
+    is_command: bool = False
+    is_deactivate: bool = False
+    command: Optional[str] = None
+    args: List[str] = None
+    duration: Optional[int] = None
+    time_range: Optional[tuple] = None
+
+    def __post_init__(self):
+        if self.args is None:
+            self.args = []
+
 
 MiddlewareFunc = Callable[[NexusContext], Coroutine[Any, Any, bool]]
 
@@ -55,9 +70,7 @@ class MiddlewarePipeline:
         # Create database session
         async with AsyncSessionLocal() as session:
             # Build context
-            ctx = await self._build_context(
-                session, bot, bot_identity, update
-            )
+            ctx = await self._build_context(session, bot, bot_identity, update)
 
             if not ctx:
                 return False
@@ -92,7 +105,11 @@ class MiddlewarePipeline:
             telegram_chat = update.message.chat
         elif update.callback_query:
             telegram_user = update.callback_query.from_user
-            telegram_chat = update.callback_query.message.chat if update.callback_query.message else None
+            telegram_chat = (
+                update.callback_query.message.chat
+                if update.callback_query.message
+                else None
+            )
         elif update.inline_query:
             telegram_user = update.inline_query.from_user
         elif update.edited_message:
@@ -186,7 +203,7 @@ class MiddlewarePipeline:
             result = await session.execute(
                 select(ModuleConfig).where(
                     ModuleConfig.group_id == group.id,
-                    ModuleConfig.is_enabled == True,
+                    ModuleConfig.is_enabled.is_(True),
                 )
             )
             configs = result.scalars().all()
@@ -282,7 +299,10 @@ class MiddlewarePipeline:
 
             # Check dependencies
             deps_satisfied = all(
-                any(m.name == dep and m.is_enabled_for(ctx.group.id) for m in self._modules)
+                any(
+                    m.name == dep and m.is_enabled_for(ctx.group.id)
+                    for m in self._modules
+                )
                 for dep in module.dependencies
             )
             if not deps_satisfied:
@@ -290,7 +310,10 @@ class MiddlewarePipeline:
 
             # Check conflicts
             has_conflict = any(
-                any(m.name == conflict and m.is_enabled_for(ctx.group.id) for m in self._modules)
+                any(
+                    m.name == conflict and m.is_enabled_for(ctx.group.id)
+                    for m in self._modules
+                )
                 for conflict in module.conflicts
             )
             if has_conflict:
@@ -402,11 +425,67 @@ async def module_config_middleware(ctx: NexusContext) -> bool:
     return True
 
 
+async def prefix_parser_middleware(ctx: NexusContext) -> bool:
+    """
+    Parse !command and !!command patterns from messages.
+
+    This is a critical middleware that:
+    - Parses the dual prefix system (! and !!)
+    - Extracts duration, time ranges, and arguments
+    - Sets parsed command info on the context
+    """
+    if not ctx.message or not ctx.message.text:
+        return True
+
+    # Get custom prefix for this group (default is !)
+    custom_prefix = ctx.group.module_configs.get("settings", {}).get(
+        "command_prefix", "!"
+    )
+
+    # Parse the message
+    parsed = prefix_parser.parse(ctx.message.text, custom_prefix)
+
+    if parsed and parsed.is_valid:
+        # Store parsed info in context
+        ctx.parsed_command = ParsedMessage(
+            is_command=True,
+            is_deactivate=parsed.is_deactivate,
+            command=parsed.command,
+            args=parsed.args,
+            duration=parsed.duration,
+            time_range=parsed.time_range,
+        )
+    else:
+        ctx.parsed_command = ParsedMessage(is_command=False)
+
+    return True
+
+
+async def command_router_middleware(ctx: NexusContext) -> bool:
+    """
+    Route parsed commands to module handlers.
+
+    After prefix_parser_middleware, this routes the command
+    to the appropriate module's command handler.
+    """
+    if not ctx.parsed_command or not ctx.parsed_command.is_command:
+        return True
+
+    # The command will be handled by module event handlers
+    # This middleware just marks it as a command for routing
+    return True
+
+
 # Setup pipeline
 def setup_pipeline():
-    """Set up the middleware pipeline."""
+    """Set up the middleware pipeline in the correct order."""
+    # Order matters! Each middleware is run in sequence.
     pipeline.add_middleware(auth_middleware)
     pipeline.add_middleware(trust_score_middleware)
+    pipeline.add_middleware(module_config_middleware)
+    pipeline.add_middleware(
+        prefix_parser_middleware
+    )  # Critical: parse ! and !! prefixes
     pipeline.add_middleware(rate_limit_middleware)
     pipeline.add_middleware(antiflood_middleware)
-    pipeline.add_middleware(module_config_middleware)
+    pipeline.add_middleware(command_router_middleware)

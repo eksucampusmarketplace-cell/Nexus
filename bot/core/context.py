@@ -1,6 +1,5 @@
 """NexusContext - Central context for all bot operations."""
 
-import hashlib
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -14,7 +13,6 @@ from aiogram.types import (
     InlineQuery,
     Message,
     Update,
-    User,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,12 +20,13 @@ from shared.redis_client import GroupScopedRedis, RateLimiter
 from shared.schemas import ActionType, Role
 
 if TYPE_CHECKING:
-    from bot.core.module_base import NexusModule
+    pass
 
 
 @dataclass
 class BotIdentity:
     """Bot identity information."""
+
     bot_id: int
     username: str
     name: str
@@ -37,6 +36,7 @@ class BotIdentity:
 @dataclass
 class MemberProfile:
     """Member profile within context."""
+
     id: int
     user_id: int
     group_id: int
@@ -81,6 +81,7 @@ class MemberProfile:
 @dataclass
 class GroupProfile:
     """Group profile within context."""
+
     id: int
     telegram_id: int
     title: str
@@ -96,6 +97,7 @@ class GroupProfile:
 @dataclass
 class AIClient:
     """AI client wrapper."""
+
     api_key: Optional[str] = None
     rate_limit_remaining: int = 100
 
@@ -146,6 +148,7 @@ class SchedulerClient:
 @dataclass
 class I18nClient:
     """Internationalization client."""
+
     language: str = "en"
 
     def t(self, key: str, **kwargs) -> str:
@@ -172,6 +175,7 @@ class I18nClient:
 @dataclass
 class WarnResult:
     """Result of a warning."""
+
     success: bool
     warn_count: int
     threshold_reached: bool
@@ -181,6 +185,7 @@ class WarnResult:
 @dataclass
 class UserHistory:
     """User moderation history."""
+
     warnings: int
     mutes: int
     bans: int
@@ -196,19 +201,23 @@ class UserHistory:
 class NexusContext:
     """Central context for all bot operations."""
 
-    # Identity
+    # Identity (required)
     bot: Bot
     bot_identity: BotIdentity
     update: Update
+    user: MemberProfile  # Required - must come before optional fields
+    group: GroupProfile  # Required - must come before optional fields
+
+    # Optional identity
     message: Optional[Message] = None
     callback_query: Optional[CallbackQuery] = None
     inline_query: Optional[InlineQuery] = None
     replied_to: Optional[Message] = None
-
-    # People
-    user: MemberProfile
-    group: GroupProfile
     target_user: Optional[MemberProfile] = None
+
+    # Parsed command info
+    parsed_command: Optional[Any] = None  # ParsedMessage from middleware
+    is_deactivate_command: bool = False  # True if !! prefix was used
 
     # Infrastructure
     ai: AIClient = field(default_factory=AIClient)
@@ -384,16 +393,14 @@ class NexusContext:
 
         if not admins:
             # Query from database
-            from shared.models import Member
-            result = await self.db.execute(
-                f"""
+
+            result = await self.db.execute(f"""
                 SELECT m.user_id, u.telegram_id
                 FROM members m
                 JOIN users u ON m.user_id = u.id
                 WHERE m.group_id = {self.group.id}
                 AND m.role IN ('owner', 'admin')
-                """
-            )
+                """)
             admins = [{"telegram_id": row[1]} for row in result.fetchall()]
             if self.cache:
                 await self.cache.set_json(admin_key, admins, expire=300)
@@ -502,7 +509,7 @@ class NexusContext:
         if not self.db:
             return WarnResult(False, 0, False)
 
-        from shared.models import Member, Warning
+        from shared.models import Warning
 
         # Create warning
         warning = Warning(
@@ -514,14 +521,12 @@ class NexusContext:
         self.db.add(warning)
 
         # Update member
-        result = await self.db.execute(
-            f"""
+        result = await self.db.execute(f"""
             UPDATE members
             SET warn_count = warn_count + 1
             WHERE id = {target.id}
             RETURNING warn_count
-            """
-        )
+            """)
         warn_count = result.scalar()
 
         await self.log_action(
@@ -546,11 +551,15 @@ class NexusContext:
             auto_action = warn_action
 
             if warn_action == "mute":
-                await self.mute_user(target, warn_duration, "Auto: Too many warnings", silent=True)
+                await self.mute_user(
+                    target, warn_duration, "Auto: Too many warnings", silent=True
+                )
             elif warn_action == "kick":
                 await self.kick_user(target, "Auto: Too many warnings")
             elif warn_action == "ban":
-                await self.ban_user(target, None, "Auto: Too many warnings", silent=True)
+                await self.ban_user(
+                    target, None, "Auto: Too many warnings", silent=True
+                )
 
         if not silent and not self._silent:
             await self.reply(
@@ -597,14 +606,12 @@ class NexusContext:
             )
 
             if self.db:
-                from shared.models import Member
-                await self.db.execute(
-                    f"""
+
+                await self.db.execute(f"""
                     UPDATE members
                     SET is_muted = TRUE, mute_until = '{until.isoformat() if until else None}'
                     WHERE id = {target.id}
-                    """
-                )
+                    """)
 
                 await self.log_action(
                     ActionType.MUTE,
@@ -615,7 +622,9 @@ class NexusContext:
                 )
 
             if not silent and not self._silent:
-                duration_str = self._format_duration(duration) if duration else "permanent"
+                duration_str = (
+                    self._format_duration(duration) if duration else "permanent"
+                )
                 await self.reply(
                     self.i18n.t(
                         "muted",
@@ -655,14 +664,12 @@ class NexusContext:
             )
 
             if self.db:
-                from shared.models import Member
-                await self.db.execute(
-                    f"""
+
+                await self.db.execute(f"""
                     UPDATE members
                     SET is_muted = FALSE, mute_until = NULL
                     WHERE id = {target.id}
-                    """
-                )
+                    """)
 
                 await self.log_action(
                     ActionType.UNMUTE,
@@ -701,14 +708,12 @@ class NexusContext:
             )
 
             if self.db:
-                from shared.models import Member
-                await self.db.execute(
-                    f"""
+
+                await self.db.execute(f"""
                     UPDATE members
                     SET is_banned = TRUE, ban_until = '{until.isoformat() if until else None}'
                     WHERE id = {target.id}
-                    """
-                )
+                    """)
 
                 await self.log_action(
                     ActionType.BAN,
@@ -719,7 +724,6 @@ class NexusContext:
                 )
 
             if not silent and not self._silent:
-                duration_str = self._format_duration(duration) if duration else "permanent"
                 await self.reply(
                     self.i18n.t(
                         "banned",
@@ -751,14 +755,12 @@ class NexusContext:
             )
 
             if self.db:
-                from shared.models import Member
-                await self.db.execute(
-                    f"""
+
+                await self.db.execute(f"""
                     UPDATE members
                     SET is_banned = FALSE, ban_until = NULL
                     WHERE id = {target.id}
-                    """
-                )
+                    """)
 
                 await self.log_action(
                     ActionType.UNBAN,
@@ -823,16 +825,13 @@ class NexusContext:
         if not self.db:
             return 50
 
-        from shared.models import Member
 
-        result = await self.db.execute(
-            f"""
+        result = await self.db.execute(f"""
             UPDATE members
             SET trust_score = GREATEST(0, LEAST(100, trust_score + {delta}))
             WHERE group_id = {self.group.id} AND user_id = {user_id}
             RETURNING trust_score
-            """
-        )
+            """)
         return result.scalar() or 50
 
     async def award_xp(
@@ -845,10 +844,8 @@ class NexusContext:
         if not self.db:
             return 0, 1
 
-        from shared.models import Member
 
-        result = await self.db.execute(
-            f"""
+        result = await self.db.execute(f"""
             UPDATE members
             SET xp = xp + {amount},
                 level = CASE
@@ -857,8 +854,7 @@ class NexusContext:
                 END
             WHERE group_id = {self.group.id} AND user_id = {user_id}
             RETURNING xp, level
-            """
-        )
+            """)
         row = result.fetchone()
         return row[0] if row else 0, row[1] if row else 1
 
@@ -867,11 +863,9 @@ class NexusContext:
         if not self.db:
             return UserHistory(0, 0, 0, 0, None, None, None, 0, [])
 
-        from shared.models import Member, ModAction
 
         # Get counts
-        result = await self.db.execute(
-            f"""
+        result = await self.db.execute(f"""
             SELECT
                 COUNT(CASE WHEN action_type = 'warn' THEN 1 END),
                 COUNT(CASE WHEN action_type = 'mute' THEN 1 END),
@@ -882,17 +876,14 @@ class NexusContext:
                 MAX(CASE WHEN action_type = 'ban' THEN created_at END)
             FROM mod_actions
             WHERE group_id = {self.group.id} AND target_user_id = {user_id}
-            """
-        )
+            """)
         row = result.fetchone()
 
         # Get member stats
-        member_result = await self.db.execute(
-            f"""
+        member_result = await self.db.execute(f"""
             SELECT message_count FROM members
             WHERE group_id = {self.group.id} AND user_id = {user_id}
-            """
-        )
+            """)
         msg_count = member_result.scalar() or 0
 
         return UserHistory(
@@ -932,7 +923,7 @@ class NexusContext:
 
             # Get telegram_id from user_id
             if self.db:
-                from shared.models import User
+
                 result = await self.db.execute(
                     f"SELECT telegram_id FROM users WHERE id = {user_id}"
                 )
