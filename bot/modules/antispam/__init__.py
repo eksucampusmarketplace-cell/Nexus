@@ -1,5 +1,5 @@
-"""Anti-spam module - Flood and spam protection."""
+"""Antispam module."""
 
-from .module import AntispamModule
+from bot.modules.antispam.module import AntispamModule
 
 __all__ = ["AntispamModule"]

@@ -1,24 +1,27 @@
-"""Notes module implementation."""
+"""Notes module - Saved notes system."""
 
+from typing import Optional, List, Dict
 from pydantic import BaseModel
+from aiogram.types import Message
 
 from bot.core.context import NexusContext
-from bot.core.module_base import CommandDef, EventType, ModuleCategory, NexusModule
+from bot.core.module_base import CommandDef, ModuleCategory, NexusModule, EventType
 
 
 class NotesConfig(BaseModel):
-    """Notes module configuration."""
-    max_notes: int = 100
-    max_note_length: int = 4096
+    """Configuration for notes module."""
+    notes_enabled: bool = True
+    private_notes_only: bool = False
+    notes_per_page: int = 20
 
 
 class NotesModule(NexusModule):
-    """Saved notes module."""
+    """Saved notes system."""
 
     name = "notes"
     version = "1.0.0"
     author = "Nexus Team"
-    description = "Save and retrieve notes with #keyword"
+    description = "Save and retrieve notes"
     category = ModuleCategory.UTILITY
 
     config_schema = NotesConfig
@@ -27,202 +30,301 @@ class NotesModule(NexusModule):
     commands = [
         CommandDef(
             name="save",
-            description="Save a note. Reply to text or use: /save notename content",
+            description="Save a note",
             admin_only=True,
-            args="<keyword> <content>",
+            args="<notename> <content>",
         ),
         CommandDef(
             name="get",
-            description="Get a saved note.",
-            args="<keyword>",
+            description="Get a note",
+            admin_only=False,
+            args="<notename>",
         ),
         CommandDef(
             name="notes",
-            description="List all saved notes.",
-            admin_only=True,
+            description="List all notes",
+            admin_only=False,
         ),
         CommandDef(
             name="clear",
-            description="Delete a specific note.",
+            description="Delete a note",
             admin_only=True,
-            args="<keyword>",
+            args="<notename>",
         ),
         CommandDef(
             name="clearall",
-            description="Delete all notes.",
+            description="Delete all notes",
             admin_only=True,
         ),
     ]
 
-    listeners = [EventType.MESSAGE]
+    listeners = [
+        EventType.MESSAGE,
+    ]
+
+    async def on_load(self, app):
+        """Register command handlers."""
+        self.register_command("save", self.cmd_save)
+        self.register_command("get", self.cmd_get)
+        self.register_command("notes", self.cmd_notes)
+        self.register_command("clear", self.cmd_clear)
+        self.register_command("clearall", self.cmd_clearall)
 
     async def on_message(self, ctx: NexusContext) -> bool:
-        """Handle messages."""
+        """Handle #notename triggers."""
         if not ctx.message or not ctx.message.text:
             return False
 
-        text = ctx.message.text
+        text = ctx.message.text.strip()
 
-        # Check for #keyword
-        if text.startswith("#") and " " not in text:
-            keyword = text[1:].lower()
-            return await self._get_note(ctx, keyword)
+        # Check if message starts with #
+        if text.startswith("#"):
+            notename = text[1:].split()[0]
+            return await self._send_note(ctx, notename)
 
-        # Check for commands
-        command = text.split()[0].lower()
-
-        if command == "/save":
-            return await self._handle_save(ctx)
-        elif command == "/get":
-            return await self._handle_get(ctx)
-        elif command == "/notes":
-            return await self._handle_list(ctx)
-        elif command == "/clear":
-            return await self._handle_clear(ctx)
-        elif command == "/clearall":
-            return await self._handle_clearall(ctx)
+        # Check for /get trigger
+        if text.startswith("/get "):
+            notename = text[5:].split()[0]
+            return await self._send_note(ctx, notename)
 
         return False
 
-    async def _handle_save(self, ctx: NexusContext) -> bool:
-        """Handle /save command."""
-        if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
-
-        text = ctx.message.text.split(maxsplit=1)
-        if len(text) < 2:
-            await ctx.reply("⚠️ Usage: /save <keyword> <content>")
-            return True
-
-        parts = text[1].split(maxsplit=1)
-        if len(parts) < 2:
-            await ctx.reply("⚠️ Usage: /save <keyword> <content>")
-            return True
-
-        keyword = parts[0].lower()
-        content = parts[1]
-
-        # Check if note exists
+    async def _send_note(self, ctx: NexusContext, notename: str) -> bool:
+        """Send a note by keyword."""
         if ctx.db:
             from shared.models import Note
-            result = await ctx.db.execute(
+            result = ctx.db.execute(
                 f"""
-                INSERT INTO notes (group_id, keyword, content, created_by)
-                VALUES ({ctx.group.id}, '{keyword}', '{content.replace(chr(39), chr(39)*2)}', {ctx.user.user_id})
-                ON CONFLICT (group_id, keyword) DO UPDATE
-                SET content = EXCLUDED.content, updated_at = NOW(), created_by = EXCLUDED.created_by
-                RETURNING id
+                SELECT * FROM notes
+                WHERE group_id = {ctx.group.id} AND keyword = '{notename}'
+                LIMIT 1
                 """
             )
-            await ctx.db.commit()
+            row = result.fetchone()
 
-        await ctx.reply(f"✅ Note '#{keyword}' saved!")
-        return True
+            if row:
+                content = row[2]
+                media_file_id = row[3]
+                media_type = row[4]
+                has_buttons = row[5]
+                button_data = row[6]
+                is_private = row[7]
 
-    async def _get_note(self, ctx: NexusContext, keyword: str) -> bool:
-        """Get a note by keyword."""
-        if not ctx.db:
-            return False
+                # Check if private and user is not creator
+                if is_private and row[8] != ctx.user.user_id:
+                    await ctx.reply("❌ This note is private")
+                    return True
 
-        from shared.models import Note
-        result = await ctx.db.execute(
-            f"""
-            SELECT content, has_buttons, button_data FROM notes
-            WHERE group_id = {ctx.group.id} AND keyword = '{keyword}'
-            """
-        )
-        note = result.fetchone()
+                # Send note
+                if media_file_id:
+                    await ctx.reply_media(media_file_id, media_type, caption=content)
+                elif has_buttons and button_data:
+                    buttons = self._parse_buttons(button_data)
+                    await ctx.reply(content, buttons=buttons)
+                else:
+                    await ctx.reply(content)
 
-        if note:
-            buttons = note[2] if note[1] else None
-            await ctx.reply(note[0], buttons=buttons)
-            return True
+                return True
 
         return False
 
-    async def _handle_get(self, ctx: NexusContext) -> bool:
-        """Handle /get command."""
-        text = ctx.message.text.split()
-        if len(text) < 2:
-            await ctx.reply("⚠️ Usage: /get <keyword>")
-            return True
+    def _parse_buttons(self, button_data: Dict) -> Optional[List[List[Dict]]]:
+        """Parse button data from JSON."""
+        if not button_data or not isinstance(button_data, dict):
+            return None
 
-        keyword = text[1].lower()
-        found = await self._get_note(ctx, keyword)
+        try:
+            rows = button_data.get("rows", [])
+            buttons = []
 
-        if not found:
-            await ctx.reply(f"❌ Note '#{keyword}' not found.")
+            for row in rows:
+                button_row = []
+                for btn in row:
+                    button = {
+                        "text": btn.get("text", ""),
+                        "url": btn.get("url"),
+                        "callback_data": btn.get("callback_data"),
+                    }
+                    button_row.append(button)
+                buttons.append(button_row)
 
-        return True
+            return buttons
+        except Exception:
+            return None
 
-    async def _handle_list(self, ctx: NexusContext) -> bool:
-        """Handle /notes command."""
+    async def cmd_save(self, ctx: NexusContext):
+        """Save a note."""
         if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
 
-        if not ctx.db:
-            return True
+        args = ctx.message.text.split(maxsplit=1)[1:] if ctx.message.text else []
+        if not args:
+            await ctx.reply("❌ Usage: /save <notename> <content> or reply to media")
+            return
 
-        from shared.models import Note
-        result = await ctx.db.execute(
-            f"""
-            SELECT keyword FROM notes
-            WHERE group_id = {ctx.group.id}
-            ORDER BY keyword
-            """
-        )
-        notes = [row[0] for row in result.fetchall()]
+        notename = args[0].lower()
 
-        if notes:
-            text = "📋 <b>Saved Notes:</b>\n\n"
-            text += "\n".join(f"  • #{note}" for note in notes)
-        else:
-            text = "📋 No notes saved yet.\n\nUse /save to create one."
+        # Check if reply to media
+        media_file_id = None
+        media_type = None
+        content = None
 
-        await ctx.reply(text)
-        return True
+        if ctx.replied_to:
+            if ctx.replied_to.photo:
+                media_file_id = ctx.replied_to.photo[-1].file_id
+                media_type = "photo"
+                content = ctx.replied_to.caption or f"#{notename}"
+            elif ctx.replied_to.video:
+                media_file_id = ctx.replied_to.video.file_id
+                media_type = "video"
+                content = ctx.replied_to.caption or f"#{notename}"
+            elif ctx.replied_to.animation:
+                media_file_id = ctx.replied_to.animation.file_id
+                media_type = "animation"
+                content = ctx.replied_to.caption or f"#{notename}"
+            elif ctx.replied_to.document:
+                media_file_id = ctx.replied_to.document.file_id
+                media_type = "document"
+                content = ctx.replied_to.caption or f"#{notename}"
+            elif ctx.replied_to.sticker:
+                media_file_id = ctx.replied_to.sticker.file_id
+                media_type = "sticker"
+                content = f"#{notename}"
+            elif ctx.replied_to.text:
+                content = ctx.replied_to.text
+                if len(args) > 1:
+                    content = " ".join(args[1:])
 
-    async def _handle_clear(self, ctx: NexusContext) -> bool:
-        """Handle /clear command."""
-        if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+        if not content:
+            if len(args) > 1:
+                content = " ".join(args[1:])
 
-        text = ctx.message.text.split()
-        if len(text) < 2:
-            await ctx.reply("⚠️ Usage: /clear <keyword>")
-            return True
+        if not content and not media_file_id:
+            await ctx.reply("❌ Please provide content or reply to media")
+            return
 
-        keyword = text[1].lower()
-
+        # Save to database
         if ctx.db:
-            await ctx.db.execute(
+            from shared.models import Note
+            existing = ctx.db.execute(
                 f"""
-                DELETE FROM notes
-                WHERE group_id = {ctx.group.id} AND keyword = '{keyword}'
+                SELECT id FROM notes
+                WHERE group_id = {ctx.group.id} AND keyword = '{notename}'
+                LIMIT 1
+                """
+            ).fetchone()
+
+            if existing:
+                # Update existing note
+                ctx.db.execute(
+                    f"""
+                    UPDATE notes
+                    SET content = %s,
+                        media_file_id = %s,
+                        media_type = %s,
+                        updated_at = NOW()
+                    WHERE id = {existing[0]}
+                    """,
+                    (content, media_file_id, media_type)
+                )
+                await ctx.reply(f"✅ Note '{notename}' updated")
+            else:
+                # Create new note
+                note = Note(
+                    group_id=ctx.group.id,
+                    keyword=notename,
+                    content=content,
+                    media_file_id=media_file_id,
+                    media_type=media_type,
+                    has_buttons=False,
+                    created_by=ctx.user.user_id,
+                )
+                ctx.db.add(note)
+                await ctx.reply(f"✅ Note '{notename}' saved")
+
+    async def cmd_get(self, ctx: NexusContext):
+        """Get a note."""
+        args = ctx.message.text.split()[1:] if ctx.message.text else []
+        if not args:
+            await ctx.reply("❌ Usage: /get <notename>")
+            return
+
+        notename = args[0].lower()
+        await self._send_note(ctx, notename)
+
+    async def cmd_notes(self, ctx: NexusContext):
+        """List all notes."""
+        if ctx.db:
+            from shared.models import Note
+            result = ctx.db.execute(
+                f"""
+                SELECT keyword, content, media_type, is_private, created_by
+                FROM notes
+                WHERE group_id = {ctx.group.id}
+                ORDER BY keyword ASC
                 """
             )
-            await ctx.db.commit()
 
-        await ctx.reply(f"✅ Note '#{keyword}' deleted.")
-        return True
+            notes = result.fetchall()
 
-    async def _handle_clearall(self, ctx: NexusContext) -> bool:
-        """Handle /clearall command."""
+            if not notes:
+                await ctx.reply("📝 No notes saved yet")
+                return
+
+            text = "📝 **Saved Notes:**\n\n"
+            for row in notes:
+                notename = row[0]
+                has_media = row[2] is not None
+                is_private = row[3]
+
+                icon = "🔒" if is_private else "📄"
+                media_icon = "📎" if has_media else ""
+
+                text += f"{icon} **#{notename}** {media_icon}\n"
+
+            await ctx.reply(text, parse_mode="Markdown")
+
+    async def cmd_clear(self, ctx: NexusContext):
+        """Delete a note."""
         if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
+
+        args = ctx.message.text.split()[1:] if ctx.message.text else []
+        if not args:
+            await ctx.reply("❌ Usage: /clear <notename>")
+            return
+
+        notename = args[0].lower()
 
         if ctx.db:
-            await ctx.db.execute(
+            from shared.models import Note
+            result = ctx.db.execute(
+                f"""
+                DELETE FROM notes
+                WHERE group_id = {ctx.group.id} AND keyword = '{notename}'
+                """
+            )
+
+            await ctx.reply(f"✅ Note '{notename}' deleted")
+
+    async def cmd_clearall(self, ctx: NexusContext):
+        """Delete all notes."""
+        if not ctx.user.is_admin:
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
+
+        # Confirm
+        # In a real implementation, we'd show a confirmation button
+
+        if ctx.db:
+            from shared.models import Note
+            ctx.db.execute(
                 f"""
                 DELETE FROM notes
                 WHERE group_id = {ctx.group.id}
                 """
             )
-            await ctx.db.commit()
 
-        await ctx.reply("✅ All notes deleted.")
-        return True
+            await ctx.reply("✅ All notes cleared")

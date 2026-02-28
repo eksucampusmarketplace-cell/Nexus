@@ -1,24 +1,28 @@
-"""Rules module implementation."""
+"""Rules module - Group rules management."""
+
+from typing import Optional
 
 from pydantic import BaseModel
 
 from bot.core.context import NexusContext
-from bot.core.module_base import CommandDef, EventType, ModuleCategory, NexusModule
+from bot.core.module_base import CommandDef, ModuleCategory, NexusModule
 
 
 class RulesConfig(BaseModel):
-    """Rules module configuration."""
-    show_on_join: bool = True
+    """Configuration for rules module."""
+    rules_enabled: bool = True
+    show_on_join: bool = False
     send_as_dm: bool = False
+    require_acknowledge: bool = False
 
 
 class RulesModule(NexusModule):
-    """Group rules module."""
+    """Group rules system."""
 
     name = "rules"
     version = "1.0.0"
     author = "Nexus Team"
-    description = "Group rules management"
+    description = "Manage and display group rules"
     category = ModuleCategory.UTILITY
 
     config_schema = RulesConfig
@@ -26,99 +30,126 @@ class RulesModule(NexusModule):
 
     commands = [
         CommandDef(
-            name="rules",
-            description="Show group rules.",
+            name="setrules",
+            description="Set group rules",
+            admin_only=True,
+            args="<content>",
         ),
         CommandDef(
-            name="setrules",
-            description="Set group rules.",
-            admin_only=True,
-            args="<text>",
+            name="rules",
+            description="View group rules",
+            admin_only=False,
         ),
         CommandDef(
             name="resetrules",
-            description="Reset rules to empty.",
+            description="Reset group rules to default",
+            admin_only=True,
+        ),
+        CommandDef(
+            name="clearrules",
+            description="Clear all group rules",
             admin_only=True,
         ),
     ]
 
-    listeners = [EventType.MESSAGE]
+    async def on_load(self, app):
+        """Register command handlers."""
+        self.register_command("setrules", self.cmd_setrules)
+        self.register_command("rules", self.cmd_rules)
+        self.register_command("resetrules", self.cmd_resetrules)
+        self.register_command("clearrules", self.cmd_clearrules)
 
-    async def on_message(self, ctx: NexusContext) -> bool:
-        """Handle messages."""
-        if not ctx.message or not ctx.message.text:
-            return False
-
-        text = ctx.message.text
-        command = text.split()[0].lower()
-
-        if command == "/rules":
-            return await self._handle_rules(ctx)
-        elif command == "/setrules":
-            return await self._handle_setrules(ctx)
-        elif command == "/resetrules":
-            return await self._handle_resetrules(ctx)
-
-        return False
-
-    async def _handle_rules(self, ctx: NexusContext) -> bool:
-        """Handle /rules command."""
-        if not ctx.db:
-            return True
-
-        from shared.models import Rule
-        result = await ctx.db.execute(
-            f"SELECT content FROM rules WHERE group_id = {ctx.group.id}"
-        )
-        row = result.fetchone()
-
-        if row and row[0]:
-            await ctx.reply(f"📜 <b>Group Rules:</b>\n\n{row[0]}")
-        else:
-            await ctx.reply("📜 No rules set for this group yet.")
-
-        return True
-
-    async def _handle_setrules(self, ctx: NexusContext) -> bool:
-        """Handle /setrules command."""
+    async def cmd_setrules(self, ctx: NexusContext):
+        """Set group rules."""
         if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
 
-        text = ctx.message.text.split(maxsplit=1)
-        if len(text) < 2:
-            await ctx.reply("⚠️ Usage: /setrules <text>")
-            return True
+        args = ctx.message.text.split(maxsplit=1)[1:] if ctx.message.text else []
+        if not args:
+            await ctx.reply("❌ Usage: /setrules <rules>")
+            return
 
-        content = text[1]
+        content = " ".join(args)
 
         if ctx.db:
             from shared.models import Rule
-            await ctx.db.execute(
+            rule = ctx.db.execute(
                 f"""
-                INSERT INTO rules (group_id, content, updated_by)
-                VALUES ({ctx.group.id}, '{content.replace(chr(39), chr(39)*2)}', {ctx.user.user_id})
-                ON CONFLICT (group_id) DO UPDATE
-                SET content = EXCLUDED.content, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+                SELECT * FROM rules WHERE group_id = {ctx.group.id}
+                LIMIT 1
+                """
+            ).fetchone()
+
+            if rule:
+                ctx.db.execute(
+                    f"""
+                    UPDATE rules
+                    SET content = %s,
+                        updated_by = {ctx.user.user_id}
+                    WHERE id = {rule[0]}
+                    """,
+                    (content,)
+                )
+            else:
+                rule = Rule(
+                    group_id=ctx.group.id,
+                    content=content,
+                    updated_by=ctx.user.user_id,
+                )
+                ctx.db.add(rule)
+
+        config = ctx.group.module_configs.get("rules", {})
+        config["rules_enabled"] = True
+
+        await ctx.reply("✅ Rules updated")
+
+    async def cmd_rules(self, ctx: NexusContext):
+        """View group rules."""
+        if ctx.db:
+            from shared.models import Rule
+            result = ctx.db.execute(
+                f"SELECT content FROM rules WHERE group_id = {ctx.group.id}"
+            )
+            row = result.fetchone()
+
+            if row:
+                rules = row[0]
+                await ctx.reply(f"📜 **Rules**\n\n{rules}")
+            else:
+                await ctx.reply("❌ No rules set yet. Use /setrules to set them.")
+
+    async def cmd_resetrules(self, ctx: NexusContext):
+        """Reset rules to default."""
+        if not ctx.user.is_admin:
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
+
+        if ctx.db:
+            from shared.models import Rule
+            ctx.db.execute(
+                f"""
+                DELETE FROM rules WHERE group_id = {ctx.group.id}
                 """
             )
-            await ctx.db.commit()
 
-        await ctx.reply("✅ Rules updated!")
-        return True
+        await ctx.reply("✅ Rules reset to default")
 
-    async def _handle_resetrules(self, ctx: NexusContext) -> bool:
-        """Handle /resetrules command."""
+    async def cmd_clearrules(self, ctx: NexusContext):
+        """Clear all rules."""
         if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
 
         if ctx.db:
             from shared.models import Rule
-            await ctx.db.execute(
-                f"DELETE FROM rules WHERE group_id = {ctx.group.id}"
+            ctx.db.execute(
+                f"""
+                DELETE FROM rules WHERE group_id = {ctx.group.id}
+                """
             )
-            await ctx.db.commit()
 
-        await ctx.reply("✅ Rules cleared.")
-        return True
+        config = ctx.group.module_configs.get("rules", {})
+        config["rules_enabled"] = False
+
+        await ctx.reply("✅ Rules cleared")

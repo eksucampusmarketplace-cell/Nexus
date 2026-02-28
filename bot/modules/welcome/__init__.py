@@ -1,5 +1,5 @@
-"""Welcome module - Welcome and goodbye messages."""
+"""Welcome module."""
 
-from .module import WelcomeModule
+from bot.modules.welcome.module import WelcomeModule
 
 __all__ = ["WelcomeModule"]
