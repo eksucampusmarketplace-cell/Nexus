@@ -28,6 +28,7 @@ from shared.database import Base
 
 class Role(PyEnum):
     """Member roles in a group."""
+
     OWNER = "owner"
     ADMIN = "admin"
     MODERATOR = "mod"
@@ -39,6 +40,7 @@ class Role(PyEnum):
 
 class ActionType(PyEnum):
     """Moderation action types."""
+
     WARN = "warn"
     MUTE = "mute"
     BAN = "ban"
@@ -53,6 +55,7 @@ class ActionType(PyEnum):
 
 class ModuleCategory(PyEnum):
     """Module categories."""
+
     MODERATION = "moderation"
     GREETINGS = "greetings"
     ANTISPAM = "antispam"
@@ -66,6 +69,7 @@ class ModuleCategory(PyEnum):
 # Association table for many-to-many relationships
 class User(Base):
     """Global user model (cross-group)."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -90,6 +94,7 @@ class User(Base):
 
 class Group(Base):
     """Group/Chat model."""
+
     __tablename__ = "groups"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -114,8 +119,12 @@ class Group(Base):
     notes: Mapped[List["Note"]] = relationship("Note", back_populates="group")
     filters: Mapped[List["Filter"]] = relationship("Filter", back_populates="group")
     locks: Mapped[List["Lock"]] = relationship("Lock", back_populates="group")
-    rules: Mapped[Optional["Rule"]] = relationship("Rule", back_populates="group", uselist=False)
-    greetings: Mapped[List["Greeting"]] = relationship("Greeting", back_populates="group")
+    rules: Mapped[Optional["Rule"]] = relationship(
+        "Rule", back_populates="group", uselist=False
+    )
+    greetings: Mapped[List["Greeting"]] = relationship(
+        "Greeting", back_populates="group"
+    )
     scheduled_messages: Mapped[List["ScheduledMessage"]] = relationship(
         "ScheduledMessage", back_populates="group"
     )
@@ -123,6 +132,7 @@ class Group(Base):
 
 class BotInstance(Base):
     """Bot instance for shared and custom tokens."""
+
     __tablename__ = "bot_instances"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -142,6 +152,7 @@ class BotInstance(Base):
 
 class Member(Base):
     """Member model (user in a specific group)."""
+
     __tablename__ = "members"
     __table_args__ = (UniqueConstraint("user_id", "group_id", name="uq_user_group"),)
 
@@ -172,7 +183,9 @@ class Member(Base):
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="members")
     group: Mapped["Group"] = relationship("Group", back_populates="members")
-    badges: Mapped[List["MemberBadge"]] = relationship("MemberBadge", back_populates="member")
+    badges: Mapped[List["MemberBadge"]] = relationship(
+        "MemberBadge", back_populates="member"
+    )
     profile: Mapped[Optional["MemberProfile"]] = relationship(
         "MemberProfile", back_populates="member", uselist=False
     )
@@ -183,6 +196,7 @@ class Member(Base):
 
 class BadgeDefinition(Base):
     """Badge definitions."""
+
     __tablename__ = "badge_definitions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -196,13 +210,14 @@ class BadgeDefinition(Base):
 
 class MemberBadge(Base):
     """Badges earned by members."""
+
     __tablename__ = "member_badges"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
     badge_slug: Mapped[str] = mapped_column(ForeignKey("badge_definitions.slug"))
     earned_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
-    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    extra_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, name="metadata")
 
     # Relationships
     member: Mapped["Member"] = relationship("Member", back_populates="badges")
@@ -211,8 +226,11 @@ class MemberBadge(Base):
 
 class MemberProfile(Base):
     """Extended member profiles."""
+
     __tablename__ = "member_profiles"
-    __table_args__ = (UniqueConstraint("user_id", "group_id", name="uq_profile_user_group"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "group_id", name="uq_profile_user_group"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
@@ -229,6 +247,7 @@ class MemberProfile(Base):
 
 class ModAction(Base):
     """Moderation actions log."""
+
     __tablename__ = "mod_actions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -250,6 +269,7 @@ class ModAction(Base):
 
 class Warning(Base):
     """Warnings tracking."""
+
     __tablename__ = "warnings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -264,6 +284,7 @@ class Warning(Base):
 
 class Federation(Base):
     """Federation for cross-group bans."""
+
     __tablename__ = "federations"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -290,38 +311,51 @@ class Federation(Base):
 
 class FederationAdmin(Base):
     """Federation administrators."""
+
     __tablename__ = "federation_admins"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    federation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("federations.id"), index=True)
+    federation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("federations.id"), index=True
+    )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     added_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     added_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
     # Relationships
-    federation: Mapped["Federation"] = relationship("Federation", back_populates="admins")
+    federation: Mapped["Federation"] = relationship(
+        "Federation", back_populates="admins"
+    )
 
 
 class FederationMember(Base):
     """Groups that are part of a federation."""
+
     __tablename__ = "federation_members"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    federation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("federations.id"), index=True)
+    federation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("federations.id"), index=True
+    )
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"))
     joined_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     joined_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
 
     # Relationships
-    federation: Mapped["Federation"] = relationship("Federation", back_populates="members")
+    federation: Mapped["Federation"] = relationship(
+        "Federation", back_populates="members"
+    )
 
 
 class FederationBan(Base):
     """Federation-wide bans."""
+
     __tablename__ = "federation_bans"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    federation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("federations.id"), index=True)
+    federation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("federations.id"), index=True
+    )
     target_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     banned_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     reason: Mapped[str] = mapped_column(Text)
@@ -334,6 +368,7 @@ class FederationBan(Base):
 
 class Note(Base):
     """Saved notes."""
+
     __tablename__ = "notes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -357,6 +392,7 @@ class Note(Base):
 
 class Filter(Base):
     """Keyword auto-responses."""
+
     __tablename__ = "filters"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -379,6 +415,7 @@ class Filter(Base):
 
 class Lock(Base):
     """Content type locks."""
+
     __tablename__ = "locks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -400,6 +437,7 @@ class Lock(Base):
 
 class Rule(Base):
     """Group rules."""
+
     __tablename__ = "rules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -416,11 +454,14 @@ class Rule(Base):
 
 class Greeting(Base):
     """Welcome and goodbye messages."""
+
     __tablename__ = "greetings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
-    greeting_type: Mapped[str] = mapped_column(String(10), index=True)  # welcome/goodbye
+    greeting_type: Mapped[str] = mapped_column(
+        String(10), index=True
+    )  # welcome/goodbye
     content: Mapped[str] = mapped_column(Text)
     media_file_id: Mapped[Optional[str]] = mapped_column(String(500))
     media_type: Mapped[Optional[str]] = mapped_column(String(20))
@@ -441,6 +482,7 @@ class Greeting(Base):
 
 class CaptchaSetting(Base):
     """Captcha configuration."""
+
     __tablename__ = "captcha_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -457,6 +499,7 @@ class CaptchaSetting(Base):
 
 class ScheduledMessage(Base):
     """Scheduled and recurring messages."""
+
     __tablename__ = "scheduled_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -487,6 +530,7 @@ class ScheduledMessage(Base):
 
 class LogChannel(Base):
     """Log channel configuration."""
+
     __tablename__ = "log_channels"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -500,6 +544,7 @@ class LogChannel(Base):
 
 class AntifloodConfig(Base):
     """Anti-flood configuration."""
+
     __tablename__ = "antiflood_config"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -515,6 +560,7 @@ class AntifloodConfig(Base):
 
 class AntiraidConfig(Base):
     """Anti-raid configuration."""
+
     __tablename__ = "antiraid_config"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -529,6 +575,7 @@ class AntiraidConfig(Base):
 
 class BannedWord(Base):
     """Banned words (two lists per group)."""
+
     __tablename__ = "banned_words"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -543,8 +590,11 @@ class BannedWord(Base):
 
 class BannedWordListConfig(Base):
     """Configuration for each banned word list."""
+
     __tablename__ = "banned_word_list_configs"
-    __table_args__ = (UniqueConstraint("group_id", "list_number", name="uq_group_list"),)
+    __table_args__ = (
+        UniqueConstraint("group_id", "list_number", name="uq_group_list"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"))
@@ -556,6 +606,7 @@ class BannedWordListConfig(Base):
 
 class Approval(Base):
     """Approved users."""
+
     __tablename__ = "approvals"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -567,6 +618,7 @@ class Approval(Base):
 
 class Connection(Base):
     """Multi-group connections for DM management."""
+
     __tablename__ = "connections"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -578,6 +630,7 @@ class Connection(Base):
 
 class ForceSubscribe(Base):
     """Force subscribe configuration."""
+
     __tablename__ = "force_subscribe"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -591,6 +644,7 @@ class ForceSubscribe(Base):
 
 class GroupEvent(Base):
     """Group events."""
+
     __tablename__ = "group_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -608,6 +662,7 @@ class GroupEvent(Base):
 
 class EventRSVP(Base):
     """Event RSVPs."""
+
     __tablename__ = "event_rsvps"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -619,6 +674,7 @@ class EventRSVP(Base):
 
 class GroupMilestone(Base):
     """Group milestones and memory."""
+
     __tablename__ = "group_milestones"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -627,11 +683,12 @@ class GroupMilestone(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     happened_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    extra_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, name="metadata")
 
 
 class Wallet(Base):
     """Economy wallets."""
+
     __tablename__ = "wallets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -650,6 +707,7 @@ class Wallet(Base):
 
 class Transaction(Base):
     """Economy transactions."""
+
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -663,6 +721,7 @@ class Transaction(Base):
 
 class EconomyConfig(Base):
     """Economy configuration per group."""
+
     __tablename__ = "economy_config"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -677,8 +736,11 @@ class EconomyConfig(Base):
 
 class Reputation(Base):
     """Reputation system."""
+
     __tablename__ = "reputation"
-    __table_args__ = (UniqueConstraint("group_id", "user_id", name="uq_rep_group_user"),)
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_rep_group_user"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"))
@@ -689,6 +751,7 @@ class Reputation(Base):
 
 class ReputationLog(Base):
     """Reputation transaction log."""
+
     __tablename__ = "reputation_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -702,6 +765,7 @@ class ReputationLog(Base):
 
 class GameSession(Base):
     """Active game sessions."""
+
     __tablename__ = "game_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -715,6 +779,7 @@ class GameSession(Base):
 
 class GameScore(Base):
     """Game scores/leaderboard."""
+
     __tablename__ = "game_scores"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -727,6 +792,7 @@ class GameScore(Base):
 
 class Poll(Base):
     """Extended polls."""
+
     __tablename__ = "polls"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -744,6 +810,7 @@ class Poll(Base):
 
 class PollVote(Base):
     """Poll votes."""
+
     __tablename__ = "poll_votes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -755,6 +822,7 @@ class PollVote(Base):
 
 class TopicConfig(Base):
     """Forum topic configurations."""
+
     __tablename__ = "topic_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -768,8 +836,11 @@ class TopicConfig(Base):
 
 class ModuleConfig(Base):
     """Per-group module configurations."""
+
     __tablename__ = "module_configs"
-    __table_args__ = (UniqueConstraint("group_id", "module_name", name="uq_group_module"),)
+    __table_args__ = (
+        UniqueConstraint("group_id", "module_name", name="uq_group_module"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
@@ -787,6 +858,7 @@ class ModuleConfig(Base):
 
 class APIKey(Base):
     """API keys for REST API access."""
+
     __tablename__ = "api_keys"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -803,6 +875,7 @@ class APIKey(Base):
 
 class CASCache(Base):
     """CAS (Combot Anti-Spam) cache."""
+
     __tablename__ = "cas_cache"
 
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -813,6 +886,7 @@ class CASCache(Base):
 
 class ExportJob(Base):
     """Import/Export jobs."""
+
     __tablename__ = "export_jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -827,8 +901,10 @@ class ExportJob(Base):
 
 # ============ NEW MODELS FOR ADVANCED FEATURES ============
 
+
 class BotTemplate(Base):
     """Pre-built bot templates (like botifi.me, ManyBot)."""
+
     __tablename__ = "bot_templates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -838,14 +914,14 @@ class BotTemplate(Base):
     category: Mapped[str] = mapped_column(String(30))
     icon: Mapped[str] = mapped_column(String(50))
     preview_image: Mapped[Optional[str]] = mapped_column(String(500))
-    
+
     # Template structure (flow JSON)
     flow_data: Mapped[Dict[str, Any]] = mapped_column(JSON)
-    
+
     # Features included
     features: Mapped[List[str]] = mapped_column(JSON)
     commands: Mapped[Optional[Dict[str, str]]] = mapped_column(JSON)
-    
+
     # Metadata
     author: Mapped[str] = mapped_column(String(100))
     author_url: Mapped[Optional[str]] = mapped_column(String(500))
@@ -853,12 +929,12 @@ class BotTemplate(Base):
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     # Usage stats
     usage_count: Mapped[int] = mapped_column(Integer, default=0)
     rating: Mapped[float] = mapped_column(default=0.0)
     rating_count: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
@@ -867,35 +943,36 @@ class BotTemplate(Base):
 
 class UserBot(Base):
     """User-created bots via flow builder or AI."""
+
     __tablename__ = "user_bots"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    
+
     # Bot identity
     name: Mapped[str] = mapped_column(String(100))
     username: Mapped[Optional[str]] = mapped_column(String(32), unique=True)
     description: Mapped[Optional[str]] = mapped_column(Text)
     bot_token: Mapped[Optional[str]] = mapped_column(String(500))
     bot_token_encrypted: Mapped[Optional[str]] = mapped_column(String(200))
-    
+
     # Bot type: 'custom' (own token), 'nexus_powered' (nexus infrastructure)
     bot_type: Mapped[str] = mapped_column(String(20), default="nexus_powered")
-    
+
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     # Flow reference
     flow_id: Mapped[Optional[int]] = mapped_column(ForeignKey("bot_flows.id"))
-    
+
     # Settings
     settings: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    
+
     # Stats
     total_users: Mapped[int] = mapped_column(Integer, default=0)
     total_messages: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
@@ -904,34 +981,35 @@ class UserBot(Base):
 
 class BotFlow(Base):
     """Flow definitions for bot builders."""
+
     __tablename__ = "bot_flows"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    
+
     # Flow info
     name: Mapped[str] = mapped_column(String(100))
     description: Mapped[Optional[str]] = mapped_column(Text)
-    
+
     # Flow structure - nodes and connections
     nodes: Mapped[List[Dict[str, Any]]] = mapped_column(JSON)
     connections: Mapped[List[Dict[str, Any]]] = mapped_column(JSON)
-    
+
     # Variables and configurations
     variables: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
     settings: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    
+
     # Trigger configuration
     triggers: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON)
-    
+
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False)
     is_template: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     # Stats
     usage_count: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
@@ -940,27 +1018,28 @@ class BotFlow(Base):
 
 class FlowExecution(Base):
     """Flow execution logs."""
+
     __tablename__ = "flow_executions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     flow_id: Mapped[int] = mapped_column(ForeignKey("bot_flows.id"), index=True)
     user_bot_id: Mapped[Optional[int]] = mapped_column(ForeignKey("user_bots.id"))
-    
+
     # Execution data
     trigger_type: Mapped[str] = mapped_column(String(30))
     trigger_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    
+
     # Path taken
     node_path: Mapped[List[str]] = mapped_column(JSON)
-    
+
     # Input/Output
     user_input: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
     bot_response: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    
+
     # Status
     status: Mapped[str] = mapped_column(String(20), default="running")
     error: Mapped[Optional[str]] = mapped_column(Text)
-    
+
     # Timing
     started_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
@@ -968,42 +1047,43 @@ class FlowExecution(Base):
 
 class ScrapingJob(Base):
     """Web scraping jobs."""
+
     __tablename__ = "scraping_jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     group_id: Mapped[Optional[int]] = mapped_column(ForeignKey("groups.id"))
-    
+
     # Job info
     name: Mapped[str] = mapped_column(String(100))
     description: Mapped[Optional[str]] = mapped_column(Text)
-    
+
     # Target configuration
     target_url: Mapped[str] = mapped_column(String(1000))
     selector: Mapped[Optional[str]] = mapped_column(String(500))
     method: Mapped[str] = mapped_column(String(20), default="GET")
     headers: Mapped[Optional[Dict[str, str]]] = mapped_column(JSON)
     body: Mapped[Optional[str]] = mapped_column(Text)
-    
+
     # Schedule
     schedule_type: Mapped[str] = mapped_column(String(20), default="manual")
     cron_expression: Mapped[Optional[str]] = mapped_column(String(100))
-    
+
     # Post-processing
     transform_rule: Mapped[Optional[str]] = mapped_column(Text)
     output_format: Mapped[str] = mapped_column(String(20), default="text")
-    
+
     # Action on new data
     action_type: Mapped[str] = mapped_column(String(30), default="notify")
     action_config: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    
+
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_run: Mapped[Optional[datetime]] = mapped_column(DateTime)
     next_run: Mapped[Optional[datetime]] = mapped_column(DateTime)
     last_result: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
     last_error: Mapped[Optional[str]] = mapped_column(Text)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
@@ -1012,50 +1092,52 @@ class ScrapingJob(Base):
 
 class ScrapingResult(Base):
     """Scraping results storage."""
+
     __tablename__ = "scraping_results"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("scraping_jobs.id"), index=True)
-    
+
     # Result data
     data: Mapped[Dict[str, Any]] = mapped_column(JSON)
     raw_html: Mapped[Optional[Text]] = mapped_column(Text)
     status_code: Mapped[int] = mapped_column(Integer)
-    
+
     # Metadata
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
 
 class ChannelConfig(Base):
     """Channel configuration for broadcasting."""
+
     __tablename__ = "channel_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     group_id: Mapped[Optional[int]] = mapped_column(ForeignKey("groups.id"))
-    
+
     # Channel info
     channel_id: Mapped[int] = mapped_column(BigInteger)
     channel_name: Mapped[str] = mapped_column(String(100))
     channel_username: Mapped[Optional[str]] = mapped_column(String(32))
-    
+
     # Configuration
     channel_type: Mapped[str] = mapped_column(String(30))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    
+
     # Auto-post settings
     auto_post_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     post_triggers: Mapped[Optional[List[str]]] = mapped_column(JSON)
     filters: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    
+
     # Formatting
     format_template: Mapped[Optional[str]] = mapped_column(Text)
     include_source: Mapped[bool] = mapped_column(Boolean, default=True)
     include_media: Mapped[bool] = mapped_column(Boolean, default=True)
-    
+
     # Stats
     total_posts: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
@@ -1064,30 +1146,31 @@ class ChannelConfig(Base):
 
 class AutoForward(Base):
     """Auto-forward rules between chats."""
+
     __tablename__ = "auto_forwards"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     group_id: Mapped[Optional[int]] = mapped_column(ForeignKey("groups.id"))
-    
+
     # Source and destination
     source_chat_id: Mapped[int] = mapped_column(BigInteger)
     dest_chat_id: Mapped[int] = mapped_column(BigInteger)
-    
+
     # Configuration
     forward_type: Mapped[str] = mapped_column(String(30))
     filters: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    
+
     # Processing
     transform_content: Mapped[Optional[str]] = mapped_column(Text)
     add_caption: Mapped[Optional[str]] = mapped_column(Text)
-    
+
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    
+
     # Stats
     total_forwarded: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
@@ -1096,39 +1179,40 @@ class AutoForward(Base):
 
 class AdvancedExport(Base):
     """Advanced export configurations."""
+
     __tablename__ = "advanced_exports"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     group_id: Mapped[Optional[int]] = mapped_column(ForeignKey("groups.id"))
-    
+
     # Export config
     name: Mapped[str] = mapped_column(String(100))
     export_type: Mapped[str] = mapped_column(String(50))
-    
+
     # Data to include
     data_sources: Mapped[List[str]] = mapped_column(JSON)
     filters: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    
+
     # Format options
     format: Mapped[str] = mapped_column(String(20), default="json")
     include_media: Mapped[bool] = mapped_column(Boolean, default=False)
     compress: Mapped[bool] = mapped_column(Boolean, default=True)
-    
+
     # Schedule
     schedule_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     schedule_cron: Mapped[Optional[str]] = mapped_column(String(100))
     last_run: Mapped[Optional[datetime]] = mapped_column(DateTime)
     next_run: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    
+
     # Delivery
     delivery_method: Mapped[str] = mapped_column(String(20), default="file")
     delivery_config: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    
+
     # Status
     last_status: Mapped[Optional[str]] = mapped_column(String(20))
     last_file_path: Mapped[Optional[str]] = mapped_column(String(500))
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
@@ -1137,23 +1221,24 @@ class AdvancedExport(Base):
 
 class AIConversation(Base):
     """AI chatbot conversations."""
+
     __tablename__ = "ai_conversations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_bot_id: Mapped[int] = mapped_column(ForeignKey("user_bots.id"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    
+
     # Context
     context: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
     system_prompt: Mapped[Optional[str]] = mapped_column(Text)
-    
+
     # Stats
     message_count: Mapped[int] = mapped_column(Integer, default=0)
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     last_message_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
@@ -1162,48 +1247,52 @@ class AIConversation(Base):
 
 class AIMessage(Base):
     """AI chatbot messages."""
+
     __tablename__ = "ai_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    conversation_id: Mapped[int] = mapped_column(ForeignKey("ai_conversations.id"), index=True)
-    
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_conversations.id"), index=True
+    )
+
     # Message
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
     tokens: Mapped[int] = mapped_column(Integer, default=0)
-    
-    # Metadata
-    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    
+
+    # Extra data
+    extra_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, name="metadata")
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
 
 class CustomCommand(Base):
     """Custom commands created by users."""
+
     __tablename__ = "custom_commands"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     user_bot_id: Mapped[Optional[int]] = mapped_column(ForeignKey("user_bots.id"))
-    
+
     # Command definition
     command: Mapped[str] = mapped_column(String(50), index=True)
     description: Mapped[Optional[str]] = mapped_column(String(200))
-    
+
     # Response
     response_type: Mapped[str] = mapped_column(String(20), default="text")
     response_content: Mapped[str] = mapped_column(Text)
     response_media: Mapped[Optional[str]] = mapped_column(String(500))
     buttons: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    
+
     # Behavior
     allow_variables: Mapped[bool] = mapped_column(Boolean, default=True)
     require_args: Mapped[bool] = mapped_column(Boolean, default=False)
     admin_only: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     # Stats
     usage_count: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now()
@@ -1212,32 +1301,33 @@ class CustomCommand(Base):
 
 class KeywordResponder(Base):
     """Keyword-based auto-responders."""
+
     __tablename__ = "keyword_responders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     user_bot_id: Mapped[Optional[int]] = mapped_column(ForeignKey("user_bots.id"))
-    
+
     # Keywords
     keywords: Mapped[List[str]] = mapped_column(JSON)
     match_type: Mapped[str] = mapped_column(String(20), default="contains")
     case_sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     # Response
     responses: Mapped[List[str]] = mapped_column(JSON)
     random_response: Mapped[bool] = mapped_column(Boolean, default=True)
-    
+
     # Media
     media_type: Mapped[Optional[str]] = mapped_column(String(20))
     media_file_id: Mapped[Optional[str]] = mapped_column(String(500))
-    
+
     # Behavior
     delete_trigger: Mapped[bool] = mapped_column(Boolean, default=False)
     cooldown_seconds: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     # Stats
     trigger_count: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -1247,70 +1337,73 @@ class KeywordResponder(Base):
 
 class BotAnalytics(Base):
     """Analytics for user-created bots."""
+
     __tablename__ = "bot_analytics"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_bot_id: Mapped[int] = mapped_column(ForeignKey("user_bots.id"), index=True)
-    
+
     # Time period
     date: Mapped[date] = mapped_column(Date, index=True)
-    
+
     # Metrics
     messages_received: Mapped[int] = mapped_column(Integer, default=0)
     messages_sent: Mapped[int] = mapped_column(Integer, default=0)
     commands_used: Mapped[int] = mapped_column(Integer, default=0)
     new_users: Mapped[int] = mapped_column(Integer, default=0)
     active_users: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     # Engagement
     avg_response_time_ms: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
 
 class SubscriptionPlan(Base):
     """Subscription plans for premium features."""
+
     __tablename__ = "subscription_plans"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     slug: Mapped[str] = mapped_column(String(30), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(50))
     description: Mapped[str] = mapped_column(Text)
-    
+
     # Pricing
     price_monthly: Mapped[int] = mapped_column(Integer, default=0)
     price_yearly: Mapped[int] = mapped_column(Integer, default=0)
     currency: Mapped[str] = mapped_column(String(3), default="USD")
-    
+
     # Features
     features: Mapped[List[str]] = mapped_column(JSON)
     limits: Mapped[Dict[str, int]] = mapped_column(JSON)
-    
+
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
 
 class UserSubscription(Base):
     """User subscriptions."""
+
     __tablename__ = "user_subscriptions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     plan_id: Mapped[int] = mapped_column(ForeignKey("subscription_plans.id"))
-    
+
     # Status
     status: Mapped[str] = mapped_column(String(20), default="active")
-    
+
     # Billing
     billing_cycle: Mapped[str] = mapped_column(String(10), default="monthly")
     started_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    
+
     # Payment
     payment_method: Mapped[Optional[str]] = mapped_column(String(50))
     last_payment_at: Mapped[Optional[datetime]] = mapped_column(DateTime)

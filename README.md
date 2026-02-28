@@ -1,256 +1,215 @@
 # Nexus - The Ultimate Telegram Bot Platform
 
-Nexus is the most complete, modern, AI-native Telegram bot platform ever built. It combines every feature from MissRose, GroupHelp, Group-Bot, Combot, Shieldy, Guardian, Baymax, Group Butler, and every other notable Telegram bot into one unified, intelligent, fully configurable system.
+Nexus is a comprehensive, AI-native Telegram bot platform that consolidates features from major Telegram bots into a unified system with 27+ modules and 230+ commands.
 
-## 🚀 Features Overview
+## Key Features
 
-### 📦 Modules: 27 Production-Ready
-- **Core:** Moderation, Welcome, Anti-Spam, Locks, Notes, Filters, Rules
-- **Gamification:** Economy, Reputation, Identity, Scheduler, Games
-- **AI:** AI Assistant (GPT-4), Analytics, Sentiment Analysis
-- **Community:** Community (events, interest groups, matching), Integrations
-- **Utility:** Info, Polls, Cleaning, Formatting, Echo, Help
-- **Advanced:** Captcha, Blocklist, Channels, Scraping, Bot Builder
+### Dual Mode System
+- **Shared Bot Mode**: One central NexusBot can be added to any group
+- **White-Label Mode**: Bring your own BotFather token for custom branding
 
-### 🎮 Commands: 230+ Fully Documented
-- **Moderation:** warn, mute, ban, kick, promote, demote, history, trust, approve, report, slowmode, etc.
-- **Economy:** balance, daily, give, transfer, shop, buy, inventory, coinflip, gamble, rob, work, crime, bank, loan, repay
-- **Reputation:** rep, +rep, -rep, reputation, repleaderboard
-- **Identity:** me, profile, rank, level, xp, streak, badges, achievements
-- **Community:** match, interestgroups, joingroup, creategroup, events, createevent, rsvp, myevents, celebrate, birthday, birthdays, bio, membercount
-- **Integrations:** addrss, addyoutube, addgithub, addwebhook, addtwitter
-- **Scheduler:** schedule, recurring, listscheduled, cancelschedule, clearschedule
-- **Notes:** save, note, notes, clear, clearall
-- **Filters:** filter, filters, stop, stopall, filtermode, filterregex, filtercase
-- **Locks:** lock, unlock, locktypes, locks, lockall, unlockall
-- **Games:** trivia, wordle, hangman, mathrace, typerace, 8ball, roll, flip, rps, dice, spin, lottery, blackjack, roulette, slots, guessnumber, unscramble, quiz, tictactoe
-- **Analytics:** stats, activity, top, chart, sentiment, growth, heatmap, reportcard
-- **AI Assistant:** ai, summarize, translate, factcheck, detectscam, draft, suggestpromote, weeklyreport, whatidid
-- **Info:** info, chatinfo, id, adminlist
-- **Polls:** poll, quiz, closepoll, vote, pollresults, pollsettings
-- **Formatting:** bold, italic, underline, strike, spoiler, code, pre, link, button
-- **Echo:** echo, say
-- **Help:** help, start, about, ping, version, donate, support, feedback, privacy, deleteaccount
-- **Cleaning:** cleanservice, cleancommands, clean
-- **Captcha:** captcha, captchatimeout, captchaaction
-- **Blocklist:** blocklist, addblacklist, rmblacklist, blacklistmode
-- **Welcome:** setwelcome, welcome, resetwelcome, setgoodbye, goodbye, resetgoodbye, cleanwelcome, welcomemute, welcomehelp
-- **Anti-Spam:** antiflood, antiraid, setcasban
-- **Rules:** setrules, rules, resetrules
+### Dual Prefix Command System
+- `!command` - Activate/execute a feature
+- `!!command` - Deactivate/remove a feature
+- `/command` - Standard Telegram slash commands
+- Configurable prefix per group
 
-### 🎨 Multi-Token Architecture
-- **Shared Bot Mode:** One central bot (@NexusBot) that any group can add
-- **Custom Bot Tokens:** Group owners can use their own bot tokens (white-label mode)
-- **Token Encryption:** All custom tokens encrypted at rest (Fernet)
-- **Seamless Routing:** Automatic routing based on incoming webhook token
-- **Unified Management:** Single admin panel for all tokens
+### Mini App Dashboard
+- **Toggle Controls**: Enable/disable modules without sending commands
+- **Quick Actions**: Execute moderation instantly via UI
+- **Groups Manager**: Manage multiple groups from one interface
+- **Analytics Dashboard**: View group statistics and trends
 
-### 🤖 AI-Native Design
-- **GPT-4 Integration:** Advanced AI assistant powered by OpenAI GPT-4
-- **Smart Moderation:** AI-powered content analysis, toxicity detection, spam detection
-- **Content Generation:** AI-powered announcements, summaries, translations
-- **Sentiment Analysis:** Track group sentiment trends over time
-- **Automated Insights:** AI-powered recommendations for engagement and growth
+## Architecture
 
-### 💰 Complete Economy System
-- **Wallet & Bank:** Virtual currency with savings and 5% daily interest
-- **Loans:** Borrow up to 10x your balance with repayment tracking
-- **Games:** Coin flip, gamble, dice, roulette, slots, blackjack
-- **Shop System:** Purchase items, VIP badges, special abilities
-- **Transactions:** Complete transaction history and transfer system
-- **Tax System:** Configurable tax on transfers
+```
+├── bot/                    # Bot service (aiogram)
+│   ├── core/               # Core middleware and context
+│   │   ├── middleware.py   # Request processing pipeline
+│   │   ├── context.py      # NexusContext object
+│   │   ├── prefix_parser.py# Dual prefix parsing
+│   │   ├── token_manager.py# Multi-token management
+│   │   └── module_*.py     # Module system
+│   └── modules/            # All bot modules
+├── api/                    # FastAPI REST API
+│   ├── main.py             # App entry point
+│   └── routers/            # API endpoints
+├── mini-app/               # React Mini App
+│   └── src/
+│       ├── views/          # Page components
+│       ├── components/     # Reusable components
+│       └── api/            # API client
+├── shared/                 # Shared utilities
+│   ├── models.py           # SQLAlchemy models
+│   ├── schemas.py          # Pydantic schemas
+│   └── database.py         # Database config
+├── worker/                 # Celery tasks
+└── alembic/                # Database migrations
+```
 
-### 📊 Complete Gamification
-- **XP System:** Earn XP for messages with weekend multiplier
-- **Levels:** 0-100 levels with automatic level-up announcements
-- **Achievements:** 20+ achievements with automatic unlocking
-- **Badges:** Visual badge system with emoji icons
-- **Streaks:** Activity streaks (7-day, 30-day, 90-day milestones)
-- **Reputation:** +rep/-rep system with cooldowns and limits
-- **Leaderboards:** Economy and reputation leaderboards
+## Quick Start
 
-### 🎮 Gaming Suite (20+ Games)
-- **Trivia:** Multiple categories and difficulty levels
-- **Word Games:** Wordle, Hangman, Unscramble
-- **Math Games:** Math Race
-- **Casino:** Coin Flip, Dice, Roulette, Slots, Blackjack
-- **Party Games:** 8-Ball, Rock-Paper-Scissors, Tic-Tac-Toe
-- **Betting Games:** All games support economy integration
-
-### 👥 Community Features
-- **Member Matching:** Find like-minded members automatically
-- **Interest Groups:** Create and join topic-based communities
-- **Events:** Create events with RSVPs, times, locations
-- **Celebrations:** Celebrate member milestones and achievements
-- **Birthdays:** Track birthdays and send automatic wishes
-- **Profile Bios:** Set custom bio (280 character limit)
-- **Member Milestones:** Track and announce member count milestones
-
-### 🔌 External Integrations
-- **RSS Feeds:** Add RSS feeds with auto-posting
-- **YouTube:** Monitor channels and post new videos
-- **GitHub:** Watch repositories for push, star, release events
-- **Webhooks:** Custom webhook integrations with secrets
-- **Twitter/X:** Monitor accounts and post new tweets
-- **Async HTTP:** aiohttp for all external requests
-
-### 📈 Analytics & Insights
-- **Stats:** General group statistics
-- **Activity:** Message activity over time
-- **Top Users:** Top users by various metrics
-- **Charts:** Generate activity charts
-- **Sentiment:** Sentiment analysis and trends
-- **Growth:** Member growth tracking
-- **Heatmap:** Activity heatmap (hour vs day)
-- **Report Card:** Generate group report card
-
-### 🎯 Moderation
-- **Warn/Mute/Ban/Kick:** Complete moderation actions
-- **User History:** Full moderation history with evidence
-- **Trust/Approve:** Bypass restrictions for trusted users
-- **Slow Mode:** Configurable slow mode
-- **Restrictions:** Granular user permission controls
-- **Anti-Flood:** Configurable anti-flood limits
-- **Anti-Raid:** Mass join protection
-- **CAS Integration:** Combot Anti-Spam ban sync
-- **Blocklist:** Two independent blocklists with actions
-- **Locks:** 40+ content type locks with modes
-
-### 👋 Welcome System
-- **Custom Messages:** Fully customizable welcome and goodbye
-- **Variables:** {first}, {last}, {username}, {mention}, {id}, {count}, {chatname}, {rules}, {date}, {time}
-- **Media Support:** Photo, video, GIF, document attachments
-- **Buttons:** Inline keyboard support
-- **Auto-Delete:** Delete previous welcome messages
-- **DM Mode:** Send welcome as direct message
-- **CAPTCHA Mute:** Mute new members until CAPTCHA completion
-
-### 🔒 Security
-- **Token Encryption:** All custom bot tokens encrypted at rest
-- **SQL Injection Prevention:** SQLAlchemy parameterized queries
-- **XSS Protection:** Input validation and output encoding
-- **CORS Configuration:** Configurable CORS headers
-- **API Rate Limiting:** Redis-based token bucket algorithm
-- **Bearer Token Auth:** Secure API authentication
-- **Group Data Isolation:** Complete data separation by group
-- **Audit Logging:** Comprehensive audit trail for all actions
-
-### 📱 Mini App
-- **React 18 + TypeScript:** Modern React with TypeScript
-- **Vite + Tailwind CSS:** Fast build and beautiful UI
-- **Admin Dashboard:** Complete admin control panel
-- **Member Profiles:** View member profiles with stats
-- **Module Configuration:** Visual configuration for all modules
-- **Analytics Charts:** Beautiful charts and graphs
-- **Economy Management:** Visual economy and shop management
-- **Settings Panel:** Group settings and customization
-- **Responsive Design:** Mobile-first responsive design
-
-### ⚡ Performance
-- **Async Throughout:** aiogram 3, FastAPI, SQLAlchemy async
-- **Connection Pooling:** Optimized database connection pool
-- **Redis Caching:** Group-scoped caching with TTL
-- **Rate Limiting:** Token bucket algorithm for all operations
-- **Webhook Processing:** Returns 200 immediately, processes in background
-- **Background Tasks:** Celery for all background operations
-- **Horizontal Scaling:** Ready for horizontal scaling
-- **Load Balancing:** Can be load balanced with multiple instances
-
-### 📚 Documentation
-- **60,000+ Words:** Comprehensive documentation covering all features
-- **Commands Reference:** Complete reference for all 230+ commands with examples
-- **Implementation Guide:** Technical implementation details and architecture
-- **API Documentation:** Complete OpenAPI/Swagger documentation
-- **Testing Guide:** Comprehensive testing and deployment guide
-- **Telegram API Compatibility:** Analysis of 1,090 features (80% implementable)
-
-## 🛠 Tech Stack
-
-- **Backend:** Python 3.12 + aiogram 3.x + FastAPI
-- **Database:** PostgreSQL 16 + SQLAlchemy 2.0 async
-- **Cache:** Redis 7
-- **Queue:** Celery 5 + Redis
-- **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS
-- **AI:** OpenAI GPT-4o
-- **Deployment:** Docker + Docker Compose + Render
-
-## 🚀 Quick Start
-
-### Local Development
+### Using Docker Compose
 
 ```bash
-# Clone repository
-git clone <repository>
+# Clone the repository
+git clone https://github.com/your-repo/nexus.git
 cd nexus
 
-# Configure environment
+# Copy environment file
 cp .env.example .env
-nano .env  # Add your tokens
 
-# Start services
+# Edit .env with your values
+nano .env
+
+# Start all services
 docker-compose up -d
 ```
 
-### Deploy to Render
+### Manual Setup
 
 ```bash
-# Fork and clone
-git clone https://github.com/your-username/nexus.git
-cd nexus
+# Install dependencies
+pip install -r requirements.txt
 
-# Create a New Web Service on Render
-# Connect your GitHub repository
-# Configure build and deploy
+# Run database migrations
+alembic upgrade head
 
-# Or use Render CLI
-render blueprint apply
+# Start the API server
+uvicorn api.main:app --reload
+
+# Start the bot service
+python -m bot.core
+
+# Start the Celery worker
+celery -A worker.celery_app worker --loglevel=info
 ```
 
-## 📖 Module Documentation
+## Available Modules
 
-Each module is fully documented in its respective `module.py` file with:
-- Complete command list
-- Detailed descriptions
-- Usage examples
-- Permission requirements
-- Configuration options
-- Event handlers
+### Moderation
+- **moderation**: Warn, mute, ban, kick, history
+- **locks**: Lock content types (links, stickers, etc.)
+- **antispam**: Anti-flood and spam protection
+- **antiraid**: Mass join detection
+- **word_filter**: Banned words filtering
 
-## 📞 Support & Community
+### Community
+- **welcome**: Welcome/goodbye messages
+- **rules**: Group rules management
+- **economy**: Virtual currency system
+- **reputation**: Community reputation
+- **games**: 20+ games with rewards
+- **identity**: XP, levels, badges
 
-- **GitHub Issues:** Report bugs and request features
-- **GitHub Discussions:** Ask questions and discuss
-- **Documentation:** Read comprehensive guides in `/docs/`
-- **Telegram:** Join support group (link in `/start` message)
+### Utility
+- **notes**: Saved notes with keywords
+- **filters**: Auto-responses
+- **scheduler**: Scheduled messages
+- **polls**: Advanced polls
 
-## 📜 License
+### AI
+- **ai_assistant**: GPT-4 powered assistant
+- **analytics**: Group insights
 
-This project is licensed under the AGPL-3.0 License - see [LICENSE](LICENSE) for details.
+## Mini App Features
 
-## 👥 Credits
+### Toggle Manager
+Manage all modules without sending commands:
+```typescript
+// Toggle a module
+await toggleApi.toggleModule(groupId, 'moderation', true)
 
-Built by the Nexus Team. Inspired by and combining features from:
-- MissRose
-- GroupHelp
-- Group-Bot
-- Combot
-- Shieldy
-- Guardian
-- Baymax
-- Group Butler
-- And all other great Telegram bots
+// Update a feature
+await toggleApi.updateFeature(groupId, 'moderation', 'warn_threshold', 3)
+```
 
-## 🎉 What Makes Nexus Unique
+### Quick Actions Panel
+Execute moderation actions instantly:
+```typescript
+// Warn a user
+await moderationToggleApi.warnUser(groupId, userId, 'Spam')
 
-1. **Most Complete:** 230+ commands across 27 modules
-2. **AI-Native:** GPT-4 integration throughout all features
-3. **Multi-Token:** Shared bot + custom bot tokens for white-label
-4. **All Features:** Every feature from major bots combined
-5. **Production-Ready:** Built for production with proper error handling
-6. **Beautiful UI:** Modern Mini App with admin dashboard
-7. **Well Documented:** 60,000+ words of comprehensive documentation
-8. **Highly Scalable:** Async throughout, horizontal scaling ready
-9. **Secure:** Token encryption, SQL injection prevention, XSS protection
-10. **Maintainable:** Modular architecture, type-hyped, well-organized
+// Mute a user
+await moderationToggleApi.muteUser(groupId, userId, '1h', 'Inappropriate behavior')
+```
 
-**Nexus is truly the Ultimate Telegram Bot Platform!** 🚀
+### Groups Manager
+Manage multiple groups from one interface:
+```typescript
+// Get all managed groups
+const groups = await api.get('/groups/my-groups')
+
+// Switch between groups
+<GroupCard onSelect={(groupId) => setSelectedGroup(groupId)} />
+```
+
+## API Endpoints
+
+### Authentication
+- `POST /api/v1/auth/token` - Get API token
+
+### Groups
+- `GET /api/v1/groups/my-groups` - List managed groups
+- `GET /api/v1/groups/{id}` - Get group info
+- `PATCH /api/v1/groups/{id}` - Update settings
+
+### Modules
+- `GET /api/v1/groups/{id}/toggles` - Get all module toggles
+- `PATCH /api/v1/groups/{id}/modules/{name}` - Toggle module
+- `PATCH /api/v1/groups/{id}/modules/{name}/features/{key}` - Update feature
+
+### Moderation
+- `POST /api/v1/groups/{id}/moderation/warn` - Warn user
+- `POST /api/v1/groups/{id}/moderation/mute` - Mute user
+- `POST /api/v1/groups/{id}/moderation/ban` - Ban user
+
+### Locks
+- `GET /api/v1/groups/{id}/locks` - Get all locks
+- `PATCH /api/v1/groups/{id}/locks/{type}` - Toggle lock
+- `POST /api/v1/groups/{id}/locks/{type}/timed` - Set timed lock
+
+## Development
+
+### Running Tests
+```bash
+pytest tests/ -v --cov=bot --cov=api
+```
+
+### Code Style
+```bash
+# Format code
+black .
+
+# Sort imports
+isort .
+
+# Type checking
+mypy bot api
+```
+
+### Creating Migrations
+```bash
+alembic revision --autogenerate -m "Description of changes"
+alembic upgrade head
+```
+
+## Deployment
+
+### Docker
+```bash
+docker-compose -f docker-compose.yml up -d
+```
+
+### Render.com
+The project includes a `render.yaml` for one-click deployment.
+
+## License
+
+MIT License - See LICENSE file for details.
+
+## Support
+
+- Documentation: `/docs` directory
+- Issues: GitHub Issues
+- Community: Telegram Group
