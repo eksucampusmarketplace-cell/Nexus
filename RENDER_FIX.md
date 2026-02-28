@@ -23,7 +23,7 @@ Updated all Python packages to newer versions that have pre-built wheels for Pyt
 - `aiogram`: 3.4.1 → 3.13.1
 - `fastapi`: 0.109.2 → 0.115.0
 - `sqlalchemy[asyncio]`: 2.0.27 → 2.0.36
-- `asyncpg`: 0.31.0 → 0.30.0
+- `asyncpg`: 0.31.0 (maintained - this is the correct version with pre-built wheels for Python 3.12)
 - `redis`: 5.0.1 → 5.2.1
 - `celery`: 5.3.6 → 5.4.0
 - `openai`: 1.12.0 → 1.55.0

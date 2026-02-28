@@ -33,11 +33,11 @@ aiogram              3.4.1  → 3.13.1
 fastapi              0.109.2 → 0.115.0
 uvicorn[standard]    0.27.1 → 0.32.0
 sqlalchemy[asyncio]  2.0.27 → 2.0.36
-asyncpg              0.31.0 → 0.30.0
+asyncpg              0.31.0 (maintained - correct version with pre-built wheels)
 redis                5.0.1  → 5.2.1
 celery               5.3.6  → 5.4.0
 openai               1.12.0 → 1.55.0
-pydantic             2.5.3  → 2.10.3 ⭐ KEY FIX
+pydantic             2.5.3  → 2.9.2 ⭐ KEY FIX
 pydantic-settings    2.1.0  → 2.6.1
 aiohttp              3.9.3  → 3.11.10
 httpx                0.26.0 → 0.28.1
@@ -179,7 +179,7 @@ Ran validation script `validate_changes.py`:
 ✓ PASS: Key Dependencies
   ✓ aiogram: 3.13.1
   ✓ fastapi: 0.115.0
-  ✓ pydantic: 2.10.3
+  ✓ pydantic: 2.9.2
   ✓ pydantic-settings: 2.6.1
 ✓ PASS: Render Config
 ✓ PASS: .gitignore
