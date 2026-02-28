@@ -21,6 +21,13 @@ import {
   FileText,
   Upload,
   Key,
+  Trophy,
+  Heart,
+  Gamepad2,
+  Megaphone,
+  Workflow,
+  Type,
+  Search,
 } from 'lucide-react'
 import { useGroupStore } from '../../stores/groupStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -46,6 +53,14 @@ const menuItems = [
   { icon: Flow, label: 'Bot Builder', path: 'bot-builder', color: 'text-rose-500' },
   { icon: Scissors, label: 'Advanced', path: 'advanced', color: 'text-teal-500' },
   { icon: Settings, label: 'Settings', path: 'settings', color: 'text-gray-500' },
+  { icon: Zap, label: 'Integrations', path: 'integrations', color: 'text-teal-500' },
+  { icon: Trophy, label: 'Gamification', path: 'gamification', color: 'text-yellow-500' },
+  { icon: Heart, label: 'Community', path: 'community', color: 'text-pink-500' },
+  { icon: Gamepad2, label: 'Games', path: 'games', color: 'text-purple-500' },
+  { icon: Megaphone, label: 'Broadcast', path: 'broadcast', color: 'text-blue-500' },
+  { icon: Workflow, label: 'Automation', path: 'automation', color: 'text-indigo-500' },
+  { icon: Type, label: 'Formatting', path: 'formatting', color: 'text-emerald-500' },
+  { icon: Search, label: 'Search', path: 'search', color: 'text-cyan-500' },
 ]
 
 export default function AdminDashboard() {
@@ -53,10 +68,11 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const { currentGroup, setCurrentGroup, isLoading, setLoading } = useGroupStore()
   const { user } = useAuthStore()
-
+  
   useEffect(() => {
     const loadGroup = async () => {
       if (!groupId) return
+      
       setLoading(true)
       try {
         const [group, stats] = await Promise.all([
@@ -71,14 +87,14 @@ export default function AdminDashboard() {
         setLoading(false)
       }
     }
-
+  
     loadGroup()
   }, [groupId])
-
+  
   if (isLoading || !currentGroup) {
     return <Loading />
   }
-
+  
   return (
     <div className="py-6 animate-fade-in">
       {/* Header */}
@@ -93,7 +109,7 @@ export default function AdminDashboard() {
           </p>
         </div>
       </div>
-
+  
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <StatCard
@@ -124,7 +140,7 @@ export default function AdminDashboard() {
           trend="Stable"
         />
       </div>
-
+  
       {/* Quick Actions */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-white mb-3">Quick Actions</h2>
@@ -142,7 +158,7 @@ export default function AdminDashboard() {
           ))}
         </div>
       </div>
-
+  
       {/* Bot Status */}
       <Card
         title="Bot Status"
