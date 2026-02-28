@@ -3,7 +3,7 @@ services:
     name: nexus-api
     runtime: python
     plan: standard
-    pythonVersion: 3.12.2
+    pythonVersion: 3.12.8
     buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -49,7 +49,7 @@ services:
     name: nexus-bot
     runtime: python
     plan: standard
-    pythonVersion: 3.12.2
+    pythonVersion: 3.12.8
     buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt
     startCommand: python -m bot.core
     envVars:
@@ -95,7 +95,7 @@ services:
     name: nexus-worker
     runtime: python
     plan: standard
-    pythonVersion: 3.12.2
+    pythonVersion: 3.12.8
     buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt
     startCommand: celery -A worker.celery_app worker --loglevel=info --concurrency=4
     envVars:
@@ -137,7 +137,7 @@ services:
     name: nexus-beat
     runtime: python
     plan: starter
-    pythonVersion: 3.12.2
+    pythonVersion: 3.12.8
     buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt
     startCommand: celery -A worker.celery_app beat --loglevel=info
     envVars:
