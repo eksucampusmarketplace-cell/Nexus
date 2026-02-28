@@ -44,6 +44,10 @@ services:
         value: production
       - key: PYTHONPATH
         value: /opt/render/project
+      - key: DATABASE_POOL_SIZE
+        value: "5"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "5"
 
   - type: web
     name: nexus-bot
@@ -90,6 +94,10 @@ services:
         value: production
       - key: PYTHONPATH
         value: /opt/render/project
+      - key: DATABASE_POOL_SIZE
+        value: "5"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "5"
 
   - type: worker
     name: nexus-worker
@@ -107,6 +115,10 @@ services:
         fromDatabase:
           name: nexus-db
           property: connectionString
+      - key: DATABASE_POOL_SIZE
+        value: "5"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "5"
       - key: REDIS_URL
         fromService:
           type: redis
@@ -149,6 +161,10 @@ services:
         fromDatabase:
           name: nexus-db
           property: connectionString
+      - key: DATABASE_POOL_SIZE
+        value: "3"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "2"
       - key: REDIS_URL
         fromService:
           type: redis
