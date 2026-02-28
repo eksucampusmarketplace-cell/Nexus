@@ -81,7 +81,7 @@ app.include_router(toggles.router, prefix="/api/v1", tags=["toggles"])
 app.include_router(webhooks.router, prefix="", tags=["webhooks"])
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     """Root endpoint."""
     return {
@@ -91,7 +91,7 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
