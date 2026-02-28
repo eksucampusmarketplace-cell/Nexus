@@ -1,5 +1,5 @@
-"""Locks module - Content type locking."""
+"""Locks module."""
 
-from .module import LocksModule
+from bot.modules.locks.module import LocksModule
 
 __all__ = ["LocksModule"]

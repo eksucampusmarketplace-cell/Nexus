@@ -1,5 +1,5 @@
-"""Filters module - Keyword auto-responses."""
+"""Filters module."""
 
-from .module import FiltersModule
+from bot.modules.filters.module import FiltersModule
 
 __all__ = ["FiltersModule"]

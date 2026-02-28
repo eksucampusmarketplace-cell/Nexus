@@ -1,39 +1,39 @@
-"""Welcome module implementation."""
+"""Welcome module - Welcome and goodbye messages."""
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from aiogram.types import Message
+from pydantic import BaseModel
 
 from bot.core.context import NexusContext
-from bot.core.module_base import CommandDef, EventType, ModuleCategory, NexusModule
+from bot.core.module_base import CommandDef, ModuleCategory, NexusModule
 
 
 class WelcomeConfig(BaseModel):
-    """Welcome module configuration."""
+    """Configuration for welcome module."""
     welcome_enabled: bool = True
-    welcome_text: str = Field(default="Welcome {mention} to {chatname}!")
-    welcome_media: Optional[str] = None
-    welcome_media_type: Optional[str] = None
-    welcome_buttons: Optional[list] = None
-    delete_previous: bool = False
-    delete_after: Optional[int] = None
-    send_as_dm: bool = False
-
     goodbye_enabled: bool = False
-    goodbye_text: str = Field(default="Goodbye {mention}! We hope to see you again.")
-
-    captcha_enabled: bool = False
-    captcha_type: str = "button"  # button, math, quiz
-    captcha_timeout: int = 90
+    welcome_content: str = "Welcome {first}! You are member #{count} of {chatname}."
+    goodbye_content: str = "Goodbye {first}!"
+    welcome_media_file_id: Optional[str] = None
+    welcome_media_type: Optional[str] = None
+    goodbye_media_file_id: Optional[str] = None
+    goodbye_media_type: Optional[str] = None
+    delete_previous: bool = False
+    delete_after_seconds: Optional[int] = None
+    send_as_dm: bool = False
+    mute_on_join: bool = False
+    show_on_join: bool = True
+    auto_delete_service: bool = True
 
 
 class WelcomeModule(NexusModule):
-    """Welcome and goodbye messages module."""
+    """Welcome and goodbye system."""
 
     name = "welcome"
     version = "1.0.0"
     author = "Nexus Team"
-    description = "Welcome and goodbye messages for new and leaving members"
+    description = "Welcome new members and goodbye leaving members"
     category = ModuleCategory.GREETINGS
 
     config_schema = WelcomeConfig
@@ -42,354 +42,493 @@ class WelcomeModule(NexusModule):
     commands = [
         CommandDef(
             name="setwelcome",
-            description="Set the welcome message. Use {first}, {last}, {username}, {mention}, {count}, {chatname}",
+            description="Set welcome message",
             admin_only=True,
-            args="<text>",
+            args="<content>",
         ),
         CommandDef(
             name="welcome",
-            description="Show current welcome settings.",
+            description="View current welcome message",
             admin_only=True,
         ),
         CommandDef(
             name="resetwelcome",
-            description="Reset welcome message to default.",
+            description="Reset welcome message to default",
             admin_only=True,
         ),
         CommandDef(
             name="setgoodbye",
-            description="Set the goodbye message.",
+            description="Set goodbye message",
             admin_only=True,
-            args="<text>",
+            args="<content>",
         ),
         CommandDef(
             name="goodbye",
-            description="Show current goodbye settings.",
+            description="View current goodbye message",
             admin_only=True,
         ),
         CommandDef(
             name="resetgoodbye",
-            description="Reset goodbye message to default.",
+            description="Reset goodbye message to default",
             admin_only=True,
         ),
         CommandDef(
             name="cleanwelcome",
-            description="Toggle auto-delete of previous welcome.",
+            description="Auto-delete previous welcome messages",
             admin_only=True,
-            args="on/off",
+            args="[on|off]",
         ),
         CommandDef(
             name="welcomemute",
-            description="Mute new members until captcha is completed.",
+            description="Mute new members until they complete captcha",
             admin_only=True,
-            args="on/off",
+            args="[on|off]",
         ),
         CommandDef(
             name="welcomehelp",
-            description="Show welcome variables help.",
-            admin_only=True,
+            description="Show welcome message variables",
+            admin_only=False,
         ),
     ]
 
-    listeners = [EventType.NEW_MEMBER, EventType.LEFT_MEMBER, EventType.MESSAGE]
+    listeners = [
+        EventType.NEW_MEMBER,
+        EventType.LEFT_MEMBER,
+    ]
+
+    async def on_load(self, app):
+        """Register command handlers."""
+        self.register_command("setwelcome", self.cmd_setwelcome)
+        self.register_command("welcome", self.cmd_welcome)
+        self.register_command("resetwelcome", self.cmd_resetwelcome)
+        self.register_command("setgoodbye", self.cmd_setgoodbye)
+        self.register_command("goodbye", self.cmd_goodbye)
+        self.register_command("resetgoodbye", self.cmd_resetgoodbye)
+        self.register_command("cleanwelcome", self.cmd_cleanwelcome)
+        self.register_command("welcomemute", self.cmd_welcomemute)
+        self.register_command("welcomehelp", self.cmd_welcomehelp)
+
+    def _format_variables(self, text: str, ctx: NexusContext) -> str:
+        """Format welcome/goodbye variables."""
+        if ctx.replied_to and ctx.replied_to.new_chat_members:
+            member = ctx.replied_to.new_chat_members[0]
+            first_name = member.first_name or "Friend"
+            last_name = member.last_name or ""
+            username = member.username or ""
+            user_id = member.id
+            full_name = f"{first_name} {last_name}".strip()
+            chatname = ctx.group.title
+            count = ctx.group.member_count
+
+            # Get rules
+            rules = "No rules set"
+            if ctx.db:
+                from shared.models import Rule
+                result = ctx.db.execute(
+                    f"SELECT content FROM rules WHERE group_id = {ctx.group.id}"
+                )
+                row = result.fetchone()
+                if row:
+                    rules = row[0]
+
+            text = text.replace("{first}", first_name)
+            text = text.replace("{last}", last_name)
+            text = text.replace("{fullname}", full_name)
+            text = text.replace("{username}", username or f"@{user_id}")
+            text = text.replace("{mention}", f"<a href='tg://user?id={user_id}'>{full_name}</a>")
+            text = text.replace("{id}", str(user_id))
+            text = text.replace("{count}", str(count))
+            text = text.replace("{chatname}", chatname)
+            text = text.replace("{rules}", rules)
+
+        return text
 
     async def on_new_member(self, ctx: NexusContext) -> bool:
-        """Send welcome message when new member joins."""
-        if not ctx.message or not ctx.message.new_chat_members:
+        """Handle new member join."""
+        if not ctx.group.module_configs.get("welcome", {}).get("welcome_enabled", True):
             return False
 
         config = ctx.group.module_configs.get("welcome", {})
-        if not config.get("welcome_enabled", True):
+
+        # Mute if enabled
+        if config.get("mute_on_join", False):
+            if ctx.replied_to and ctx.replied_to.new_chat_members:
+                member = ctx.replied_to.new_chat_members[0]
+                try:
+                    await ctx.bot.restrict_chat_member(
+                        chat_id=ctx.group.telegram_id,
+                        user_id=member.id,
+                        permissions={
+                            "can_send_messages": False,
+                            "can_send_media_messages": False,
+                            "can_send_polls": False,
+                            "can_send_other_messages": False,
+                        },
+                    )
+                except Exception:
+                    pass
+
+        # Don't show welcome if disabled
+        if not config.get("show_on_join", True):
             return False
 
-        welcome_text = config.get("welcome_text", "Welcome {mention}!")
-        welcome_media = config.get("welcome_media")
-        welcome_media_type = config.get("welcome_media_type")
+        content = config.get("welcome_content", "")
+        content = self._format_variables(content, ctx)
 
-        for new_member in ctx.message.new_chat_members:
-            if new_member.is_bot:
-                continue
+        # Check if should send as DM
+        send_as_dm = config.get("send_as_dm", False)
 
-            # Format welcome message
-            formatted_text = self._format_message(
-                welcome_text,
-                new_member,
-                ctx.group,
-            )
-
-            # Send welcome
-            buttons = config.get("welcome_buttons")
-            if welcome_media:
-                await ctx.reply_media(
-                    welcome_media,
-                    media_type=welcome_media_type or "photo",
-                    caption=formatted_text,
-                    buttons=buttons,
+        # Send welcome message
+        if send_as_dm and ctx.replied_to and ctx.replied_to.new_chat_members:
+            member = ctx.replied_to.new_chat_members[0]
+            try:
+                await ctx.bot.send_message(
+                    chat_id=member.id,
+                    text=content,
+                    parse_mode="HTML",
                 )
-            else:
-                await ctx.reply(formatted_text, buttons=buttons)
+                return True
+            except Exception:
+                pass
+
+        # Send in group
+        media_file_id = config.get("welcome_media_file_id")
+        media_type = config.get("welcome_media_type")
+        delete_after = config.get("delete_after_seconds")
+
+        if media_file_id:
+            if media_type == "photo":
+                await ctx.reply_media(media_file_id, "photo", caption=content)
+            elif media_type == "video":
+                await ctx.reply_media(media_file_id, "video", caption=content)
+            elif media_type == "animation":
+                await ctx.reply_media(media_file_id, "animation", caption=content)
+            elif media_type == "document":
+                await ctx.reply_media(media_file_id, "document", caption=content)
+        else:
+            await ctx.reply(content)
+
+        # Auto-delete after N seconds
+        if delete_after:
+            pass  # Would use scheduler
 
         return True
 
     async def on_left_member(self, ctx: NexusContext) -> bool:
-        """Send goodbye message when member leaves."""
-        if not ctx.message or not ctx.message.left_chat_member:
+        """Handle member leave."""
+        if not ctx.group.module_configs.get("welcome", {}).get("goodbye_enabled", False):
             return False
 
         config = ctx.group.module_configs.get("welcome", {})
-        if not config.get("goodbye_enabled", False):
-            return False
+        content = config.get("goodbye_content", "")
 
-        goodbye_text = config.get("goodbye_text", "Goodbye {mention}!")
+        if ctx.replied_to and ctx.replied_to.left_chat_member:
+            member = ctx.replied_to.left_chat_member
+            first_name = member.first_name or "Friend"
+            last_name = member.last_name or ""
+            full_name = f"{first_name} {last_name}".strip()
+            username = member.username or ""
+            user_id = member.id
 
-        formatted_text = self._format_message(
-            goodbye_text,
-            ctx.message.left_chat_member,
-            ctx.group,
-        )
+            content = content.replace("{first}", first_name)
+            content = content.replace("{last}", last_name)
+            content = content.replace("{fullname}", full_name)
+            content = content.replace("{username}", username or f"@{user_id}")
+            content = content.replace("{mention}", f"<a href='tg://user?id={user_id}'>{full_name}</a>")
+            content = content.replace("{id}", str(user_id))
 
-        await ctx.reply(formatted_text)
+            media_file_id = config.get("goodbye_media_file_id")
+            media_type = config.get("goodbye_media_type")
+
+            if media_file_id:
+                if media_type == "photo":
+                    await ctx.reply_media(media_file_id, "photo", caption=content)
+                elif media_type == "video":
+                    await ctx.reply_media(media_file_id, "video", caption=content)
+                elif media_type == "animation":
+                    await ctx.reply_media(media_file_id, "animation", caption=content)
+            else:
+                await ctx.reply(content)
+
         return True
 
-    async def on_message(self, ctx: NexusContext) -> bool:
-        """Handle welcome commands."""
-        if not ctx.message or not ctx.message.text:
-            return False
-
-        text = ctx.message.text
-        command = text.split()[0].lower()
-
-        if command == "/setwelcome":
-            return await self._handle_setwelcome(ctx)
-        elif command == "/welcome":
-            return await self._handle_welcome(ctx)
-        elif command == "/resetwelcome":
-            return await self._handle_resetwelcome(ctx)
-        elif command == "/setgoodbye":
-            return await self._handle_setgoodbye(ctx)
-        elif command == "/goodbye":
-            return await self._handle_goodbye(ctx)
-        elif command == "/resetgoodbye":
-            return await self._handle_resetgoodbye(ctx)
-        elif command == "/cleanwelcome":
-            return await self._handle_cleanwelcome(ctx)
-        elif command == "/welcomemute":
-            return await self._handle_welcomemute(ctx)
-        elif command == "/welcomehelp":
-            return await self._handle_welcomehelp(ctx)
-
-        return False
-
-    async def _handle_setwelcome(self, ctx: NexusContext) -> bool:
-        """Handle /setwelcome command."""
+    async def cmd_setwelcome(self, ctx: NexusContext):
+        """Set welcome message."""
         if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
 
-        text = ctx.message.text.split(maxsplit=1)
-        if len(text) < 2:
-            await ctx.reply("⚠️ Please provide welcome text.")
-            return True
+        args = ctx.message.text.split(maxsplit=1)[1:] if ctx.message.text else []
+        if not args:
+            await ctx.reply("❌ Usage: /setwelcome <message>")
+            return
 
-        welcome_text = text[1]
+        content = " ".join(args)
 
-        # Update config
+        # Check if reply to media
+        media_file_id = None
+        media_type = None
+        if ctx.replied_to:
+            if ctx.replied_to.photo:
+                media_file_id = ctx.replied_to.photo[-1].file_id
+                media_type = "photo"
+            elif ctx.replied_to.video:
+                media_file_id = ctx.replied_to.video.file_id
+                media_type = "video"
+            elif ctx.replied_to.animation:
+                media_file_id = ctx.replied_to.animation.file_id
+                media_type = "animation"
+            elif ctx.replied_to.document:
+                media_file_id = ctx.replied_to.document.file_id
+                media_type = "document"
+
+        config = ctx.group.module_configs.get("welcome", {})
+        config["welcome_content"] = content
+        config["welcome_enabled"] = True
+        if media_file_id:
+            config["welcome_media_file_id"] = media_file_id
+            config["welcome_media_type"] = media_type
+
+        # Save to database
         if ctx.db:
             from shared.models import Greeting
-            result = await ctx.db.execute(
+            greeting = ctx.db.execute(
                 f"""
                 SELECT * FROM greetings
-                WHERE group_id = {ctx.group.id} AND type = 'welcome'
+                WHERE group_id = {ctx.group.id} AND greeting_type = 'welcome'
+                LIMIT 1
                 """
-            )
-            greeting = result.fetchone()
+            ).fetchone()
 
             if greeting:
-                await ctx.db.execute(
+                ctx.db.execute(
                     f"""
                     UPDATE greetings
-                    SET content = '{welcome_text.replace(chr(39), chr(39)*2)}',
+                    SET content = %s,
+                        media_file_id = %s,
+                        media_type = %s,
+                        is_enabled = TRUE,
                         updated_by = {ctx.user.user_id}
-                    WHERE group_id = {ctx.group.id} AND type = 'welcome'
-                    """
+                    WHERE id = {greeting[0]}
+                    """,
+                    (content, media_file_id, media_type)
                 )
             else:
-                await ctx.db.execute(
-                    f"""
-                    INSERT INTO greetings (group_id, type, content, updated_by)
-                    VALUES ({ctx.group.id}, 'welcome', '{welcome_text.replace(chr(39), chr(39)*2)}', {ctx.user.user_id})
-                    """
+                greeting = Greeting(
+                    group_id=ctx.group.id,
+                    greeting_type="welcome",
+                    content=content,
+                    media_file_id=media_file_id,
+                    media_type=media_type,
+                    is_enabled=True,
+                    updated_by=ctx.user.user_id,
                 )
-            await ctx.db.commit()
+                ctx.db.add(greeting)
 
-        await ctx.reply("✅ Welcome message updated!")
-        return True
+        await ctx.reply("✅ Welcome message set")
 
-    async def _handle_welcome(self, ctx: NexusContext) -> bool:
-        """Handle /welcome command."""
+    async def cmd_welcome(self, ctx: NexusContext):
+        """View current welcome message."""
+        config = ctx.group.module_configs.get("welcome", {})
+        content = config.get("welcome_content", "Not set")
+        media_file_id = config.get("welcome_media_file_id")
+
+        text = f"📝 Welcome Message:\n\n{content}"
+        if media_file_id:
+            text += "\n\n📎 Media attached"
+        if not config.get("welcome_enabled", False):
+            text += "\n\n⚠️ Welcome is disabled"
+
+        await ctx.reply(text)
+
+    async def cmd_resetwelcome(self, ctx: NexusContext):
+        """Reset welcome message."""
         if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
 
         config = ctx.group.module_configs.get("welcome", {})
-        text = config.get("welcome_text", "Not set")
-
-        await ctx.reply(f"📋 <b>Current Welcome Message:</b>\n\n{text}")
-        return True
-
-    async def _handle_resetwelcome(self, ctx: NexusContext) -> bool:
-        """Handle /resetwelcome command."""
-        if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+        config["welcome_content"] = "Welcome {first}! You are member #{count} of {chatname}."
+        config["welcome_media_file_id"] = None
+        config["welcome_media_type"] = None
+        config["welcome_enabled"] = True
 
         if ctx.db:
-            await ctx.db.execute(
+            from shared.models import Greeting
+            ctx.db.execute(
                 f"""
                 DELETE FROM greetings
-                WHERE group_id = {ctx.group.id} AND type = 'welcome'
+                WHERE group_id = {ctx.group.id} AND greeting_type = 'welcome'
                 """
             )
-            await ctx.db.commit()
 
-        await ctx.reply("✅ Welcome message reset to default.")
-        return True
+        await ctx.reply("✅ Welcome message reset to default")
 
-    async def _handle_setgoodbye(self, ctx: NexusContext) -> bool:
-        """Handle /setgoodbye command."""
+    async def cmd_setgoodbye(self, ctx: NexusContext):
+        """Set goodbye message."""
         if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
 
-        text = ctx.message.text.split(maxsplit=1)
-        if len(text) < 2:
-            await ctx.reply("⚠️ Please provide goodbye text.")
-            return True
+        args = ctx.message.text.split(maxsplit=1)[1:] if ctx.message.text else []
+        if not args:
+            await ctx.reply("❌ Usage: /setgoodbye <message>")
+            return
 
-        goodbye_text = text[1]
+        content = " ".join(args)
 
-        if ctx.db:
-            await ctx.db.execute(
-                f"""
-                INSERT INTO greetings (group_id, type, content, updated_by)
-                VALUES ({ctx.group.id}, 'goodbye', '{goodbye_text.replace(chr(39), chr(39)*2)}', {ctx.user.user_id})
-                ON CONFLICT (group_id, type) DO UPDATE
-                SET content = EXCLUDED.content, updated_by = EXCLUDED.updated_by
-                """
-            )
-            await ctx.db.commit()
-
-        await ctx.reply("✅ Goodbye message updated!")
-        return True
-
-    async def _handle_goodbye(self, ctx: NexusContext) -> bool:
-        """Handle /goodbye command."""
-        if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+        media_file_id = None
+        media_type = None
+        if ctx.replied_to:
+            if ctx.replied_to.photo:
+                media_file_id = ctx.replied_to.photo[-1].file_id
+                media_type = "photo"
+            elif ctx.replied_to.video:
+                media_file_id = ctx.replied_to.video.file_id
+                media_type = "video"
+            elif ctx.replied_to.animation:
+                media_file_id = ctx.replied_to.animation.file_id
+                media_type = "animation"
 
         config = ctx.group.module_configs.get("welcome", {})
-        enabled = config.get("goodbye_enabled", False)
-        text = config.get("goodbye_text", "Not set")
-
-        status = "✅ Enabled" if enabled else "❌ Disabled"
-        await ctx.reply(f"📋 <b>Goodbye ({status}):</b>\n\n{text}")
-        return True
-
-    async def _handle_resetgoodbye(self, ctx: NexusContext) -> bool:
-        """Handle /resetgoodbye command."""
-        if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+        config["goodbye_content"] = content
+        config["goodbye_enabled"] = True
+        if media_file_id:
+            config["goodbye_media_file_id"] = media_file_id
+            config["goodbye_media_type"] = media_type
 
         if ctx.db:
-            await ctx.db.execute(
+            from shared.models import Greeting
+            greeting = ctx.db.execute(
+                f"""
+                SELECT * FROM greetings
+                WHERE group_id = {ctx.group.id} AND greeting_type = 'goodbye'
+                LIMIT 1
+                """
+            ).fetchone()
+
+            if greeting:
+                ctx.db.execute(
+                    f"""
+                    UPDATE greetings
+                    SET content = %s,
+                        media_file_id = %s,
+                        media_type = %s,
+                        is_enabled = TRUE,
+                        updated_by = {ctx.user.user_id}
+                    WHERE id = {greeting[0]}
+                    """,
+                    (content, media_file_id, media_type)
+                )
+            else:
+                greeting = Greeting(
+                    group_id=ctx.group.id,
+                    greeting_type="goodbye",
+                    content=content,
+                    media_file_id=media_file_id,
+                    media_type=media_type,
+                    is_enabled=True,
+                    updated_by=ctx.user.user_id,
+                )
+                ctx.db.add(greeting)
+
+        await ctx.reply("✅ Goodbye message set")
+
+    async def cmd_goodbye(self, ctx: NexusContext):
+        """View current goodbye message."""
+        config = ctx.group.module_configs.get("welcome", {})
+        content = config.get("goodbye_content", "Not set")
+        media_file_id = config.get("goodbye_media_file_id")
+
+        text = f"📝 Goodbye Message:\n\n{content}"
+        if media_file_id:
+            text += "\n\n📎 Media attached"
+        if not config.get("goodbye_enabled", False):
+            text += "\n\n⚠️ Goodbye is disabled"
+
+        await ctx.reply(text)
+
+    async def cmd_resetgoodbye(self, ctx: NexusContext):
+        """Reset goodbye message."""
+        if not ctx.user.is_admin:
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
+
+        config = ctx.group.module_configs.get("welcome", {})
+        config["goodbye_content"] = "Goodbye {first}!"
+        config["goodbye_media_file_id"] = None
+        config["goodbye_media_type"] = None
+        config["goodbye_enabled"] = False
+
+        if ctx.db:
+            from shared.models import Greeting
+            ctx.db.execute(
                 f"""
                 DELETE FROM greetings
-                WHERE group_id = {ctx.group.id} AND type = 'goodbye'
+                WHERE group_id = {ctx.group.id} AND greeting_type = 'goodbye'
                 """
             )
-            await ctx.db.commit()
 
-        await ctx.reply("✅ Goodbye message reset to default.")
-        return True
+        await ctx.reply("✅ Goodbye message reset")
 
-    async def _handle_cleanwelcome(self, ctx: NexusContext) -> bool:
-        """Handle /cleanwelcome command."""
+    async def cmd_cleanwelcome(self, ctx: NexusContext):
+        """Auto-delete previous welcome messages."""
         if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
 
-        args = ctx.message.text.split()
-        if len(args) < 2 or args[1].lower() not in ["on", "off"]:
-            await ctx.reply("⚠️ Usage: /cleanwelcome on/off")
-            return True
+        args = ctx.message.text.split()[1:] if ctx.message.text else []
+        if not args:
+            await ctx.reply("✅ Clean welcome: ON")
+        elif args[0].lower() in ["on", "yes", "1"]:
+            await ctx.reply("✅ Clean welcome: ON")
+        elif args[0].lower() in ["off", "no", "0"]:
+            await ctx.reply("✅ Clean welcome: OFF")
+        else:
+            await ctx.reply("❌ Usage: /cleanwelcome [on|off]")
 
-        enabled = args[1].lower() == "on"
-        # Update config
-
-        await ctx.reply(f"✅ Auto-delete previous welcome: {'Enabled' if enabled else 'Disabled'}")
-        return True
-
-    async def _handle_welcomemute(self, ctx: NexusContext) -> bool:
-        """Handle /welcomemute command."""
+    async def cmd_welcomemute(self, ctx: NexusContext):
+        """Mute new members."""
         if not ctx.user.is_admin:
-            await ctx.reply("❌ Admin only.")
-            return True
+            await ctx.reply(ctx.i18n.t("no_permission"))
+            return
 
-        args = ctx.message.text.split()
-        if len(args) < 2 or args[1].lower() not in ["on", "off"]:
-            await ctx.reply("⚠️ Usage: /welcomemute on/off")
-            return True
+        args = ctx.message.text.split()[1:] if ctx.message.text else []
+        if not args:
+            await ctx.reply("❌ Usage: /welcomemute [on|off]")
+            return
 
-        enabled = args[1].lower() == "on"
+        config = ctx.group.module_configs.get("welcome", {})
+        if args[0].lower() in ["on", "yes", "1"]:
+            config["mute_on_join"] = True
+            await ctx.reply("✅ Welcome mute: ON")
+        elif args[0].lower() in ["off", "no", "0"]:
+            config["mute_on_join"] = False
+            await ctx.reply("✅ Welcome mute: OFF")
+        else:
+            await ctx.reply("❌ Usage: /welcomemute [on|off]")
 
-        await ctx.reply(f"✅ Welcome captcha: {'Enabled' if enabled else 'Disabled'}")
-        return True
+    async def cmd_welcomehelp(self, ctx: NexusContext):
+        """Show welcome message help."""
+        help_text = """
+📝 Welcome Message Variables
 
-    async def _handle_welcomehelp(self, ctx: NexusContext) -> bool:
-        """Handle /welcomehelp command."""
-        help_text = """📖 <b>Welcome Message Variables</b>
+{first} - User's first name
+{last} - User's last name
+{fullname} - User's full name
+{username} - User's username
+{mention} - User's mention
+{id} - User's ID
+{count} - Current member count
+{chatname} - Chat title
+{rules} - Group rules
 
-Use these placeholders in your welcome message:
+💡 You can reply to media to set it as the welcome media.
 
-<code>{first}</code> - User's first name
-<code>{last}</code> - User's last name
-<code>{fullname}</code> - Full name
-<code>{username}</code> - Username (without @)
-<code>{mention}</code> - User mention
-<code>{id}</code> - User ID
-<code>{count}</code> - Group member count
-<code>{chatname}</code> - Group name
-<code>{rules}</code> - Link to rules
+Examples:
+/setwelcome Welcome {first}! You are member #{count} of {chatname}
+/setwelcome Hello {mention}! Please read our rules: {rules}
+/setgoodbye Goodbye {first}!
+        """
 
-<b>Example:</b>
-<code>Welcome {mention} to {chatname}! You are member #{count}.</code>
-"""
         await ctx.reply(help_text)
-        return True
-
-    def _format_message(
-        self,
-        template: str,
-        user,
-        group: NexusContext,
-    ) -> str:
-        """Format welcome/goodbye message with variables."""
-        first = user.first_name or ""
-        last = user.last_name or ""
-        fullname = f"{first} {last}".strip()
-        username = user.username or ""
-        mention = f'<a href="tg://user?id={user.id}">{first}</a>'
-
-        return template.format(
-            first=first,
-            last=last,
-            fullname=fullname,
-            username=username,
-            mention=mention,
-            id=user.id,
-            count=group.member_count if hasattr(group, 'member_count') else '?',
-            chatname=group.title if hasattr(group, 'title') else 'this group',
-            rules="/rules",
-        )

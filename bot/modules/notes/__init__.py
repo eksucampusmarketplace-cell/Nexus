@@ -1,5 +1,5 @@
-"""Notes module - Saved notes system."""
+"""Notes module."""
 
-from .module import NotesModule
+from bot.modules.notes.module import NotesModule
 
 __all__ = ["NotesModule"]

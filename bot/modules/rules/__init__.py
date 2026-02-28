@@ -1,5 +1,5 @@
-"""Rules module - Group rules management."""
+"""Rules module."""
 
-from .module import RulesModule
+from bot.modules.rules.module import RulesModule
 
 __all__ = ["RulesModule"]
