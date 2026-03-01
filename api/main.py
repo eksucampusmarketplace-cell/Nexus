@@ -75,8 +75,18 @@ async def setup_telegram_webhook():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
+    logger.info("=" * 50)
+    logger.info("Nexus API Starting Up")
+    logger.info("=" * 50)
+    logger.info(f"Python Version: {os.sys.version}")
+    logger.info(f"Working Directory: {os.getcwd()}")
+    logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    
     # Startup
+    logger.info("Initializing database...")
     await init_db()
+    
+    logger.info("Connecting to Redis...")
     await get_redis()
 
     # Set up middleware pipeline
@@ -110,13 +120,27 @@ async def lifespan(app: FastAPI):
     # Set up Telegram webhook (critical for Render single-service deployment)
     logger.info("Setting up Telegram webhook...")
     await setup_telegram_webhook()
+    
+    # Check Mini App files
+    dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
+    if os.path.exists(dist_path):
+        logger.info(f"Mini App dist directory found at: {dist_path}")
+        file_count = sum(1 for _, _, files in os.walk(dist_path) for _ in files)
+        logger.info(f"Mini App contains {file_count} files")
+    else:
+        logger.warning(f"Mini App dist directory NOT found at: {dist_path}")
+        logger.warning("Mini App will not be available via /debug/serve-mini-app")
+    
     logger.info("Startup complete!")
+    logger.info("=" * 50)
 
     yield
 
     # Shutdown
+    logger.info("Shutting down Nexus API...")
     await module_registry.unload_all()
     await close_redis()
+    logger.info("Shutdown complete")
 
 
 app = FastAPI(
@@ -134,6 +158,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests for debugging."""
+    start_time = None
+    
+    try:
+        start_time = logger.info(f"Request: {request.method} {request.url.path}")
+        response = await call_next(request)
+        return response
+    except Exception as e:
+        logger.error(f"Request failed: {request.method} {request.url.path} - Error: {e}")
+        raise
 
 
 # Error handlers
@@ -190,3 +229,212 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.get("/debug/env")
+async def debug_env():
+    """Debug endpoint to check environment variables."""
+    env_vars = {
+        "BOT_TOKEN": bool(os.getenv("BOT_TOKEN")),
+        "WEBHOOK_URL": os.getenv("WEBHOOK_URL"),
+        "MINI_APP_URL": os.getenv("MINI_APP_URL"),
+        "DATABASE_URL": bool(os.getenv("DATABASE_URL")),
+        "REDIS_URL": bool(os.getenv("REDIS_URL")),
+        "ENVIRONMENT": os.getenv("ENVIRONMENT", "unknown"),
+        "PYTHONPATH": os.getenv("PYTHONPATH"),
+    }
+    return {
+        "environment": env_vars,
+        "all_env_keys": sorted([k for k in os.environ.keys() if not k.startswith("_")]),
+    }
+
+
+@app.get("/debug/mini-app-check")
+async def debug_mini_app():
+    """Debug endpoint to check Mini App availability."""
+    import httpx
+    import socket
+    
+    mini_app_url = os.getenv("MINI_APP_URL")
+    if not mini_app_url:
+        return {
+            "error": "MINI_APP_URL not set",
+            "suggestion": "Check render.yaml environment variables"
+        }
+    
+    results = {
+        "mini_app_url": mini_app_url,
+        "dns_resolution": None,
+        "http_response": None,
+        "error": None,
+    }
+    
+    # Check DNS resolution
+    try:
+        hostname = mini_app_url.replace("https://", "").replace("http://", "").split("/")[0]
+        ip = socket.gethostbyname(hostname)
+        results["dns_resolution"] = {"success": True, "hostname": hostname, "ip": ip}
+    except Exception as e:
+        results["dns_resolution"] = {"success": False, "error": str(e)}
+    
+    # Check HTTP response
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(mini_app_url)
+            results["http_response"] = {
+                "status_code": response.status_code,
+                "headers": dict(response.headers),
+                "content_length": len(response.content),
+                "content_preview": response.text[:200] if len(response.text) < 200 else response.text[:200] + "...",
+            }
+    except Exception as e:
+        results["http_response"] = {"success": False, "error": str(e)}
+        results["error"] = str(e)
+    
+    return results
+
+
+@app.get("/debug/static-files")
+async def debug_static_files():
+    """Debug endpoint to check if static files exist."""
+    import os
+    
+    dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
+    
+    results = {
+        "current_working_dir": os.getcwd(),
+        "dist_path": dist_path,
+        "dist_exists": os.path.exists(dist_path),
+        "dist_is_dir": os.path.isdir(dist_path) if os.path.exists(dist_path) else None,
+        "mini_app_exists": os.path.exists(os.path.join(os.getcwd(), "mini-app")),
+    }
+    
+    if os.path.exists(dist_path) and os.path.isdir(dist_path):
+        try:
+            files = []
+            for root, dirs, filenames in os.walk(dist_path):
+                for filename in filenames:
+                    filepath = os.path.join(root, filename)
+                    relpath = os.path.relpath(filepath, dist_path)
+                    files.append({
+                        "path": relpath,
+                        "size": os.path.getsize(filepath),
+                    })
+            results["files"] = sorted(files, key=lambda x: x["path"])
+            results["total_files"] = len(files)
+        except Exception as e:
+            results["file_list_error"] = str(e)
+    
+    return results
+
+
+@app.get("/debug/serve-mini-app", include_in_schema=False)
+async def serve_mini_app_html():
+    """Debug endpoint to serve Mini App HTML as fallback."""
+    from fastapi.responses import HTMLResponse
+    
+    dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
+    index_path = os.path.join(dist_path, "index.html")
+    
+    if not os.path.exists(index_path):
+        return HTMLResponse(
+            content="""
+            <html>
+            <head><title>Mini App Not Found</title></head>
+            <body>
+                <h1>Mini App Not Found</h1>
+                <p>The Mini App files are not available.</p>
+                <pre>""" + f"Looking for: {index_path}\nDist path exists: {os.path.exists(dist_path)}\nIndex exists: {os.path.exists(index_path)}" + """</pre>
+            </body>
+            </html>
+        """,
+            status_code=404
+        )
+    
+    with open(index_path, "r") as f:
+        html_content = f.read()
+    
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/debug/summary")
+async def debug_summary():
+    """Comprehensive debug summary endpoint."""
+    import httpx
+    import socket
+    import os
+    
+    summary = {
+        "api_status": {
+            "service": "Nexus API",
+            "version": "1.0.0",
+            "environment": os.getenv("ENVIRONMENT", "unknown"),
+            "working_dir": os.getcwd(),
+        },
+        "environment": {
+            "BOT_TOKEN_set": bool(os.getenv("BOT_TOKEN")),
+            "WEBHOOK_URL": os.getenv("WEBHOOK_URL"),
+            "MINI_APP_URL": os.getenv("MINI_APP_URL"),
+            "DATABASE_URL_set": bool(os.getenv("DATABASE_URL")),
+            "REDIS_URL_set": bool(os.getenv("REDIS_URL")),
+        },
+        "mini_app_files": {
+            "dist_path": os.path.join(os.getcwd(), "mini-app", "dist"),
+            "exists": os.path.exists(os.path.join(os.getcwd(), "mini-app", "dist")),
+            "is_directory": os.path.isdir(os.path.join(os.getcwd(), "mini-app", "dist")) if os.path.exists(os.path.join(os.getcwd(), "mini-app", "dist")) else None,
+        },
+        "mini_app_service": {},
+        "recommendations": [],
+    }
+    
+    # Check static files
+    dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
+    if os.path.exists(dist_path):
+        try:
+            files = []
+            for root, dirs, filenames in os.walk(dist_path):
+                for filename in filenames:
+                    filepath = os.path.join(root, filename)
+                    relpath = os.path.relpath(filepath, dist_path)
+                    files.append(relpath)
+            summary["mini_app_files"]["file_count"] = len(files)
+            summary["mini_app_files"]["sample_files"] = sorted(files)[:5]
+        except Exception as e:
+            summary["mini_app_files"]["error"] = str(e)
+    
+    # Check Mini App service
+    mini_app_url = os.getenv("MINI_APP_URL")
+    if mini_app_url:
+        try:
+            hostname = mini_app_url.replace("https://", "").replace("http://", "").split("/")[0]
+            ip = socket.gethostbyname(hostname)
+            summary["mini_app_service"]["dns"] = {"success": True, "ip": ip}
+        except Exception as e:
+            summary["mini_app_service"]["dns"] = {"success": False, "error": str(e)}
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(mini_app_url)
+                summary["mini_app_service"]["http"] = {
+                    "status_code": response.status_code,
+                    "success": response.status_code == 200,
+                }
+        except Exception as e:
+            summary["mini_app_service"]["http"] = {"success": False, "error": str(e)}
+    else:
+        summary["mini_app_service"]["error"] = "MINI_APP_URL not set"
+        summary["recommendations"].append("Set MINI_APP_URL environment variable")
+    
+    # Generate recommendations
+    if not summary["mini_app_files"]["exists"]:
+        summary["recommendations"].append("Mini App dist directory not found - run 'cd mini-app && bun run build'")
+    
+    if summary.get("mini_app_service", {}).get("http", {}).get("status_code") == 404:
+        summary["recommendations"].append("Mini App service returns 404 - check Render static service deployment")
+        summary["recommendations"].append("Verify staticPublishPath in render.yaml points to ./mini-app/dist")
+        summary["recommendations"].append("Check Render build logs for nexus-mini-app service")
+    
+    if summary.get("mini_app_service", {}).get("http", {}).get("success") == False:
+        summary["recommendations"].append("Mini App service unreachable - check service status on Render")
+    
+    return summary
