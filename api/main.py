@@ -186,10 +186,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Mount Mini App static files if dist exists
 dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
-assets_path = os.path.join(dist_path, "assets")
 
-if os.path.exists(assets_path):
-    app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+if os.path.exists(dist_path):
+    app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
     logger.info(f"Mini App assets mounted at /assets")
 
 
@@ -241,7 +240,8 @@ async def health_check():
 
 @app.get("/mini-app", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/mini-app/", response_class=HTMLResponse, include_in_schema=False)
-async def serve_mini_app():
+@app.get("/mini-app/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
+async def serve_mini_app(full_path: str = None):
     """Serve Mini App at /mini-app."""
     index_path = os.path.join(os.getcwd(), "mini-app", "dist", "index.html")
     

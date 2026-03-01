@@ -1,0 +1,50 @@
+Downloading click_didyoumean-0.3.1-py3-none-any.whl (3.6 kB)
+Downloading click_plugins-1.1.1.2-py2.py3-none-any.whl (11 kB)
+Downloading click_repl-0.3.0-py3-none-any.whl (10 kB)
+Downloading coverage-7.13.4-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (254 kB)
+Downloading ecdsa-0.19.1-py2.py3-none-any.whl (150 kB)
+Downloading frozenlist-1.8.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (242 kB)
+Downloading greenlet-3.3.2-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (613 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 613.9/613.9 kB 553.1 MB/s  0:00:00
+Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading idna-3.11-py3-none-any.whl (71 kB)
+Downloading iniconfig-2.3.0-py3-none-any.whl (7.5 kB)
+Downloading kombu-5.6.2-py3-none-any.whl (214 kB)
+Downloading amqp-5.3.1-py3-none-any.whl (50 kB)
+Downloading librt-0.8.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (224 kB)
+Downloading mypy_extensions-1.1.0-py3-none-any.whl (5.0 kB)
+Downloading packaging-26.0-py3-none-any.whl (74 kB)
+Downloading pathspec-1.0.4-py3-none-any.whl (55 kB)
+Downloading platformdirs-4.9.2-py3-none-any.whl (21 kB)
+Downloading prompt_toolkit-3.0.52-py3-none-any.whl (391 kB)
+Downloading propcache-0.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (221 kB)
+Downloading pyasn1-0.6.2-py3-none-any.whl (83 kB)
+Downloading pygments-2.19.2-py3-none-any.whl (1.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 560.0 MB/s  0:00:00
+Downloading pytokens-0.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (269 kB)
+Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+Downloading soupsieve-2.8.3-py3-none-any.whl (37 kB)
+Downloading starlette-0.52.1-py3-none-any.whl (74 kB)
+Downloading tqdm-4.67.3-py3-none-any.whl (78 kB)
+Downloading typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+Downloading tzdata-2025.3-py2.py3-none-any.whl (348 kB)
+Downloading tzlocal-5.3.1-py3-none-any.whl (18 kB)
+Downloading httptools-0.7.1-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (517 kB)
+Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 807.9/807.9 kB 594.6 MB/s  0:00:00
+Downloading uvloop-0.22.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (4.4 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.4/4.4 MB 309.7 MB/s  0:00:00
+Downloading watchfiles-1.1.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (456 kB)
+Downloading websockets-16.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (184 kB)
+Downloading redis-6.4.0-py3-none-any.whl (279 kB)
+Downloading mako-1.3.10-py3-none-any.whl (78 kB)
+Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+Downloading pycparser-3.0-py3-none-any.whl (48 kB)
+Downloading sniffio-1.3.1-py3-none-any.whl (10 kB)
+Downloading wcwidth-0.6.0-py3-none-any.whl (94 kB)
+Installing collected packages: pytz, websockets, wcwidth, vine, uvloop, tzlocal, tzdata, typing-extensions, tqdm, structlog, soupsieve, sniffio, six, ruff, redis, pyyaml, pytokens, python-multipart, python-dotenv, pygments, pycparser, pyasn1, propcache, pluggy, platformdirs, pillow, pathspec, packaging, orjson, mypy-extensions, multidict, MarkupSafe, magic-filter, lxml, loguru, librt, jiter, isort, iniconfig, idna, httptools, h11, greenlet, frozenlist, faker, distro, coverage, click, certifi, billiard, attrs, asyncpg, annotated-types, annotated-doc, aiohappyeyeballs, aiofiles, yarl, uvicorn, typing-inspection, sqlalchemy, rsa, python-dateutil, pytest, pydantic-core, prompt-toolkit, mypy, Mako, httpcore, factory-boy, ecdsa, click-plugins, click-didyoumean, cffi, black, beautifulsoup4, apscheduler, anyio, amqp, aiosignal, watchfiles, starlette, python-jose, pytest-cov, pytest-asyncio, pydantic, kombu, httpx, cryptography, click-repl, alembic, aiohttp, pydantic-settings, openai, fastapi, celery, aiogram
+Successfully installed Mako-1.3.10 MarkupSafe-3.0.3 aiofiles-25.1.0 aiogram-3.25.0 aiohappyeyeballs-2.6.1 aiohttp-3.13.3 aiosignal-1.4.0 alembic-1.18.4 amqp-5.3.1 annotated-doc-0.0.4 annotated-types-0.7.0 anyio-4.12.1 apscheduler-3.11.2 asyncpg-0.31.0 attrs-25.4.0 beautifulsoup4-4.14.3 billiard-4.2.4 black-26.1.0 celery-5.6.2 certifi-2026.2.25 cffi-2.0.0 click-8.3.1 click-didyoumean-0.3.1 click-plugins-1.1.1.2 click-repl-0.3.0 coverage-7.13.4 cryptography-46.0.5 distro-1.9.0 ecdsa-0.19.1 factory-boy-3.3.3 faker-40.5.1 fastapi-0.135.1 frozenlist-1.8.0 greenlet-3.3.2 h11-0.16.0 httpcore-1.0.9 httptools-0.7.1 httpx-0.28.1 idna-3.11 iniconfig-2.3.0 isort-8.0.1 jiter-0.13.0 kombu-5.6.2 librt-0.8.1 loguru-0.7.3 lxml-6.0.2 magic-filter-1.0.12 multidict-6.7.1 mypy-1.19.1 mypy-extensions-1.1.0 openai-2.24.0 orjson-3.11.7 packaging-26.0 pathspec-1.0.4 pillow-12.1.1 platformdirs-4.9.2 pluggy-1.6.0 prompt-toolkit-3.0.52 propcache-0.4.1 pyasn1-0.6.2 pycparser-3.0 pydantic-2.12.5 pydantic-core-2.41.5 pydantic-settings-2.13.1 pygments-2.19.2 pytest-9.0.2 pytest-asyncio-1.3.0 pytest-cov-7.0.0 python-dateutil-2.9.0.post0 python-dotenv-1.2.2 python-jose-3.5.0 python-multipart-0.0.22 pytokens-0.4.1 pytz-2025.2 pyyaml-6.0.3 redis-6.4.0 rsa-4.9.1 ruff-0.15.4 six-1.17.0 sniffio-1.3.1 soupsieve-2.8.3 sqlalchemy-2.0.47 starlette-0.52.1 structlog-25.5.0 tqdm-4.67.3 typing-extensions-4.15.0 typing-inspection-0.4.2 tzdata-2025.3 tzlocal-5.3.1 uvicorn-0.41.0 uvloop-0.22.1 vine-5.1.0 watchfiles-1.1.1 wcwidth-0.6.0 websockets-16.0 yarl-1.22.0
+Menu
+bash: line 1: cd: too many arguments
+==> Build failed 😞
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
