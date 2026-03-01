@@ -23,6 +23,14 @@ Only the frontend Mini App is set up to run in Replit. The backend services (bot
 
 - `mini-app/vite.config.ts` — Configured to run on port 5000, host `0.0.0.0`, `allowedHosts: 'all'` for Replit proxy compatibility
 
+## Bot Troubleshooting (Production/Render)
+
+If the bot is not responding in production:
+1. **Webhook URL**: Ensure `WEBHOOK_URL` in Render is set to `https://your-app-name.onrender.com/webhook` (with the `/webhook` suffix).
+2. **BOT_TOKEN**: Verify `BOT_TOKEN` is correctly set in Render environment variables.
+3. **Logs**: Check Render logs for `DEBUG: Received shared webhook data`.
+4. **Manual Set**: You can trigger a webhook set by restarting the `nexus-bot` service on Render.
+
 ## Deployment
 
 Configured as a **static** deployment:

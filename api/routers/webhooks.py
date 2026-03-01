@@ -10,8 +10,14 @@ from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from bot.core.middleware import pipeline
 from bot.core.token_manager import token_manager
 
-router = APIRouter()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if not BOT_TOKEN:
+    print("ERROR: BOT_TOKEN is not set in webhooks.py at module level")
+else:
+    print(f"DEBUG: BOT_TOKEN is set in webhooks.py (length: {len(BOT_TOKEN)})")
+
+router = APIRouter()
 
 
 async def process_update(bot: Bot, bot_identity: Any, update: Update):
@@ -30,7 +36,12 @@ async def shared_webhook(
     """Webhook endpoint for shared bot."""
     try:
         data = await request.json()
+        print(f"DEBUG: Received shared webhook data: {data}")
         update = Update(**data)
+
+        if not BOT_TOKEN:
+            print("ERROR: BOT_TOKEN is not set in webhooks.py")
+            raise HTTPException(status_code=500, detail="Bot token not configured")
 
         bot = Bot(token=BOT_TOKEN)
         bot_info = await bot.get_me()

@@ -134,7 +134,8 @@ async def startup():
 
     if webhook_url:
         # Production mode: Use webhooks
-        shared_webhook = f"{webhook_url}/webhook/shared"
+        shared_webhook = f"{webhook_url}/shared"
+        print(f"DEBUG: Setting webhook to {shared_webhook}")
         await bot.set_webhook(
             url=shared_webhook,
             allowed_updates=[
