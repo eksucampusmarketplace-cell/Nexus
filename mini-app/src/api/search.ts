@@ -17,6 +17,7 @@ export interface SearchFilters {
   user_id?: number
   moderator_id?: number
   action_type?: string
+  role?: string
 }
 
 export interface SearchStats {

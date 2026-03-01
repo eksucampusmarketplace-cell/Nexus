@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Plus, Bot, Flow, Zap, Globe, Filter, Download, 
+  Plus, Bot, GitBranch, Zap, Globe, Filter, Download, 
   ChevronRight, Play, Pause, Settings, Trash2, Copy,
   MessageSquare, Hash, Link2, Image, FileText, MoreVertical,
   Check, X, ArrowRight, Sparkles, Layers, Cpu, Send
@@ -196,7 +196,7 @@ export default function BotBuilder() {
 
   const tabs = [
     { id: 'bots', label: 'My Bots', icon: Bot },
-    { id: 'flows', label: 'Flows', icon: Flow },
+    { id: 'flows', label: 'Flows', icon: GitBranch },
     { id: 'templates', label: 'Templates', icon: Layers },
     { id: 'ai', label: 'AI Builder', icon: Sparkles },
   ]
@@ -433,7 +433,7 @@ function FlowsTab({ flows, onCreate }: {
       {flows.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-accent-500/20 to-secondary-500/20 flex items-center justify-center">
-            <Flow size={40} className="text-accent-400" />
+            <GitBranch size={40} className="text-accent-400" />
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">No flows yet</h3>
           <p className="text-dark-400">Create a flow to build your bot's conversation logic</p>
@@ -449,7 +449,7 @@ function FlowsTab({ flows, onCreate }: {
             >
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-lg bg-accent-500/20 flex items-center justify-center">
-                  <Flow size={20} className="text-accent-400" />
+                  <GitBranch size={20} className="text-accent-400" />
                 </div>
                 <div>
                   <h4 className="font-medium text-white">{flow.name}</h4>
