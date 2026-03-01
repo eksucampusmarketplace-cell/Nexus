@@ -1,7 +1,7 @@
 """Webhook handlers for Telegram updates."""
 
 import os
-from typing import Dict, Any
+from typing import Any
 
 from aiogram import Bot
 from aiogram.types import Update
@@ -22,6 +22,28 @@ async def process_update(bot: Bot, bot_identity: Any, update: Update):
         print(f"Error processing update: {e}")
 
 
+_shared_bot: Bot | None = None
+_shared_identity: Any = None
+
+
+async def _get_shared_bot() -> tuple["Bot", Any]:
+    """Return (and lazily initialise) the singleton shared bot + identity."""
+    global _shared_bot, _shared_identity
+    if _shared_bot is None:
+        from bot.core.context import BotIdentity
+
+        bot = Bot(token=BOT_TOKEN)
+        bot_info = await bot.get_me()
+        _shared_bot = bot
+        _shared_identity = BotIdentity(
+            bot_id=bot_info.id,
+            username=bot_info.username,
+            name=bot_info.first_name,
+            token_hash="shared",
+        )
+    return _shared_bot, _shared_identity
+
+
 @router.post("/webhook/shared")
 async def shared_webhook(
     request: Request,
@@ -32,18 +54,8 @@ async def shared_webhook(
         data = await request.json()
         update = Update(**data)
 
-        bot = Bot(token=BOT_TOKEN)
-        bot_info = await bot.get_me()
+        bot, identity = await _get_shared_bot()
 
-        from bot.core.context import BotIdentity
-        identity = BotIdentity(
-            bot_id=bot_info.id,
-            username=bot_info.username,
-            name=bot_info.first_name,
-            token_hash="shared",
-        )
-
-        # Process in background
         background_tasks.add_task(process_update, bot, identity, update)
 
         return {"ok": True}
