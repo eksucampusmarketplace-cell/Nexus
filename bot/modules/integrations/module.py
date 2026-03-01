@@ -1,8 +1,9 @@
 """Integrations module - RSS feeds, YouTube, GitHub, webhook integrations."""
 
-import aiohttp
-import feedparser
 import re
+import xml.etree.ElementTree as ET
+
+import aiohttp
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 
@@ -375,16 +376,39 @@ class IntegrationsModule(NexusModule):
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
                     if response.status == 200:
                         content = await response.text()
-                        feed = feedparser.parse(content)
+                        root = ET.fromstring(content)
 
+                        ns = {"atom": "http://www.w3.org/2005/Atom"}
                         entries = []
-                        for entry in feed.entries[:5]:  # Last 5 entries
+
+                        # Try RSS 2.0 format
+                        items = root.findall(".//item")
+                        for item in items[:5]:
+                            title = item.findtext("title") or "No title"
+                            link = item.findtext("link") or ""
+                            description = item.findtext("description") or ""
+                            published = item.findtext("pubDate") or ""
                             entries.append({
-                                "title": entry.get("title", "No title"),
-                                "link": entry.get("link", ""),
-                                "description": entry.get("description", ""),
-                                "published": entry.get("published", ""),
+                                "title": title,
+                                "link": link,
+                                "description": description,
+                                "published": published,
                             })
+
+                        # Try Atom format if no RSS items found
+                        if not entries:
+                            for entry in root.findall("atom:entry", ns)[:5]:
+                                title = entry.findtext("atom:title", namespaces=ns) or "No title"
+                                link_el = entry.find("atom:link", ns)
+                                link = link_el.get("href", "") if link_el is not None else ""
+                                summary = entry.findtext("atom:summary", namespaces=ns) or ""
+                                published = entry.findtext("atom:published", namespaces=ns) or ""
+                                entries.append({
+                                    "title": title,
+                                    "link": link,
+                                    "description": summary,
+                                    "published": published,
+                                })
 
                         return entries
         except Exception as e:

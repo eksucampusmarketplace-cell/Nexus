@@ -22,7 +22,7 @@ class AnalyticsModule(NexusModule):
     version = "1.0.0"
     author = "Nexus Team"
     description = "Group insights and analytics dashboard"
-    category = ModuleCategory.ANALYTICS
+    category = ModuleCategory.UTILITY
 
     config_schema = AnalyticsConfig
     default_config = AnalyticsConfig().dict()

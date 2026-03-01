@@ -78,8 +78,9 @@ class CaptchaModule(NexusModule):
     # CAPTCHA types
     CAPTCHA_TYPES = ["button", "math", "quiz", "image", "emoji"]
 
-    # Challenge storage
-    self._challenges: Dict[int, Dict] = {}
+    def __init__(self):
+        super().__init__()
+        self._challenges: Dict[int, Dict] = {}
 
     async def on_load(self, app):
         """Register command handlers."""

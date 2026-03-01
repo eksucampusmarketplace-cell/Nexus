@@ -6,7 +6,7 @@ from aiogram.types import Message
 from pydantic import BaseModel
 
 from bot.core.context import NexusContext
-from bot.core.module_base import CommandDef, ModuleCategory, NexusModule
+from bot.core.module_base import CommandDef, EventType, ModuleCategory, NexusModule
 
 
 class WelcomeConfig(BaseModel):

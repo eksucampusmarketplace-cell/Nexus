@@ -57,31 +57,79 @@ class MiddlewarePipeline:
         """Add a module to handle events."""
         self._modules.append(module)
 
-    async def _handle_private_message(self, bot: Bot, update: Update) -> bool:
+    async def _handle_private_command(self, bot: Bot, update: Update) -> bool:
+        """Handle slash commands sent in private chat without a DB session."""
         if not update.message or update.message.chat.type != "private":
             return False
 
-        if not update.message.text:
-            return True
+        if not update.message.text or not update.message.text.startswith("/"):
+            return False
 
-        command = update.message.text.split()[0].lower()
-        command = command.split("@")[0]
+        parts = update.message.text.split()
+        command = parts[0].lower().split("@")[0].lstrip("/")
 
-        if command in {"/start", "/help"}:
+        if command == "start":
             text = f"👋 {hbold('Welcome to Nexus Bot!')} 🚀\n\n"
             text += f"{hbold('The Ultimate Telegram Bot Platform')} 🎉\n\n"
             text += f"📚 {hcode('/help')} - View all commands\n"
             text += f"📱 {hcode('/settings')} - Open settings panel\n"
             text += "ℹ️ Use commands or open the Mini App for full control!\n\n"
             text += f"💡 {hitalic('Type /help <command> for detailed information')}"
-
             await bot.send_message(
                 chat_id=update.message.chat.id,
                 text=text,
                 reply_to_message_id=update.message.message_id,
                 parse_mode="HTML",
             )
+            return True
 
+        if command == "help":
+            text = f"{hbold('📚 Nexus Bot Help')}\n\n"
+            text += f"{hbold('Core Commands')}:\n"
+            text += f"  {hcode('/start')} - Start the bot\n"
+            text += f"  {hcode('/help')} - Show this help\n"
+            text += f"  {hcode('/ping')} - Check bot latency\n"
+            text += f"  {hcode('/about')} - About Nexus bot\n\n"
+            text += "Add me to a group to enable moderation and all other features!"
+            await bot.send_message(
+                chat_id=update.message.chat.id,
+                text=text,
+                reply_to_message_id=update.message.message_id,
+                parse_mode="HTML",
+            )
+            return True
+
+        if command == "ping":
+            await bot.send_message(
+                chat_id=update.message.chat.id,
+                text="🏓 Pong!",
+                reply_to_message_id=update.message.message_id,
+            )
+            return True
+
+        if command == "about":
+            text = f"🤖 {hbold('Nexus Bot')} v1.0.0\n\n"
+            text += f"{hbold('The Ultimate Telegram Bot Platform')} 🚀\n\n"
+            text += f"• 27 production-ready modules\n"
+            text += f"• 230+ documented commands\n"
+            text += f"• AI-powered assistant\n"
+            text += f"• Economy, games, moderation & more\n\n"
+            text += f"Add me to a group and type {hcode('/help')} to get started!"
+            await bot.send_message(
+                chat_id=update.message.chat.id,
+                text=text,
+                reply_to_message_id=update.message.message_id,
+                parse_mode="HTML",
+            )
+            return True
+
+        # Unknown private command — give a hint
+        await bot.send_message(
+            chat_id=update.message.chat.id,
+            text=f"ℹ️ Use {hcode('/help')} to see available commands, or add me to a group for full features.",
+            reply_to_message_id=update.message.message_id,
+            parse_mode="HTML",
+        )
         return True
 
     async def process_update(
@@ -95,29 +143,34 @@ class MiddlewarePipeline:
 
         Returns True if the update was handled, False otherwise.
         """
-        if await self._handle_private_message(bot, update):
-            return True
+        # Handle private chat slash commands without requiring DB
+        if update.message and update.message.chat.type == "private":
+            return await self._handle_private_command(bot, update)
 
-        # Create database session
-        async with AsyncSessionLocal() as session:
-            # Build context
-            ctx = await self._build_context(session, bot, bot_identity, update)
+        # Create database session for group updates
+        try:
+            async with AsyncSessionLocal() as session:
+                # Build context
+                ctx = await self._build_context(session, bot, bot_identity, update)
 
-            if not ctx:
-                return False
+                if not ctx:
+                    return False
 
-            # Run middleware pipeline
-            for middleware in self._middlewares:
-                try:
-                    should_continue = await middleware(ctx)
-                    if not should_continue:
-                        return False
-                except Exception as e:
-                    print(f"Middleware error: {e}")
-                    continue
+                # Run middleware pipeline
+                for middleware in self._middlewares:
+                    try:
+                        should_continue = await middleware(ctx)
+                        if not should_continue:
+                            return False
+                    except Exception as e:
+                        print(f"Middleware error: {e}")
+                        continue
 
-            # Route to modules
-            return await self._route_to_modules(ctx)
+                # Route to modules
+                return await self._route_to_modules(ctx)
+        except Exception as e:
+            print(f"Pipeline error: {e}")
+            return False
 
     async def _build_context(
         self,
@@ -299,10 +352,25 @@ class MiddlewarePipeline:
 
         return ctx
 
+    def _is_module_enabled(self, module: NexusModule, group_id: int, enabled_modules: list) -> bool:
+        """Check if a module is enabled for a group.
+
+        Falls back to True (all modules on by default) if no explicit config exists.
+        """
+        if module.is_enabled_for(group_id):
+            return True
+        # If there's an explicit enabled_modules list, respect it
+        if enabled_modules:
+            return module.name in enabled_modules
+        # No config yet — treat all modules as enabled by default
+        return True
+
     async def _route_to_modules(self, ctx: NexusContext) -> bool:
         """Route the update to appropriate modules."""
         if not ctx.group:
             return False
+
+        enabled_modules = ctx.group.enabled_modules if ctx.group else []
 
         # Determine event type
         event_type = None
@@ -321,17 +389,33 @@ class MiddlewarePipeline:
         if not event_type:
             return False
 
-        # Route to modules
+        # For slash commands in groups, dispatch to module command handlers
+        if event_type == EventType.MESSAGE and ctx.message and ctx.message.text:
+            text = ctx.message.text.strip()
+            if text.startswith("/"):
+                parts = text.split()
+                command = parts[0].lower().split("@")[0].lstrip("/")
+                for module in self._modules:
+                    if not self._is_module_enabled(module, ctx.group.id, enabled_modules):
+                        continue
+                    if command in module._command_handlers:
+                        try:
+                            await module._command_handlers[command](ctx)
+                            return True
+                        except Exception as e:
+                            print(f"Command handler error in {module.name}.{command}: {e}")
+                            return False
+
+        # Route to modules for event handling
         handled = False
         for module in self._modules:
-            # Check if module is enabled for this group
-            if not module.is_enabled_for(ctx.group.id):
+            if not self._is_module_enabled(module, ctx.group.id, enabled_modules):
                 continue
 
             # Check dependencies
             deps_satisfied = all(
                 any(
-                    m.name == dep and m.is_enabled_for(ctx.group.id)
+                    m.name == dep and self._is_module_enabled(m, ctx.group.id, enabled_modules)
                     for m in self._modules
                 )
                 for dep in module.dependencies
@@ -342,7 +426,7 @@ class MiddlewarePipeline:
             # Check conflicts
             has_conflict = any(
                 any(
-                    m.name == conflict and m.is_enabled_for(ctx.group.id)
+                    m.name == conflict and self._is_module_enabled(m, ctx.group.id, enabled_modules)
                     for m in self._modules
                 )
                 for conflict in module.conflicts
