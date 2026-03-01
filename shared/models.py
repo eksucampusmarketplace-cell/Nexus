@@ -229,10 +229,11 @@ class MemberProfile(Base):
 
     __tablename__ = "member_profiles"
     __table_args__ = (
-        UniqueConstraint("user_id", "group_id", name="uq_profile_user_group"),
+        UniqueConstraint("member_id", name="uq_profile_member"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"))
     bio: Mapped[Optional[str]] = mapped_column(Text)
@@ -690,8 +691,12 @@ class Wallet(Base):
     """Economy wallets."""
 
     __tablename__ = "wallets"
+    __table_args__ = (
+        UniqueConstraint("member_id", name="uq_wallet_member"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"))
     balance: Mapped[int] = mapped_column(BigInteger, default=0)
