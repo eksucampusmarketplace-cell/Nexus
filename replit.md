@@ -26,7 +26,9 @@ Only the frontend Mini App is set up to run in Replit. The backend services (bot
 ## Bot Troubleshooting (Production/Render)
 
 If the bot is not responding in production:
-1. **Webhook URL**: Ensure `WEBHOOK_URL` in Render is set to `https://your-app-name.onrender.com/webhook` (with the `/webhook` suffix).
+1. **Webhook URL**: Ensure `WEBHOOK_URL` in Render is set to the base URL of your API (e.g., `https://nexus-4uxn.onrender.com/webhook`). 
+   - The code automatically appends `/shared` for the main bot.
+   - Final webhook URL should be `https://nexus-4uxn.onrender.com/webhook/shared`.
 2. **BOT_TOKEN**: Verify `BOT_TOKEN` is correctly set in Render environment variables.
 3. **Logs**: Check Render logs for `DEBUG: Received shared webhook data`.
 4. **Manual Set**: You can trigger a webhook set by restarting the `nexus-bot` service on Render.

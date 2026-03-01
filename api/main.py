@@ -78,7 +78,7 @@ app.include_router(scheduled.router, prefix="/api/v1", tags=["scheduled"])
 app.include_router(bot_builder.router, prefix="/api/v1", tags=["Bot Builder"])
 app.include_router(advanced.router, prefix="/api/v1", tags=["Advanced Features"])
 app.include_router(toggles.router, prefix="/api/v1", tags=["toggles"])
-app.include_router(webhooks.router, prefix="", tags=["webhooks"])
+app.include_router(webhooks.router, prefix="/webhook", tags=["webhooks"])
 
 
 @app.api_route("/", methods=["GET", "HEAD"])
