@@ -134,7 +134,10 @@ async def startup():
 
     if webhook_url:
         # Production mode: Use webhooks
-        shared_webhook = f"{webhook_url}/shared"
+        # Ensure webhook_url is just the base domain, e.g., https://nexus-4uxn.onrender.com
+        base_url = webhook_url.split("/webhook")[0]
+        shared_webhook = f"{base_url}/webhook/shared"
+        
         if not shared_webhook.startswith("http"):
              shared_webhook = f"https://{shared_webhook}"
         
