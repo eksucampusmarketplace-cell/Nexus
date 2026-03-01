@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Coroutine, List, Optional
 
 from aiogram import Bot
-from aiogram.types import Update
+from aiogram.types import ReplyParameters, Update
 from aiogram.utils.markdown import hbold, hcode, hitalic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -84,7 +84,7 @@ class MiddlewarePipeline:
                 await bot.send_message(
                     chat_id=update.message.chat.id,
                     text=text,
-                    reply_to_message_id=update.message.message_id,
+                    reply_parameters=ReplyParameters(message_id=update.message.message_id),
                     parse_mode="HTML",
                 )
                 logger.info(f"Sent /start response to chat {update.message.chat.id}")
@@ -104,7 +104,7 @@ class MiddlewarePipeline:
                 await bot.send_message(
                     chat_id=update.message.chat.id,
                     text=text,
-                    reply_to_message_id=update.message.message_id,
+                    reply_parameters=ReplyParameters(message_id=update.message.message_id),
                     parse_mode="HTML",
                 )
                 logger.info(f"Sent /help response to chat {update.message.chat.id}")
@@ -117,7 +117,7 @@ class MiddlewarePipeline:
                 await bot.send_message(
                     chat_id=update.message.chat.id,
                     text="🏓 Pong!",
-                    reply_to_message_id=update.message.message_id,
+                    reply_parameters=ReplyParameters(message_id=update.message.message_id),
                 )
                 logger.info(f"Sent /ping response to chat {update.message.chat.id}")
             except Exception as e:
@@ -136,7 +136,7 @@ class MiddlewarePipeline:
                 await bot.send_message(
                     chat_id=update.message.chat.id,
                     text=text,
-                    reply_to_message_id=update.message.message_id,
+                    reply_parameters=ReplyParameters(message_id=update.message.message_id),
                     parse_mode="HTML",
                 )
                 logger.info(f"Sent /about response to chat {update.message.chat.id}")
@@ -150,7 +150,7 @@ class MiddlewarePipeline:
             await bot.send_message(
                 chat_id=update.message.chat.id,
                 text=f"ℹ️ Use {hcode('/help')} to see available commands, or add me to a group for full features.",
-                reply_to_message_id=update.message.message_id,
+                reply_parameters=ReplyParameters(message_id=update.message.message_id),
                 parse_mode="HTML",
             )
         except Exception as e:

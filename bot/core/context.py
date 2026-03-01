@@ -12,6 +12,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineQuery,
     Message,
+    ReplyParameters,
     Update,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -317,7 +318,7 @@ class NexusContext:
         msg = await self.bot.send_message(
             chat_id=self.message.chat.id,
             text=text,
-            reply_to_message_id=self.message.message_id,
+            reply_parameters=ReplyParameters(message_id=self.message.message_id),
             reply_markup=reply_markup,
             parse_mode=parse_mode,
             protect_content=protect,
@@ -363,7 +364,7 @@ class NexusContext:
             "chat_id": self.message.chat.id,
             "caption": caption,
             "reply_markup": reply_markup,
-            "reply_to_message_id": self.message.message_id,
+            "reply_parameters": ReplyParameters(message_id=self.message.message_id),
         }
 
         if media_type == "photo":
