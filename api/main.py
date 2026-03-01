@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from aiogram import Bot
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from bot.core.middleware import pipeline, setup_pipeline
@@ -184,16 +184,36 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-    # Mount Mini App static files if dist exists
+    # Mount Mini App static files
     dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
+    replit_root = os.getcwd()
     
-    if os.path.exists(dist_path):
+    # In Replit, we serve the UI from the root where we synced it
+    if os.path.exists(os.path.join(replit_root, "assets")):
+        app.mount("/assets", StaticFiles(directory=os.path.join(replit_root, "assets")), name="assets")
+        logger.info(f"Mini App assets mounted from root: {replit_root}")
+    elif os.path.exists(dist_path):
         app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
-        logger.info(f"Mini App assets mounted at /assets")
-    
-    # Catch-all for Mini App to support client-side routing
+        logger.info(f"Mini App assets mounted from dist: {dist_path}")
+
+    @app.get("/mini-app", response_class=HTMLResponse, include_in_schema=False)
+    @app.get("/mini-app/", response_class=HTMLResponse, include_in_schema=False)
+    async def serve_mini_app():
+        """Serve Mini App index.html."""
+        replit_index = os.path.join(os.getcwd(), "index.html")
+        dist_index = os.path.join(os.getcwd(), "mini-app", "dist", "index.html")
+        
+        target = replit_index if os.path.exists(replit_index) else dist_index
+        
+        if not os.path.exists(target):
+            return HTMLResponse(content="<h1>Mini App Not Found</h1><p>Please run build command.</p>", status_code=404)
+            
+        with open(target, "r") as f:
+            return HTMLResponse(content=f.read())
+
     @app.get("/mini-app/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
     async def serve_mini_app_extended(full_path: str = None):
+        """Catch-all for client-side routing."""
         return await serve_mini_app()
 
 
@@ -227,9 +247,16 @@ app.include_router(toggles.router, prefix="/api/v1", tags=["toggles"])
 app.include_router(webhooks.router, prefix="/webhook", tags=["webhooks"])
 
 
-@app.api_route("/", methods=["GET", "HEAD"])
-async def root():
-    """Root endpoint."""
+@app.get("/", include_in_schema=False)
+async def root_redirect(request: Request):
+    """Force redirect to mini-app for all browser/Telegram UI requests."""
+    # This ensures that any browser-like request to the root (/) 
+    # goes straight to the React dashboard.
+    return RedirectResponse(url="/mini-app")
+
+@app.get("/api/status")
+async def api_status():
+    """Explicit API status endpoint."""
     return {
         "name": "Nexus API",
         "version": "1.0.0",
@@ -248,8 +275,11 @@ async def health_check():
 async def serve_mini_app():
     """Serve Mini App at /mini-app."""
     index_path = os.path.join(os.getcwd(), "mini-app", "dist", "index.html")
+    replit_index_path = os.path.join(os.getcwd(), "index.html")
     
-    if not os.path.exists(index_path):
+    target_path = index_path if os.path.exists(index_path) else replit_index_path
+    
+    if not os.path.exists(target_path):
         return HTMLResponse(
             content="""
             <!DOCTYPE html>
@@ -300,7 +330,7 @@ async def serve_mini_app():
             status_code=200
         )
     
-    with open(index_path, "r") as f:
+    with open(target_path, "r") as f:
         html_content = f.read()
     
     return HTMLResponse(content=html_content)

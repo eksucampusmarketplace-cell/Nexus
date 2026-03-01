@@ -1,48 +1,25 @@
-# Nexus - AI-Native Telegram Bot Platform
+# Nexus - Telegram Mini App
 
 ## Project Overview
+Nexus is a comprehensive AI-native Telegram bot platform. This Replit workspace contains the **React/TypeScript/Vite frontend** (Mini App dashboard).
 
-Nexus is a comprehensive, AI-native Telegram bot platform with 27+ production-ready modules. It includes a React-based Mini App (web dashboard) for administrative control of Telegram groups.
+## Environment Configuration
+- **Development Server**: Runs on port 5000 (`npm run dev`).
+- **Production Build**: Located in `mini-app/dist`.
+- **Backend API**: Connects to `https://nexus-4uxn.onrender.com`.
 
-## Architecture
+## URL Routing and Redirects
+To ensure the Mini App UI is always accessible:
+1. **Local Dev**: Access directly via the Replit webview on port 5000.
+2. **UI Redirect**: The backend root (`/`) is now configured to automatically redirect all browser and Telegram-based requests to the Mini App interface (`/mini-app`).
+3. **API Status**: To check the API status without being redirected, use the explicit status endpoint:
+   - Endpoint: `/api/status`
+   - Response: `{"name":"Nexus API","version":"1.0.0","status":"running"}`
 
-- **Frontend (Mini App):** React 18 + TypeScript + Vite + Tailwind CSS — located in `mini-app/`
-- **Backend (not running in Replit):** Python FastAPI + aiogram 3.x + Celery + PostgreSQL + Redis
-- **State Management:** Zustand
-- **Charts:** Chart.js, Recharts
-
-## Running in Replit
-
-Only the frontend Mini App is set up to run in Replit. The backend services (bot, API, worker) require PostgreSQL, Redis, and Telegram credentials which are not configured here.
-
-### Local Development (Replit)
-
-The Replit environment is configured to run the **Mini App (frontend)** only.
-- **URL:** The UI is available via the Replit webview (port 5000).
-- **API Connectivity:** By default, it connects to the production API at `https://nexus-4uxn.onrender.com`.
-- **Note on "Nonsense" Output:** If you see JSON like `{"name":"Nexus API"...}` when visiting the production URL root, that is the expected behavior of the Backend API. The actual UI is hosted at `/mini-app` on production or at the root in this Replit development environment.
-
-### Key Configuration
-
-- `mini-app/vite.config.ts` — Configured to run on port 5000, host `0.0.0.0`, `allowedHosts: 'all'` for Replit proxy compatibility
-
-## Bot Troubleshooting (Production/Render)
-
-If the bot is not responding in production:
-1. **Webhook URL**: Ensure `WEBHOOK_URL` in Render is set to your base domain: `https://nexus-4uxn.onrender.com`
-   - The code will automatically append `/webhook/shared`.
-   - Final webhook URL will be `https://nexus-4uxn.onrender.com/webhook/shared`.
-2. **BOT_TOKEN**: Verify `BOT_TOKEN` is correctly set in Render environment variables.
-3. **Logs**: Check Render logs for `DEBUG: Received shared webhook data`.
-4. **Manual Set**: You can trigger a webhook set by restarting the `nexus-bot` service on Render.
+## Key Files
+- `mini-app/src/App.tsx`: Main application logic and routing.
+- `api/main.py`: Backend entry point with the new redirect logic.
+- `mini-app/vite.config.ts`: Vite configuration.
 
 ## Deployment
-
-Configured as a **static** deployment:
-- Build: `cd mini-app && npm run build`
-- Public dir: `mini-app/dist`
-
-## Dependencies
-
-- `mini-app/package.json` — All frontend dependencies
-- Install with: `cd mini-app && npm install --legacy-peer-deps` (needed due to `date-fns` peer dep conflict)
+The project serves the static build from the root and `mini-app/dist` to ensure maximum compatibility with Replit's webview.
