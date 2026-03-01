@@ -1,7 +1,7 @@
 """Webhook handlers for Telegram updates."""
 
 import os
-from typing import Dict, Any
+from typing import Any, Optional
 
 from aiogram import Bot
 from aiogram.types import Update
@@ -19,6 +19,32 @@ else:
 
 router = APIRouter()
 
+# Cached bot instance and identity for shared bot
+_shared_bot: Optional[Bot] = None
+_shared_identity: Optional[Any] = None
+
+
+async def get_shared_bot():
+    """Get or create the cached shared bot instance."""
+    global _shared_bot, _shared_identity
+    
+    if _shared_bot is None:
+        if not BOT_TOKEN:
+            raise ValueError("BOT_TOKEN not configured")
+        
+        _shared_bot = Bot(token=BOT_TOKEN)
+        bot_info = await _shared_bot.get_me()
+        
+        from bot.core.context import BotIdentity
+        _shared_identity = BotIdentity(
+            bot_id=bot_info.id,
+            username=bot_info.username,
+            name=bot_info.first_name,
+            token_hash="shared",
+        )
+    
+    return _shared_bot, _shared_identity
+
 
 async def process_update(bot: Bot, bot_identity: Any, update: Update):
     """Process a single update through the pipeline."""
@@ -28,7 +54,7 @@ async def process_update(bot: Bot, bot_identity: Any, update: Update):
         print(f"Error processing update: {e}")
 
 
-@router.post("/webhook/shared")
+@router.post("/shared")
 async def shared_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -36,33 +62,24 @@ async def shared_webhook(
     """Webhook endpoint for shared bot."""
     try:
         data = await request.json()
-        print(f"DEBUG: Received shared webhook data: {data}")
         update = Update(**data)
 
         if not BOT_TOKEN:
-            print("ERROR: BOT_TOKEN is not set in webhooks.py")
             raise HTTPException(status_code=500, detail="Bot token not configured")
 
-        bot = Bot(token=BOT_TOKEN)
-        bot_info = await bot.get_me()
-
-        from bot.core.context import BotIdentity
-        identity = BotIdentity(
-            bot_id=bot_info.id,
-            username=bot_info.username,
-            name=bot_info.first_name,
-            token_hash="shared",
-        )
+        bot, identity = await get_shared_bot()
 
         # Process in background
         background_tasks.add_task(process_update, bot, identity, update)
 
         return {"ok": True}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/webhook/{token_hash}")
+@router.post("/{token_hash}")
 async def custom_webhook(
     token_hash: str,
     request: Request,
@@ -90,16 +107,12 @@ async def custom_webhook(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/webhook/info")
+@router.get("/info")
 async def webhook_info():
     """Get webhook information."""
-    if not BOT_TOKEN:
-        raise HTTPException(status_code=500, detail="Bot token not configured")
-
-    bot = Bot(token=BOT_TOKEN)
     try:
+        bot, _ = await get_shared_bot()
         info = await bot.get_webhook_info()
-        await bot.session.close()
         return {
             "url": info.url,
             "has_custom_certificate": info.has_custom_certificate,
@@ -111,5 +124,4 @@ async def webhook_info():
             "allowed_updates": info.allowed_updates,
         }
     except Exception as e:
-        await bot.session.close()
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,5 +1,6 @@
 """FastAPI main application."""
 
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -7,8 +8,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from bot.core.middleware import pipeline, setup_pipeline
+from bot.core.module_registry import module_registry
 from shared.database import init_db
 from shared.redis_client import close_redis, get_redis
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -18,9 +23,38 @@ async def lifespan(app: FastAPI):
     await init_db()
     await get_redis()
 
+    # Set up middleware pipeline
+    logger.info("Setting up middleware pipeline...")
+    setup_pipeline()
+
+    # Load bot modules for webhook processing
+    logger.info("Loading bot modules...")
+    try:
+        await module_registry.load_all()
+        
+        # Check dependencies and conflicts
+        missing_deps = module_registry.check_dependencies()
+        if missing_deps:
+            for name, deps in missing_deps.items():
+                logger.warning(f"Module {name} missing dependencies: {deps}")
+
+        conflicts = module_registry.check_conflicts()
+        if conflicts:
+            for name, confs in conflicts.items():
+                logger.warning(f"Module {name} conflicts with: {confs}")
+
+        # Register modules with pipeline
+        for module in module_registry.get_all_modules():
+            pipeline.add_module(module)
+
+        logger.info(f"Loaded {len(module_registry.get_all_modules())} modules")
+    except Exception as e:
+        logger.warning(f"Module loading skipped (DB unavailable): {e}")
+
     yield
 
     # Shutdown
+    await module_registry.unload_all()
     await close_redis()
 
 
