@@ -1,6 +1,27 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Detect the API URL based on environment
+const getApiUrl = () => {
+  // Check for environment variable (set at build time)
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  
+  // If running on the same domain (served from API service), use current origin
+  if (typeof window !== 'undefined' && window.location.origin) {
+    // Check if we're on the API service domain
+    if (window.location.hostname.includes('nexus-4uxn.onrender.com') || 
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1') {
+      return window.location.origin
+    }
+  }
+  
+  // Fallback to production API URL
+  return 'https://nexus-4uxn.onrender.com'
+}
+
+const API_BASE_URL = getApiUrl()
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
