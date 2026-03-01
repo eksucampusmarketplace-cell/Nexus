@@ -9,6 +9,7 @@ import MainLayout from './components/Layout/MainLayout'
 
 // Views
 import Dashboard from './views/Dashboard'
+import Help from './views/Help'
 import AdminDashboard from './views/AdminDashboard/AdminDashboard'
 import MemberProfile from './views/MemberView/MemberProfile'
 import Modules from './views/AdminDashboard/Modules'
@@ -92,6 +93,7 @@ function App() {
             </div>
           )
         } />
+        <Route path="/help" element={<Help />} />
         <Route path="/profile/:groupId" element={<MemberProfile />} />
         
         {/* Admin Dashboard Routes */}
