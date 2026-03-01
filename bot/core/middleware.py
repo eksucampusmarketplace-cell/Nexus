@@ -1,5 +1,6 @@
 """Middleware pipeline for processing updates."""
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Coroutine, List, Optional
 
@@ -21,6 +22,8 @@ from shared.database import AsyncSessionLocal
 from shared.models import Group, Member, ModuleConfig, User
 from shared.redis_client import RateLimiter, get_group_redis
 from shared.schemas import Role
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -67,6 +70,8 @@ class MiddlewarePipeline:
 
         parts = update.message.text.split()
         command = parts[0].lower().split("@")[0].lstrip("/")
+        
+        logger.info(f"Handling private command: /{command} from user {update.message.from_user.id}")
 
         if command == "start":
             text = f"👋 {hbold('Welcome to Nexus Bot!')} 🚀\n\n"
@@ -75,12 +80,16 @@ class MiddlewarePipeline:
             text += f"📱 {hcode('/settings')} - Open settings panel\n"
             text += "ℹ️ Use commands or open the Mini App for full control!\n\n"
             text += f"💡 {hitalic('Type /help <command> for detailed information')}"
-            await bot.send_message(
-                chat_id=update.message.chat.id,
-                text=text,
-                reply_to_message_id=update.message.message_id,
-                parse_mode="HTML",
-            )
+            try:
+                await bot.send_message(
+                    chat_id=update.message.chat.id,
+                    text=text,
+                    reply_to_message_id=update.message.message_id,
+                    parse_mode="HTML",
+                )
+                logger.info(f"Sent /start response to chat {update.message.chat.id}")
+            except Exception as e:
+                logger.error(f"Failed to send /start response: {e}")
             return True
 
         if command == "help":
@@ -91,20 +100,28 @@ class MiddlewarePipeline:
             text += f"  {hcode('/ping')} - Check bot latency\n"
             text += f"  {hcode('/about')} - About Nexus bot\n\n"
             text += "Add me to a group to enable moderation and all other features!"
-            await bot.send_message(
-                chat_id=update.message.chat.id,
-                text=text,
-                reply_to_message_id=update.message.message_id,
-                parse_mode="HTML",
-            )
+            try:
+                await bot.send_message(
+                    chat_id=update.message.chat.id,
+                    text=text,
+                    reply_to_message_id=update.message.message_id,
+                    parse_mode="HTML",
+                )
+                logger.info(f"Sent /help response to chat {update.message.chat.id}")
+            except Exception as e:
+                logger.error(f"Failed to send /help response: {e}")
             return True
 
         if command == "ping":
-            await bot.send_message(
-                chat_id=update.message.chat.id,
-                text="🏓 Pong!",
-                reply_to_message_id=update.message.message_id,
-            )
+            try:
+                await bot.send_message(
+                    chat_id=update.message.chat.id,
+                    text="🏓 Pong!",
+                    reply_to_message_id=update.message.message_id,
+                )
+                logger.info(f"Sent /ping response to chat {update.message.chat.id}")
+            except Exception as e:
+                logger.error(f"Failed to send /ping response: {e}")
             return True
 
         if command == "about":
@@ -115,21 +132,29 @@ class MiddlewarePipeline:
             text += f"• AI-powered assistant\n"
             text += f"• Economy, games, moderation & more\n\n"
             text += f"Add me to a group and type {hcode('/help')} to get started!"
-            await bot.send_message(
-                chat_id=update.message.chat.id,
-                text=text,
-                reply_to_message_id=update.message.message_id,
-                parse_mode="HTML",
-            )
+            try:
+                await bot.send_message(
+                    chat_id=update.message.chat.id,
+                    text=text,
+                    reply_to_message_id=update.message.message_id,
+                    parse_mode="HTML",
+                )
+                logger.info(f"Sent /about response to chat {update.message.chat.id}")
+            except Exception as e:
+                logger.error(f"Failed to send /about response: {e}")
             return True
 
         # Unknown private command — give a hint
-        await bot.send_message(
-            chat_id=update.message.chat.id,
-            text=f"ℹ️ Use {hcode('/help')} to see available commands, or add me to a group for full features.",
-            reply_to_message_id=update.message.message_id,
-            parse_mode="HTML",
-        )
+        logger.info(f"Unknown command /{command}, sending hint")
+        try:
+            await bot.send_message(
+                chat_id=update.message.chat.id,
+                text=f"ℹ️ Use {hcode('/help')} to see available commands, or add me to a group for full features.",
+                reply_to_message_id=update.message.message_id,
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error(f"Failed to send unknown command hint: {e}")
         return True
 
     async def process_update(
@@ -143,33 +168,47 @@ class MiddlewarePipeline:
 
         Returns True if the update was handled, False otherwise.
         """
+        logger.debug(f"process_update called, modules loaded: {len(self._modules)}")
+        
         # Handle private chat slash commands without requiring DB
         if update.message and update.message.chat.type == "private":
-            return await self._handle_private_command(bot, update)
+            logger.info(f"Routing to private command handler for chat {update.message.chat.id}")
+            result = await self._handle_private_command(bot, update)
+            logger.info(f"Private command handler result: {result}")
+            return result
 
         # Create database session for group updates
         try:
+            logger.debug("Creating database session for group update")
             async with AsyncSessionLocal() as session:
                 # Build context
                 ctx = await self._build_context(session, bot, bot_identity, update)
 
                 if not ctx:
+                    logger.warning("Failed to build context - ctx is None")
                     return False
 
+                logger.debug(f"Context built: group={ctx.group.id if ctx.group else None}, user={ctx.user.telegram_id if ctx.user else None}")
+
                 # Run middleware pipeline
-                for middleware in self._middlewares:
+                for i, middleware in enumerate(self._middlewares):
                     try:
+                        logger.debug(f"Running middleware {i}: {middleware.__name__ if hasattr(middleware, '__name__') else 'unknown'}")
                         should_continue = await middleware(ctx)
                         if not should_continue:
+                            logger.info(f"Middleware {i} returned False, stopping pipeline")
                             return False
                     except Exception as e:
-                        print(f"Middleware error: {e}")
+                        logger.error(f"Middleware error: {e}")
                         continue
 
                 # Route to modules
-                return await self._route_to_modules(ctx)
+                logger.debug(f"Routing to modules ({len(self._modules)} modules loaded)")
+                result = await self._route_to_modules(ctx)
+                logger.debug(f"Module routing result: {result}")
+                return result
         except Exception as e:
-            print(f"Pipeline error: {e}")
+            logger.exception(f"Pipeline error: {e}")
             return False
 
     async def _build_context(
