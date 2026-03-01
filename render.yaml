@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: standard
     pythonVersion: 3.12.2
-    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt && (cd mini-app && npm install && npm run build)
+    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt && cd mini-app && npm install && npm run build
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: CARGO_HOME
