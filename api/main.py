@@ -7,7 +7,8 @@ from contextlib import asynccontextmanager
 from aiogram import Bot
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from bot.core.middleware import pipeline, setup_pipeline
 from bot.core.module_registry import module_registry
@@ -129,7 +130,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"Mini App contains {file_count} files")
     else:
         logger.warning(f"Mini App dist directory NOT found at: {dist_path}")
-        logger.warning("Mini App will not be available via /debug/serve-mini-app")
+        logger.warning("Mini App will not be available via /mini-app endpoint")
     
     logger.info("Startup complete!")
     logger.info("=" * 50)
@@ -164,10 +165,8 @@ app.add_middleware(
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """Log all incoming requests for debugging."""
-    start_time = None
-    
     try:
-        start_time = logger.info(f"Request: {request.method} {request.url.path}")
+        logger.info(f"Request: {request.method} {request.url.path}")
         response = await call_next(request)
         return response
     except Exception as e:
@@ -185,20 +184,29 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+# Mount Mini App static files if dist exists
+dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
+assets_path = os.path.join(dist_path, "assets")
+
+if os.path.exists(assets_path):
+    app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+    logger.info(f"Mini App assets mounted at /assets")
+
+
 # Import and include routers
 from api.routers import (
+    advanced,
     analytics,
     auth,
+    bot_builder,
     economy,
     federations,
     groups,
     members,
     modules,
     scheduled,
-    webhooks,
-    bot_builder,
-    advanced,
     toggles,
+    webhooks,
 )
 
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
@@ -229,6 +237,69 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.get("/mini-app", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/mini-app/", response_class=HTMLResponse, include_in_schema=False)
+async def serve_mini_app():
+    """Serve Mini App at /mini-app."""
+    index_path = os.path.join(os.getcwd(), "mini-app", "dist", "index.html")
+    
+    if not os.path.exists(index_path):
+        return HTMLResponse(
+            content="""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Nexus Mini App</title>
+                <style>
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        background: #0f172a;
+                        color: #fff;
+                        min-height: 100vh;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin: 0;
+                    }
+                    .container {
+                        text-align: center;
+                        padding: 2rem;
+                    }
+                    h1 { color: #3b82f6; margin-bottom: 1rem; }
+                    p { color: #94a3b8; margin-bottom: 0.5rem; }
+                    code {
+                        background: #1e293b;
+                        padding: 0.5rem 1rem;
+                        border-radius: 0.5rem;
+                        display: inline-block;
+                        margin-top: 1rem;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Nexus Mini App</h1>
+                    <p>The Mini App is not available at this endpoint.</p>
+                    <p>Access the Mini App from:</p>
+                    <ul style="text-align: left; display: inline-block; color: #94a3b8;">
+                        <li>Telegram: Open from a Telegram group with Nexus bot</li>
+                        <li>Separate Service: <a href="https://nexus-mini-app.onrender.com" style="color: #3b82f6;">nexus-mini-app.onrender.com</a></li>
+                    </ul>
+                </div>
+            </body>
+            </html>
+        """,
+            status_code=200
+        )
+    
+    with open(index_path, "r") as f:
+        html_content = f.read()
+    
+    return HTMLResponse(content=html_content)
 
 
 @app.get("/debug/env")
@@ -297,25 +368,23 @@ async def debug_mini_app():
 @app.get("/debug/static-files")
 async def debug_static_files():
     """Debug endpoint to check if static files exist."""
-    import os
-    
-    dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
+    dist_path_local = os.path.join(os.getcwd(), "mini-app", "dist")
     
     results = {
         "current_working_dir": os.getcwd(),
-        "dist_path": dist_path,
-        "dist_exists": os.path.exists(dist_path),
-        "dist_is_dir": os.path.isdir(dist_path) if os.path.exists(dist_path) else None,
+        "dist_path": dist_path_local,
+        "dist_exists": os.path.exists(dist_path_local),
+        "dist_is_dir": os.path.isdir(dist_path_local) if os.path.exists(dist_path_local) else None,
         "mini_app_exists": os.path.exists(os.path.join(os.getcwd(), "mini-app")),
     }
     
-    if os.path.exists(dist_path) and os.path.isdir(dist_path):
+    if os.path.exists(dist_path_local) and os.path.isdir(dist_path_local):
         try:
             files = []
-            for root, dirs, filenames in os.walk(dist_path):
+            for root, dirs, filenames in os.walk(dist_path_local):
                 for filename in filenames:
                     filepath = os.path.join(root, filename)
-                    relpath = os.path.relpath(filepath, dist_path)
+                    relpath = os.path.relpath(filepath, dist_path_local)
                     files.append({
                         "path": relpath,
                         "size": os.path.getsize(filepath),
@@ -328,41 +397,13 @@ async def debug_static_files():
     return results
 
 
-@app.get("/debug/serve-mini-app", include_in_schema=False)
-async def serve_mini_app_html():
-    """Debug endpoint to serve Mini App HTML as fallback."""
-    from fastapi.responses import HTMLResponse
-    
-    dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
-    index_path = os.path.join(dist_path, "index.html")
-    
-    if not os.path.exists(index_path):
-        return HTMLResponse(
-            content="""
-            <html>
-            <head><title>Mini App Not Found</title></head>
-            <body>
-                <h1>Mini App Not Found</h1>
-                <p>The Mini App files are not available.</p>
-                <pre>""" + f"Looking for: {index_path}\nDist path exists: {os.path.exists(dist_path)}\nIndex exists: {os.path.exists(index_path)}" + """</pre>
-            </body>
-            </html>
-        """,
-            status_code=404
-        )
-    
-    with open(index_path, "r") as f:
-        html_content = f.read()
-    
-    return HTMLResponse(content=html_content)
-
-
 @app.get("/debug/summary")
 async def debug_summary():
     """Comprehensive debug summary endpoint."""
     import httpx
     import socket
-    import os
+    
+    dist_path_local = os.path.join(os.getcwd(), "mini-app", "dist")
     
     summary = {
         "api_status": {
@@ -379,23 +420,22 @@ async def debug_summary():
             "REDIS_URL_set": bool(os.getenv("REDIS_URL")),
         },
         "mini_app_files": {
-            "dist_path": os.path.join(os.getcwd(), "mini-app", "dist"),
-            "exists": os.path.exists(os.path.join(os.getcwd(), "mini-app", "dist")),
-            "is_directory": os.path.isdir(os.path.join(os.getcwd(), "mini-app", "dist")) if os.path.exists(os.path.join(os.getcwd(), "mini-app", "dist")) else None,
+            "dist_path": dist_path_local,
+            "exists": os.path.exists(dist_path_local),
+            "is_directory": os.path.isdir(dist_path_local) if os.path.exists(dist_path_local) else None,
         },
         "mini_app_service": {},
         "recommendations": [],
     }
     
     # Check static files
-    dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
-    if os.path.exists(dist_path):
+    if os.path.exists(dist_path_local):
         try:
             files = []
-            for root, dirs, filenames in os.walk(dist_path):
+            for root, dirs, filenames in os.walk(dist_path_local):
                 for filename in filenames:
                     filepath = os.path.join(root, filename)
-                    relpath = os.path.relpath(filepath, dist_path)
+                    relpath = os.path.relpath(filepath, dist_path_local)
                     files.append(relpath)
             summary["mini_app_files"]["file_count"] = len(files)
             summary["mini_app_files"]["sample_files"] = sorted(files)[:5]
