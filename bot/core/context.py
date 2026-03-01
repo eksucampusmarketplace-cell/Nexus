@@ -206,8 +206,8 @@ class NexusContext:
     bot: Bot
     bot_identity: BotIdentity
     update: Update
-    user: MemberProfile  # Required - must come before optional fields
-    group: GroupProfile  # Required - must come before optional fields
+    user: Optional[MemberProfile] = None
+    group: Optional[GroupProfile] = None
 
     # Optional identity
     message: Optional[Message] = None
@@ -237,10 +237,10 @@ class NexusContext:
         bot: Bot,
         bot_identity: BotIdentity,
         update: Update,
-        user: MemberProfile,
-        group: GroupProfile,
-        db: AsyncSession,
-        cache: GroupScopedRedis,
+        user: Optional[MemberProfile],
+        group: Optional[GroupProfile],
+        db: Optional[AsyncSession],
+        cache: Optional[GroupScopedRedis],
     ) -> "NexusContext":
         """Create a new context."""
         ctx = cls(
@@ -263,8 +263,10 @@ class NexusContext:
         elif update.inline_query:
             ctx.inline_query = update.inline_query
 
-        ctx._rate_limiter = RateLimiter(cache)
-        ctx.i18n = I18nClient(language=group.language)
+        ctx._rate_limiter = RateLimiter(cache) if cache else None
+        # Use group's language if available, otherwise default to English
+        language = group.language if group else "en"
+        ctx.i18n = I18nClient(language=language)
         ctx.ai = AIClient(api_key=os.getenv("OPENAI_API_KEY"))
 
         return ctx
