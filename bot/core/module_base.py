@@ -44,10 +44,21 @@ class CommandDef:
     admin_only: bool = False
     aliases: List[str] = None
     args: Optional[str] = None
+    category: Optional[str] = None
+    usage: Optional[str] = None
+    examples: List[str] = None
+    permissions: List[str] = None
 
     def __post_init__(self):
         if self.aliases is None:
             self.aliases = []
+        if self.examples is None:
+            self.examples = []
+        if self.permissions is None:
+            self.permissions = []
+        if self.usage is None:
+            args_str = f" {self.args}" if self.args else ""
+            self.usage = f"/{self.name}{args_str}"
 
 
 class NexusModule(ABC):
