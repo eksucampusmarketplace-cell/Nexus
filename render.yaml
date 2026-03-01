@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: standard
     pythonVersion: 3.12.2
-    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt && cd "mini-app" && bun install && bun run build && cd ..
+    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt && cd mini-app && bun install && bun run build && cd ..
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: CARGO_HOME
@@ -206,7 +206,7 @@ services:
   - type: static
     name: nexus-mini-app
     runtime: static
-    buildCommand: cd "mini-app" && bun install && bun run build
+    buildCommand: cd mini-app && bun install && bun run build
     staticPublishPath: ./mini-app/dist
     envVars:
       - key: VITE_API_URL
