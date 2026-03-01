@@ -15,9 +15,12 @@ Nexus is a comprehensive, AI-native Telegram bot platform with 27+ production-re
 
 Only the frontend Mini App is set up to run in Replit. The backend services (bot, API, worker) require PostgreSQL, Redis, and Telegram credentials which are not configured here.
 
-### Workflow
+### Local Development (Replit)
 
-- **Start application:** `cd mini-app && npm run dev` — runs the Vite dev server on port 5000
+The Replit environment is configured to run the **Mini App (frontend)** only.
+- **URL:** The UI is available via the Replit webview (port 5000).
+- **API Connectivity:** By default, it connects to the production API at `https://nexus-4uxn.onrender.com`.
+- **Note on "Nonsense" Output:** If you see JSON like `{"name":"Nexus API"...}` when visiting the production URL root, that is the expected behavior of the Backend API. The actual UI is hosted at `/mini-app` on production or at the root in this Replit development environment.
 
 ### Key Configuration
 
