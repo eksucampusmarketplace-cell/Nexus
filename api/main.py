@@ -184,37 +184,25 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-    # Mount Mini App static files
-    dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
-    replit_root = os.getcwd()
-    
-    # In Replit, we serve the UI from the root where we synced it
-    if os.path.exists(os.path.join(replit_root, "assets")):
-        app.mount("/assets", StaticFiles(directory=os.path.join(replit_root, "assets")), name="assets")
-        logger.info(f"Mini App assets mounted from root: {replit_root}")
-    elif os.path.exists(dist_path):
-        app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
-        logger.info(f"Mini App assets mounted from dist: {dist_path}")
+# Mount Mini App static files
+dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
+assets_path = os.path.join(dist_path, "assets")
 
-    @app.get("/mini-app", response_class=HTMLResponse, include_in_schema=False)
-    @app.get("/mini-app/", response_class=HTMLResponse, include_in_schema=False)
-    async def serve_mini_app():
-        """Serve Mini App index.html."""
-        replit_index = os.path.join(os.getcwd(), "index.html")
-        dist_index = os.path.join(os.getcwd(), "mini-app", "dist", "index.html")
-        
-        target = replit_index if os.path.exists(replit_index) else dist_index
-        
-        if not os.path.exists(target):
-            return HTMLResponse(content="<h1>Mini App Not Found</h1><p>Please run build command.</p>", status_code=404)
-            
-        with open(target, "r") as f:
-            return HTMLResponse(content=f.read())
+if os.path.exists(assets_path):
+    app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+    logger.info(f"Mini App assets mounted from: {assets_path}")
+else:
+    logger.warning(f"Mini App assets directory NOT found at: {assets_path}")
 
-    @app.get("/mini-app/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
-    async def serve_mini_app_extended(full_path: str = None):
-        """Catch-all for client-side routing."""
-        return await serve_mini_app()
+
+@app.get("/vite.svg", include_in_schema=False)
+async def serve_vite_svg():
+    """Serve vite.svg favicon."""
+    vite_svg_path = os.path.join(os.getcwd(), "mini-app", "dist", "vite.svg")
+    if os.path.exists(vite_svg_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(vite_svg_path, media_type="image/svg+xml")
+    return HTMLResponse(content="Not found", status_code=404)
 
 
 # Import and include routers
@@ -334,6 +322,21 @@ async def serve_mini_app():
         html_content = f.read()
     
     return HTMLResponse(content=html_content)
+
+
+@app.get("/mini-app/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
+async def serve_mini_app_spa(full_path: str):
+    """Catch-all for Mini App client-side routing."""
+    index_path = os.path.join(os.getcwd(), "mini-app", "dist", "index.html")
+    replit_index_path = os.path.join(os.getcwd(), "index.html")
+    
+    target_path = index_path if os.path.exists(index_path) else replit_index_path
+    
+    if not os.path.exists(target_path):
+        return HTMLResponse(content="<h1>Mini App Not Found</h1>", status_code=404)
+    
+    with open(target_path, "r") as f:
+        return HTMLResponse(content=f.read())
 
 
 @app.get("/debug/env")
