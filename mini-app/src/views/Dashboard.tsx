@@ -122,7 +122,7 @@ export default function Dashboard() {
       {viewMode === 'groups' && (
         <GroupsManager
           onSelectGroup={handleSelectGroup}
-          selectedGroupId={selectedGroupId}
+          selectedGroupId={selectedGroupId ?? undefined}
         />
       )}
 

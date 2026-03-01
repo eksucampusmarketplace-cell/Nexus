@@ -5,7 +5,7 @@ import {
   Lock, Bell, Clock, Coins, Trophy, Settings, ChevronRight,
   ToggleLeft, ToggleRight, Info, AlertCircle, Check, X
 } from 'lucide-react'
-import { toggleApi, ModuleToggle, FeatureToggle } from '../api/toggles'
+import { toggleApi, ModuleToggle, FeatureToggle } from '../../api/toggles'
 import toast from 'react-hot-toast'
 
 interface ModuleToggleManagerProps {
@@ -91,11 +91,11 @@ export default function ModuleToggleManager({ groupId, onModuleToggle }: ModuleT
     setSaving(`${moduleName}-${featureKey}`)
     try {
       await toggleApi.updateFeature(groupId, moduleName, featureKey, value)
-      setModules(prev => prev.map(m => {
+      setModules(prev => prev.map((m: ModuleToggle) => {
         if (m.name !== moduleName) return m
         return {
           ...m,
-          features: m.features.map(f => 
+          features: m.features.map((f: FeatureToggle) => 
             f.key === featureKey ? { ...f, value } : f
           )
         }
@@ -134,9 +134,9 @@ export default function ModuleToggleManager({ groupId, onModuleToggle }: ModuleT
   }, {} as Record<string, ModuleToggle[]>)
 
   // Filter modules
-  const filteredCategories = Object.entries(groupedModules).map(([category, mods]) => ({
+  const filteredCategories = (Object.entries(groupedModules) as [string, ModuleToggle[]][]).map(([category, mods]) => ({
     category,
-    modules: mods.filter(m => 
+    modules: (mods as ModuleToggle[]).filter((m: ModuleToggle) => 
       m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -336,7 +336,7 @@ function ModuleCard({
                     </button>
                   </div>
                   
-                  {module.features.map(feature => (
+                  {module.features.map((feature: FeatureToggle) => (
                     <FeatureInput
                       key={feature.key}
                       feature={feature}
@@ -425,7 +425,7 @@ function FeatureInput({
             disabled={disabled || saving}
             className="w-full px-3 py-2 bg-dark-850 border border-dark-700 rounded-lg text-white text-sm focus:border-primary-500 outline-none disabled:opacity-50"
           >
-            {feature.options?.map(opt => (
+            {feature.options?.map((opt: { value: string; label: string }) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>

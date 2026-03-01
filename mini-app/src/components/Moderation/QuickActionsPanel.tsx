@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Shield, UserX, VolumeX, Ban, AlertTriangle, CheckCircle,
   Clock, Search, ChevronDown, Send, X, User, MessageSquare,
-  MoreVertical, ShieldAlert, UserCheck, Trash2
+  MoreVertical, ShieldAlert, UserCheck, Trash2, Zap
 } from 'lucide-react'
-import { moderationToggleApi } from '../api/toggles'
+import { moderationToggleApi } from '../../api/toggles'
 import toast from 'react-hot-toast'
 
 interface QuickActionsPanelProps {

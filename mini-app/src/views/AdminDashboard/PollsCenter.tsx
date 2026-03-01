@@ -47,21 +47,21 @@ export default function PollsCenter() {
               <p className="text-white text-sm font-medium">Anonymous Polls</p>
               <p className="text-dark-400 text-xs">Hide voter identities</p>
             </div>
-            <Toggle enabled={anonymousPolls} onChange={setAnonymousPolls} />
+            <Toggle checked={anonymousPolls} onChange={setAnonymousPolls} />
           </div>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white text-sm font-medium">Multiple Choice</p>
               <p className="text-dark-400 text-xs">Allow selecting multiple options</p>
             </div>
-            <Toggle enabled={multipleChoice} onChange={setMultipleChoice} />
+            <Toggle checked={multipleChoice} onChange={setMultipleChoice} />
           </div>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white text-sm font-medium">Quiz Mode</p>
               <p className="text-dark-400 text-xs">Reveal correct answer after voting</p>
             </div>
-            <Toggle enabled={quizMode} onChange={setQuizMode} />
+            <Toggle checked={quizMode} onChange={setQuizMode} />
           </div>
         </div>
       </Card>

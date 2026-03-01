@@ -152,7 +152,7 @@ export const untrustUser = async (groupId: number, userId: number) => {
   return response.data
 }
 
-export const getMemberHistory = async (groupId: number, userId: number) => {
+export const getModerationHistory = async (groupId: number, userId: number) => {
   const response = await api.get(`/groups/${groupId}/members/${userId}/history`)
   return response.data
 }

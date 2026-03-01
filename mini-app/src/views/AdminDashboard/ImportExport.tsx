@@ -42,10 +42,10 @@ export default function ImportExport() {
   const [activeTab, setActiveTab] = useState<'export' | 'import'>('export')
   const [selectedModules, setSelectedModules] = useState<string[]>([])
   const [exportFormat, setExportFormat] = useState<'json' | 'zip'>('json')
-  const [exportStatus, setExportStatus] = useState<{ job_id: number; status: string; file_url?: string } | null>(null)
+  const [exportStatus, setExportStatus] = useState<{ id: number; status: string; file_url?: string | null } | null>(null)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importMerge, setImportMerge] = useState(false)
-  const [importStatus, setImportStatus] = useState<{ job_id: number; status: string } | null>(null)
+  const [importStatus, setImportStatus] = useState<{ id: number; status: string; imported_count?: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleExport = async () => {

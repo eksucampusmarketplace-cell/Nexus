@@ -5,7 +5,7 @@ import {
   Plus, Search, MoreVertical, Check, X, Crown, Star, Zap,
   MessageSquare, Clock, Activity
 } from 'lucide-react'
-import api from '../api/client'
+import api from '../../api/client'
 import toast from 'react-hot-toast'
 
 interface ManagedGroup {
