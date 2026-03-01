@@ -206,10 +206,13 @@ async def startup():
                 "message_reaction",
             ],
         )
-        await bot.session.close()
+        # In production with webhooks, we don't close the session if we want the process to stay alive
+        # or we rely on the API service to handle the actual requests.
+        # If this is a separate BOT service, it should just set the webhook and then idle or 
+        # run a dummy server to stay alive.
         logger.info(f"Webhook set to {shared_webhook}")
         
-        # Keep running
+        # Keep running to maintain the process
         while True:
             await asyncio.sleep(3600)
     else:
