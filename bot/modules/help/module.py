@@ -1,11 +1,34 @@
 """Help module - Comprehensive help system for all Nexus modules."""
 
+import os
 from typing import Dict, List, Optional
 
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.markdown import hbold, hcode, hitalic
 
 from bot.core.context import NexusContext
 from bot.core.module_base import CommandDef, ModuleCategory, NexusModule
+
+
+def get_mini_app_keyboard():
+    """Get inline keyboard with Mini App button."""
+    mini_app_url = os.getenv("MINI_APP_URL", "")
+    if mini_app_url:
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🚀 Open Mini App",
+                        web_app=WebAppInfo(url=mini_app_url)
+                    )
+                ],
+                [
+                    InlineKeyboardButton(text="📚 Help", callback_data="help"),
+                    InlineKeyboardButton(text="⚡ Commands", callback_data="commands")
+                ]
+            ]
+        )
+    return None
 
 
 COMMAND_DETAILS: Dict[str, Dict] = {
@@ -1282,7 +1305,8 @@ class HelpModule(NexusModule):
             f"ℹ️ Use commands or open the Mini App for full control!\n\n"
             f"💡 {hitalic('Type /help <command> for detailed information')}"
         )
-        await ctx.reply(text)
+        keyboard = get_mini_app_keyboard()
+        await ctx.reply(text, reply_markup=keyboard)
 
     async def cmd_help(self, ctx: NexusContext):
         args = ctx.message.text.split()[1:] if ctx.message.text else []
@@ -1591,7 +1615,8 @@ class HelpModule(NexusModule):
             text += f"{i}. {icon} {hbold(cat)} — {len(cmds)} commands\n"
 
         text += f"\n💡 {hitalic('Add me to a group to enable all features.')}"
-        await ctx.reply(text)
+        keyboard = get_mini_app_keyboard()
+        await ctx.reply(text, reply_markup=keyboard)
 
     async def cmd_about(self, ctx: NexusContext):
         text = (
