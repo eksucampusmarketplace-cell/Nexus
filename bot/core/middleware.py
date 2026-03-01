@@ -93,13 +93,60 @@ class MiddlewarePipeline:
             return True
 
         if command == "help":
-            text = f"{hbold('📚 Nexus Bot Help')}\n\n"
-            text += f"{hbold('Core Commands')}:\n"
-            text += f"  {hcode('/start')} - Start the bot\n"
-            text += f"  {hcode('/help')} - Show this help\n"
-            text += f"  {hcode('/ping')} - Check bot latency\n"
-            text += f"  {hcode('/about')} - About Nexus bot\n\n"
-            text += "Add me to a group to enable moderation and all other features!"
+            from bot.modules.help.module import (
+                ALIAS_MAP, CATEGORIES, CATEGORY_ICONS, COMMAND_DETAILS,
+                ADMIN_COMMANDS, _resolve_command, _find_category,
+            )
+            args = parts[1:]
+            if args:
+                query = args[0].lower().lstrip("/")
+                matched_cat = next((c for c in CATEGORIES if c.lower() == query), None)
+                if matched_cat:
+                    cmds = CATEGORIES[matched_cat]
+                    icon = CATEGORY_ICONS.get(matched_cat, "📦")
+                    text = f"{icon} {hbold(matched_cat + ' Commands')}\n\n"
+                    for cmd in cmds:
+                        lock = "🔒 " if cmd in ADMIN_COMMANDS else ""
+                        text += f"{lock}{hcode('/' + cmd)}\n"
+                    text += f"\n💡 Use {hcode('/help <command>')} for details."
+                else:
+                    canonical = _resolve_command(query)
+                    if canonical:
+                        details = COMMAND_DETAILS.get(canonical, {})
+                        usage = details.get("usage", f"/{canonical}")
+                        examples = details.get("examples", [])
+                        category = _find_category(canonical)
+                        is_admin = canonical in ADMIN_COMMANDS
+                        aliases = sorted(a for a, t in ALIAS_MAP.items() if t == canonical)
+                        text = f"📚 {hbold(f'/{canonical}')}\n"
+                        text += f"📂 {hbold('Category:')} {category or 'General'}\n\n"
+                        text += f"🔧 {hbold('Usage:')}\n{hcode(usage)}\n\n"
+                        if examples:
+                            text += f"📌 {hbold('Examples:')}\n"
+                            for ex in examples:
+                                text += f"• {hcode(ex)}\n"
+                            text += "\n"
+                        if aliases:
+                            text += f"🔀 {hbold('Aliases:')}\n"
+                            for alias in aliases:
+                                text += f"• {hcode('/' + alias)}\n"
+                            text += "\n"
+                        perm = "🔒 Admin Only" if is_admin else "✅ Everyone"
+                        text += f"{hbold('Permissions:')} {perm}\n"
+                    else:
+                        text = (
+                            f"❌ Command {hcode(query)} not found.\n\n"
+                            f"Use {hcode('/help')} to see all categories."
+                        )
+            else:
+                text = f"{hbold('📚 Nexus Bot Help')}\n\n"
+                text += f"Use {hcode('/help <command>')} for command details.\n"
+                text += f"Use {hcode('/help <category>')} to list commands in a category.\n\n"
+                text += f"{hbold('Categories:')}\n\n"
+                for i, (cat, cmds) in enumerate(CATEGORIES.items(), 1):
+                    icon = CATEGORY_ICONS.get(cat, "📦")
+                    text += f"{i}. {icon} {hbold(cat)} — {len(cmds)} commands\n"
+                text += "\n💡 Add me to a group to enable all features!"
             try:
                 await bot.send_message(
                     chat_id=update.message.chat.id,
