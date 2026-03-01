@@ -4,6 +4,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+from aiogram import Bot
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,6 +15,61 @@ from shared.database import init_db
 from shared.redis_client import close_redis, get_redis
 
 logger = logging.getLogger(__name__)
+
+
+async def setup_telegram_webhook():
+    """Set up Telegram webhook on startup."""
+    bot_token = os.getenv("BOT_TOKEN")
+    webhook_url = os.getenv("WEBHOOK_URL")
+    
+    if not bot_token:
+        logger.error("BOT_TOKEN not set - webhook cannot be configured!")
+        return
+    
+    if not webhook_url:
+        logger.warning("WEBHOOK_URL not set - skipping webhook configuration")
+        return
+    
+    try:
+        # Construct the webhook endpoint URL
+        base_url = webhook_url.split("/webhook")[0]
+        shared_webhook = f"{base_url}/webhook/shared"
+        
+        if not shared_webhook.startswith("http"):
+            shared_webhook = f"https://{shared_webhook}"
+        
+        logger.info(f"Setting Telegram webhook to: {shared_webhook}")
+        
+        bot = Bot(token=bot_token)
+        
+        # Delete any existing webhook first
+        await bot.delete_webhook(drop_pending_updates=True)
+        
+        # Set the new webhook
+        await bot.set_webhook(
+            url=shared_webhook,
+            allowed_updates=[
+                "message",
+                "edited_message",
+                "callback_query",
+                "inline_query",
+                "chat_member",
+                "my_chat_member",
+                "poll",
+                "poll_answer",
+                "chat_join_request",
+                "message_reaction",
+            ],
+        )
+        
+        # Verify webhook is set
+        info = await bot.get_webhook_info()
+        logger.info(f"Webhook configured successfully: {info.url}")
+        
+        await bot.session.close()
+        
+    except Exception as e:
+        logger.error(f"Failed to set webhook: {e}")
 
 
 @asynccontextmanager
@@ -50,6 +106,11 @@ async def lifespan(app: FastAPI):
         logger.info(f"Loaded {len(module_registry.get_all_modules())} modules")
     except Exception as e:
         logger.warning(f"Module loading skipped (DB unavailable): {e}")
+
+    # Set up Telegram webhook (critical for Render single-service deployment)
+    logger.info("Setting up Telegram webhook...")
+    await setup_telegram_webhook()
+    logger.info("Startup complete!")
 
     yield
 
