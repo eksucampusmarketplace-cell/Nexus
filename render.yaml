@@ -206,7 +206,7 @@ services:
   - type: static
     name: nexus-mini-app
     runtime: static
-    buildCommand: cd mini-app && npm install && npm run build
+    buildCommand: cd mini-app && bun install && bun run build
     staticPublishPath: ./mini-app/dist
     envVars:
       - key: VITE_API_URL
