@@ -12,7 +12,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
 from aiogram.utils.markdown import hbold, hcode, hitalic
 from dotenv import load_dotenv
 
@@ -32,6 +32,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def get_mini_app_keyboard():
+    """Get inline keyboard with Mini App button."""
+    mini_app_url = os.getenv("MINI_APP_URL", "")
+    if mini_app_url:
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🚀 Open Mini App",
+                        web_app=WebAppInfo(url=mini_app_url)
+                    )
+                ],
+                [
+                    InlineKeyboardButton(text="📚 Help", callback_data="help"),
+                    InlineKeyboardButton(text="⚡ Commands", callback_data="commands")
+                ]
+            ]
+        )
+    return None
+
+
 async def start_command(message: Message, bot: Bot):
     """Handle /start command in private chats."""
     text = f"👋 {hbold('Welcome to Nexus Bot!')} 🚀\n\n"
@@ -41,7 +62,8 @@ async def start_command(message: Message, bot: Bot):
     text += "ℹ️ Use commands or open the Mini App for full control!\n\n"
     text += f"💡 {hitalic('Type /help <command> for detailed information')}"
 
-    await message.answer(text, parse_mode=ParseMode.HTML)
+    keyboard = get_mini_app_keyboard()
+    await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 async def help_command(message: Message, bot: Bot):
@@ -51,15 +73,41 @@ async def help_command(message: Message, bot: Bot):
     text += f"  {hcode('/start')} - Start the bot\n"
     text += f"  {hcode('/help')} - Show this help\n"
     text += f"  {hcode('/ping')} - Check bot latency\n"
-    text += f"  {hcode('/about')} - About Nexus bot\n\n"
+    text += f"  {hcode('/about')} - About Nexus bot\n"
+    text += f"  {hcode('/settings')} - Open Mini App settings\n\n"
     text += f"Add me to a group to enable moderation features!"
 
-    await message.answer(text, parse_mode=ParseMode.HTML)
+    keyboard = get_mini_app_keyboard()
+    await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 async def ping_command(message: Message, bot: Bot):
     """Handle /ping command."""
     await message.answer("🏓 Pong!")
+
+
+async def settings_command(message: Message, bot: Bot):
+    """Handle /settings command - opens Mini App."""
+    mini_app_url = os.getenv("MINI_APP_URL", "")
+    if mini_app_url:
+        text = f"⚙️ {hbold('Nexus Settings')}\n\n"
+        text += "Open the Mini App to configure your groups, manage modules, and customize settings!"
+
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🚀 Open Mini App",
+                        web_app=WebAppInfo(url=mini_app_url)
+                    )
+                ]
+            ]
+        )
+        await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+    else:
+        text = f"⚙️ {hbold('Nexus Settings')}\n\n"
+        text += "Mini App URL is not configured. Please contact the bot administrator."
+        await message.answer(text, parse_mode=ParseMode.HTML)
 
 
 async def run_long_polling(dp: Dispatcher, bot: Bot):
@@ -131,6 +179,7 @@ async def startup():
     dp.message.register(start_command, Command("start"))
     dp.message.register(help_command, Command("help"))
     dp.message.register(ping_command, Command("ping"))
+    dp.message.register(settings_command, Command("settings"))
 
     if webhook_url:
         # Production mode: Use webhooks

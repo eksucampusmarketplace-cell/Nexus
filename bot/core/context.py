@@ -295,13 +295,14 @@ class NexusContext:
         delete_after: Optional[int] = None,
         parse_mode: str = "HTML",
         protect: bool = False,
+        reply_markup: Optional[InlineKeyboardMarkup] = None,
     ) -> Message:
         """Reply to the current message."""
         if not self.message:
             raise ValueError("No message to reply to")
 
-        reply_markup = None
-        if buttons:
+        # If reply_markup is not provided, build it from buttons
+        if reply_markup is None and buttons:
             keyboard = [
                 [
                     InlineKeyboardButton(

@@ -38,6 +38,8 @@ services:
         generateValue: true
       - key: WEBHOOK_URL
         value: https://nexus-4uxn.onrender.com/webhook
+      - key: MINI_APP_URL
+        value: https://nexus-mini-app.onrender.com
       - key: ENCRYPTION_KEY
         generateValue: true
       - key: OPENAI_API_KEY
@@ -90,6 +92,8 @@ services:
         sync: false
       - key: WEBHOOK_URL
         value: https://nexus-4uxn.onrender.com/webhook
+      - key: MINI_APP_URL
+        value: https://nexus-mini-app.onrender.com
       - key: ENCRYPTION_KEY
         sync: false
       - key: OPENAI_API_KEY

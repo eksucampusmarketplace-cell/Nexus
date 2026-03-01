@@ -4,8 +4,10 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Coroutine, List, Optional
 
+import os
+
 from aiogram import Bot
-from aiogram.types import ReplyParameters, Update
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyParameters, Update, WebAppInfo
 from aiogram.utils.markdown import hbold, hcode, hitalic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +26,38 @@ from shared.redis_client import RateLimiter, get_group_redis
 from shared.schemas import Role
 
 logger = logging.getLogger(__name__)
+
+
+def get_mini_app_button():
+    """Get Mini App button if URL is configured."""
+    mini_app_url = os.getenv("MINI_APP_URL", "")
+    if mini_app_url:
+        return InlineKeyboardButton(
+            text="🚀 Open Mini App",
+            web_app=WebAppInfo(url=mini_app_url)
+        )
+    return None
+
+
+def get_mini_app_keyboard():
+    """Get inline keyboard with Mini App button."""
+    mini_app_url = os.getenv("MINI_APP_URL", "")
+    if mini_app_url:
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🚀 Open Mini App",
+                        web_app=WebAppInfo(url=mini_app_url)
+                    )
+                ],
+                [
+                    InlineKeyboardButton(text="📚 Help", callback_data="help"),
+                    InlineKeyboardButton(text="⚡ Commands", callback_data="commands")
+                ]
+            ]
+        )
+    return None
 
 
 @dataclass
@@ -81,11 +115,13 @@ class MiddlewarePipeline:
             text += "ℹ️ Use commands or open the Mini App for full control!\n\n"
             text += f"💡 {hitalic('Type /help <command> for detailed information')}"
             try:
+                keyboard = get_mini_app_keyboard()
                 await bot.send_message(
                     chat_id=update.message.chat.id,
                     text=text,
                     reply_parameters=ReplyParameters(message_id=update.message.message_id),
                     parse_mode="HTML",
+                    reply_markup=keyboard,
                 )
                 logger.info(f"Sent /start response to chat {update.message.chat.id}")
             except Exception as e:
@@ -148,11 +184,13 @@ class MiddlewarePipeline:
                     text += f"{i}. {icon} {hbold(cat)} — {len(cmds)} commands\n"
                 text += "\n💡 Add me to a group to enable all features!"
             try:
+                keyboard = get_mini_app_keyboard() if not args else None
                 await bot.send_message(
                     chat_id=update.message.chat.id,
                     text=text,
                     reply_parameters=ReplyParameters(message_id=update.message.message_id),
                     parse_mode="HTML",
+                    reply_markup=keyboard,
                 )
                 logger.info(f"Sent /help response to chat {update.message.chat.id}")
             except Exception as e:
@@ -180,15 +218,49 @@ class MiddlewarePipeline:
             text += f"• Economy, games, moderation & more\n\n"
             text += f"Add me to a group and type {hcode('/help')} to get started!"
             try:
+                keyboard = get_mini_app_keyboard()
                 await bot.send_message(
                     chat_id=update.message.chat.id,
                     text=text,
                     reply_parameters=ReplyParameters(message_id=update.message.message_id),
                     parse_mode="HTML",
+                    reply_markup=keyboard,
                 )
                 logger.info(f"Sent /about response to chat {update.message.chat.id}")
             except Exception as e:
                 logger.error(f"Failed to send /about response: {e}")
+            return True
+
+        if command == "settings":
+            mini_app_url = os.getenv("MINI_APP_URL", "")
+            if mini_app_url:
+                text = f"⚙️ {hbold('Nexus Settings')}\n\n"
+                text += "Open the Mini App to configure your groups, manage modules, and customize settings!"
+                keyboard = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="🚀 Open Mini App",
+                                web_app=WebAppInfo(url=mini_app_url)
+                            )
+                        ]
+                    ]
+                )
+            else:
+                text = f"⚙️ {hbold('Nexus Settings')}\n\n"
+                text += "Mini App URL is not configured. Please contact the bot administrator."
+                keyboard = None
+            try:
+                await bot.send_message(
+                    chat_id=update.message.chat.id,
+                    text=text,
+                    reply_parameters=ReplyParameters(message_id=update.message.message_id),
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+                logger.info(f"Sent /settings response to chat {update.message.chat.id}")
+            except Exception as e:
+                logger.error(f"Failed to send /settings response: {e}")
             return True
 
         # Unknown private command — give a hint
