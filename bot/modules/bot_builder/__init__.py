@@ -10,6 +10,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 
 from bot.core.module_base import NexusModule, ModuleCategory
 from bot.core.context import NexusContext
+from shared.database import AsyncSessionLocal
 from shared.models import CustomCommand, KeywordResponder, UserBot, BotFlow, FlowExecution
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,7 +52,7 @@ class BotBuilderModule(NexusModule):
     
     async def _load_commands_cache(self):
         """Load custom commands into cache."""
-        async with self.get_db_session() as db:
+        async with AsyncSessionLocal() as db:
             result = await db.execute(select(CustomCommand))
             commands = result.scalars().all()
             
@@ -63,7 +64,7 @@ class BotBuilderModule(NexusModule):
     
     async def _load_keywords_cache(self):
         """Load keyword responders into cache."""
-        async with self.get_db_session() as db:
+        async with AsyncSessionLocal() as db:
             result = await db.execute(select(KeywordResponder).where(KeywordResponder.is_active == True))
             responders = result.scalars().all()
             
@@ -98,7 +99,7 @@ class BotBuilderModule(NexusModule):
         # Get user's bots
         user_id = ctx.user.user.telegram_id
         
-        async with self.get_db_session() as db:
+        async with AsyncSessionLocal() as db:
             result = await db.execute(
                 select(UserBot).where(
                     UserBot.owner_id == ctx.user.user.id,
@@ -142,7 +143,7 @@ class BotBuilderModule(NexusModule):
         """Handle keyword-based auto-responders."""
         user_id = ctx.user.user.telegram_id
         
-        async with self.get_db_session() as db:
+        async with AsyncSessionLocal() as db:
             result = await db.execute(
                 select(UserBot).where(
                     UserBot.owner_id == ctx.user.user.id,
@@ -200,7 +201,7 @@ class BotBuilderModule(NexusModule):
     
     async def on_command_mybot(self, ctx: NexusContext) -> None:
         """Handle /mybot command - show user's bots."""
-        async with self.get_db_session() as db:
+        async with AsyncSessionLocal() as db:
             result = await db.execute(
                 select(UserBot).where(UserBot.owner_id == ctx.user.user.id)
             )
