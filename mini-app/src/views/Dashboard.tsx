@@ -21,14 +21,19 @@ type ViewMode = 'groups' | 'manage' | 'quick-actions'
 export default function Dashboard() {
   const navigate = useNavigate()
   const { groups, setGroups, isLoading, setLoading } = useGroupStore()
-  const { user, isAuthenticated, hasStoredToken } = useAuthStore()
+  const { user, isAuthenticated, isAuthReady, hasStoredToken } = useAuthStore()
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('groups')
   const hasLoadedGroups = useRef(false)
 
   useEffect(() => {
     const loadGroups = async () => {
-      // Wait a bit for zustand persist to hydrate
+      // Wait for auth to be fully ready (rehydrated + not loading)
+      if (!isAuthReady()) {
+        console.log('Skipping group load - auth not ready')
+        return
+      }
+      
       // Check if we have a stored token that indicates user was previously authenticated
       const wasAuthenticated = hasStoredToken()
       
@@ -59,7 +64,7 @@ export default function Dashboard() {
     }
 
     loadGroups()
-  }, [isAuthenticated])
+  }, [isAuthenticated, isAuthReady])
 
   const handleSelectGroup = (groupId: number) => {
     setSelectedGroupId(groupId)

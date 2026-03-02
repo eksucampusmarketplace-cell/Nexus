@@ -45,10 +45,11 @@ import GroupIntelligence from './views/AdminDashboard/GroupIntelligence'
 import AutomationCenterEnhanced from './views/AdminDashboard/AutomationCenterEnhanced'
 
 function App() {
-  const { isAuthenticated, isLoading, error, setAuth, setLoading, setError } = useAuthStore()
+  const { isAuthenticated, isLoading, isRehydrated, error, setAuth, setLoading, setError } = useAuthStore()
   const { currentGroup, setCurrentGroup } = useGroupStore()
   const [initData, setInitData] = useState<string>('')
   const [errorDetail, setErrorDetail] = useState<string>('')
+  const [authAttempted, setAuthAttempted] = useState(false)
 
   useEffect(() => {
     const init = async () => {
@@ -75,6 +76,7 @@ function App() {
       if (!initDataRaw) {
         // Not running in Telegram context
         console.log('Not running in Telegram WebApp context')
+        setAuthAttempted(true)
         setLoading(false)
         return
       }
@@ -98,8 +100,12 @@ function App() {
       try {
         // Authenticate with backend
         // Backend now handles bot token lookup automatically
+        console.log('[App] Starting authentication...')
         const authData = await telegramAuth(initDataRaw, customBotToken)
+        console.log('[App] Authentication successful, setting auth state')
+        // Token is stored in localStorage by setAuth before state update
         setAuth(authData.access_token, authData.user)
+        console.log('[App] Auth state set, token stored in localStorage')
       } catch (err: any) {
         console.error('Auth error:', err)
         const detail = err.response?.data?.detail || 'Authentication failed'
@@ -107,6 +113,7 @@ function App() {
         setErrorDetail(detail)
       }
 
+      setAuthAttempted(true)
       setLoading(false)
     }
 

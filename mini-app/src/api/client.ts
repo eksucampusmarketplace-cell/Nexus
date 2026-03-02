@@ -3,6 +3,9 @@ import axios from 'axios'
 // Production API URL - Your Render deployment
 const PRODUCTION_API_URL = 'https://nexus-4uxn.onrender.com'
 
+// Track if we've already handled a 401 to prevent reload loops
+let hasHandled401 = false
+
 // Detect the API URL based on environment
 const getApiUrl = (): string => {
   // Check for environment variable (set at build time)
@@ -41,13 +44,14 @@ const api = axios.create({
 
 // Add auth token to requests
 api.interceptors.request.use((config) => {
+  // Always read fresh from localStorage to avoid stale closures
   const token = localStorage.getItem('nexus_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
     // Log first few chars of token for debugging
-    console.log('[API Client] Adding token:', token.substring(0, 20) + '...')
+    console.log(`[API Client] Adding token to ${config.url}:`, token.substring(0, 20) + '...')
   } else {
-    console.log('[API Client] No token found in localStorage')
+    console.log(`[API Client] No token found for request to ${config.url}`)
   }
   return config
 })
@@ -56,13 +60,30 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('[API Client] Response error:', error.response?.status, error.response?.data)
-    if (error.response?.status === 401) {
-      localStorage.removeItem('nexus_token')
-      // Only reload if not already on auth page to avoid loops
-      if (!window.location.pathname.includes('/auth')) {
-        window.location.reload()
+    const status = error.response?.status
+    const url = error.config?.url
+    
+    console.error(`[API Client] Response error for ${url}:`, status, error.response?.data)
+    
+    if (status === 401) {
+      // Only handle 401 once to prevent reload loops
+      if (hasHandled401) {
+        console.log('[API Client] 401 already handled, skipping reload')
+        return Promise.reject(error)
       }
+      
+      hasHandled401 = true
+      console.log('[API Client] 401 received, clearing token')
+      localStorage.removeItem('nexus_token')
+      
+      // Delay reload slightly to prevent rapid loops
+      setTimeout(() => {
+        // Only reload if not already on auth page to avoid loops
+        if (!window.location.pathname.includes('/auth')) {
+          console.log('[API Client] Reloading page due to 401')
+          window.location.reload()
+        }
+      }, 500)
     }
     return Promise.reject(error)
   }

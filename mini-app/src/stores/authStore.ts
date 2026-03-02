@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist, StateStorage } from 'zustand/middleware'
+import { persist } from 'zustand/middleware'
 
 export interface User {
   id: number
@@ -14,6 +14,7 @@ export interface User {
 interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
+  isRehydrated: boolean
   token: string | null
   user: User | null
   error: string | null
@@ -23,43 +24,21 @@ interface AuthState {
   logout: () => void
   // Helper to check if we have a stored token
   hasStoredToken: () => boolean
-}
-
-// Custom storage that also syncs the token to nexus_token
-const customStorage: StateStorage = {
-  getItem: (name: string): string | null => {
-    const value = localStorage.getItem(name)
-    return value
-  },
-  setItem: (name: string, value: string): void => {
-    // Also sync to nexus_token for the API client
-    try {
-      const parsed = JSON.parse(value)
-      if (parsed.state?.token) {
-        localStorage.setItem('nexus_token', parsed.state.token)
-      }
-    } catch (e) {
-      // Ignore parse errors
-    }
-    localStorage.setItem(name, value)
-  },
-  removeItem: (name: string): void => {
-    if (name === 'nexus-auth') {
-      localStorage.removeItem('nexus_token')
-    }
-    localStorage.removeItem(name)
-  },
+  // Check if auth is ready (rehydrated and not loading)
+  isAuthReady: () => boolean
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       isAuthenticated: false,
       isLoading: true,
+      isRehydrated: false,
       token: null,
       user: null,
       error: null,
       setAuth: (token, user) => {
+        // Ensure token is written to localStorage BEFORE state update
         localStorage.setItem('nexus_token', token)
         set({ isAuthenticated: true, token, user, error: null })
       },
@@ -71,11 +50,20 @@ export const useAuthStore = create<AuthState>()(
       },
       hasStoredToken: () => {
         return !!localStorage.getItem('nexus_token')
+      },
+      isAuthReady: () => {
+        const state = get()
+        return state.isRehydrated && !state.isLoading
       }
     }),
     {
       name: 'nexus-auth',
-      storage: customStorage,
+      onRehydrateStorage: () => (state) => {
+        // Mark as rehydrated after persist middleware restores state
+        if (state) {
+          state.isRehydrated = true
+        }
+      }
     }
   )
 )

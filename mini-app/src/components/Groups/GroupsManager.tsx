@@ -35,11 +35,17 @@ export default function GroupsManager({ onSelectGroup, selectedGroupId }: Groups
   const [searchQuery, setSearchQuery] = useState('')
   const [filterRole, setFilterRole] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'name' | 'members' | 'activity'>('activity')
-  const { isAuthenticated, hasStoredToken } = useAuthStore()
+  const { isAuthenticated, isAuthReady, hasStoredToken } = useAuthStore()
   const hasLoadedGroups = useRef(false)
 
   useEffect(() => {
     const loadGroups = async () => {
+      // Wait for auth to be fully ready (rehydrated + not loading)
+      if (!isAuthReady()) {
+        console.log('GroupsManager: Auth not ready, skipping load')
+        return
+      }
+      
       // Check both isAuthenticated and hasStoredToken
       const wasAuthenticated = hasStoredToken()
       if (!isAuthenticated && !wasAuthenticated) {
@@ -70,7 +76,7 @@ export default function GroupsManager({ onSelectGroup, selectedGroupId }: Groups
     }
 
     loadGroups()
-  }, [isAuthenticated])
+  }, [isAuthenticated, isAuthReady])
 
   // Filter and sort groups
   const filteredGroups = groups
@@ -346,7 +352,7 @@ function GroupCard({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              // Navigate to modules
+              window.location.href = `/admin/${group.id}/modules`
             }}
             className="flex-1 px-3 py-2 bg-dark-700 text-dark-300 rounded-lg text-sm hover:bg-dark-600 transition-colors flex items-center justify-center gap-2"
           >
@@ -356,7 +362,7 @@ function GroupCard({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              // Navigate to dashboard
+              window.location.href = `/admin/${group.id}`
             }}
             className="flex-1 px-3 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 transition-colors flex items-center justify-center gap-2"
           >
