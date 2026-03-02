@@ -28,9 +28,22 @@ from shared.schemas import Role
 logger = logging.getLogger(__name__)
 
 
+def get_mini_app_url():
+    """Get Mini App URL from environment or fallback to production."""
+    mini_app_url = os.getenv("MINI_APP_URL", "")
+    if mini_app_url and mini_app_url != "http://localhost:3000":
+        return mini_app_url
+    # Fallback to webhook URL base domain or production URL
+    webhook_url = os.getenv("WEBHOOK_URL", "")
+    if webhook_url:
+        return webhook_url.split("/webhook")[0]
+    # Final fallback to production URL
+    return "https://nexus-4uxn.onrender.com"
+
+
 def get_mini_app_button():
     """Get Mini App button if URL is configured."""
-    mini_app_url = os.getenv("MINI_APP_URL", "")
+    mini_app_url = get_mini_app_url()
     if mini_app_url:
         return InlineKeyboardButton(
             text="🚀 Open Mini App",
@@ -41,7 +54,7 @@ def get_mini_app_button():
 
 def get_mini_app_keyboard():
     """Get inline keyboard with Mini App button."""
-    mini_app_url = os.getenv("MINI_APP_URL", "")
+    mini_app_url = get_mini_app_url()
     if mini_app_url:
         return InlineKeyboardMarkup(
             inline_keyboard=[
@@ -232,7 +245,7 @@ class MiddlewarePipeline:
             return True
 
         if command == "settings":
-            mini_app_url = os.getenv("MINI_APP_URL", "")
+            mini_app_url = get_mini_app_url()
             if mini_app_url:
                 text = f"⚙️ {hbold('Nexus Settings')}\n\n"
                 text += "Open the Mini App to configure your groups, manage modules, and customize settings!"

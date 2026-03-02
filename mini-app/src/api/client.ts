@@ -1,24 +1,28 @@
 import axios from 'axios'
 
+// Production API URL - Your Render deployment
+const PRODUCTION_API_URL = 'https://nexus-4uxn.onrender.com'
+
 // Detect the API URL based on environment
 const getApiUrl = () => {
   // Check for environment variable (set at build time)
-  if (import.meta.env.VITE_API_URL) {
+  if (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== 'http://localhost:8000') {
     return import.meta.env.VITE_API_URL
   }
-  
+
   // If running on the same domain (served from API service), use current origin
   if (typeof window !== 'undefined' && window.location.origin) {
-    // Check if we're on the API service domain
-    if (window.location.hostname.includes('nexus-4uxn.onrender.com') || 
-        window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1') {
+    const hostname = window.location.hostname
+    // Use current origin if on production domain or localhost
+    if (hostname.includes('nexus-4uxn.onrender.com') ||
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1') {
       return window.location.origin
     }
   }
-  
-  // Fallback to production API URL
-  return 'https://nexus-4uxn.onrender.com'
+
+  // Default to production API URL
+  return PRODUCTION_API_URL
 }
 
 const API_BASE_URL = getApiUrl()
