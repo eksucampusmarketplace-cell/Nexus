@@ -424,6 +424,18 @@ async def _create_user_token(telegram_user: dict, db: AsyncSession) -> AuthToken
     return AuthTokenResponse(
         access_token=access_token,
         expires_in=ACCESS_TOKEN_EXPIRE_DAYS * 86400,
+        user={
+            "id": user.id,
+            "telegram_id": user.telegram_id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "language_code": user.language_code,
+            "is_bot": user.is_bot,
+            "is_premium": user.is_premium,
+            "created_at": user.created_at,
+            "updated_at": user.last_seen,
+        },
     )
 
 

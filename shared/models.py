@@ -1982,3 +1982,217 @@ class DeletedMessage(Base):
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
     deleter: Mapped["User"] = relationship("User", foreign_keys=[deleted_by])
     restorer: Mapped[Optional["User"]] = relationship("User", foreign_keys=[restored_by])
+
+
+# ============ ANALYTICS MODELS ============
+
+
+class DailyAnalytics(Base):
+    """Daily analytics rollup for groups."""
+
+    __tablename__ = "daily_analytics"
+    __table_args__ = (
+        UniqueConstraint("group_id", "date", name="uq_daily_analytics_group_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    date: Mapped[date] = mapped_column(Date, index=True)
+
+    # Metrics
+    total_messages: Mapped[int] = mapped_column(Integer, default=0)
+    unique_users: Mapped[int] = mapped_column(Integer, default=0)
+    peak_hour: Mapped[Optional[int]] = mapped_column(Integer)
+
+    # Engagement
+    new_members: Mapped[int] = mapped_column(Integer, default=0)
+    active_members: Mapped[int] = mapped_column(Integer, default=0)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class HourlyStats(Base):
+    """Hourly statistics for activity tracking."""
+
+    __tablename__ = "hourly_stats"
+    __table_args__ = (
+        UniqueConstraint("group_id", "date", "hour", name="uq_hourly_stats_group_date_hour"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    date: Mapped[date] = mapped_column(Date, index=True)
+    hour: Mapped[int] = mapped_column(Integer)
+
+    # Metrics
+    message_count: Mapped[int] = mapped_column(Integer, default=0)
+    unique_users: Mapped[int] = mapped_column(Integer, default=0)
+    media_count: Mapped[int] = mapped_column(Integer, default=0)
+    reaction_count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Message(Base):
+    """Message tracking for analytics."""
+
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    message_id: Mapped[int] = mapped_column(BigInteger, index=True)
+
+    # Content
+    content: Mapped[Optional[str]] = mapped_column(Text)
+    content_type: Mapped[str] = mapped_column(String(20), default="text")
+    sentiment_score: Mapped[Optional[float]] = mapped_column(default=None)
+
+    # Metadata
+    is_forwarded: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_media: Mapped[bool] = mapped_column(Boolean, default=False)
+    media_types: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    reply_to_message_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class MemberRetention(Base):
+    """Member retention tracking."""
+
+    __tablename__ = "member_retention"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+
+    # Cohort tracking
+    join_date: Mapped[date] = mapped_column(Date, index=True)
+    last_active_date: Mapped[date] = mapped_column(Date)
+
+    # Retention markers
+    active_day_1: Mapped[bool] = mapped_column(Boolean, default=False)
+    active_day_3: Mapped[bool] = mapped_column(Boolean, default=False)
+    active_day_7: Mapped[bool] = mapped_column(Boolean, default=False)
+    active_day_14: Mapped[bool] = mapped_column(Boolean, default=False)
+    active_day_30: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+# ============ CHALLENGES MODELS ============
+
+
+class GroupChallenge(Base):
+    """Group-wide challenges."""
+
+    __tablename__ = "group_challenges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+
+    # Challenge info
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    challenge_type: Mapped[str] = mapped_column(String(50), index=True)
+
+    # Targets
+    target_value: Mapped[int] = mapped_column(Integer)
+    current_value: Mapped[int] = mapped_column(Integer, default=0)
+    target_metric: Mapped[str] = mapped_column(String(50))
+
+    # Timing
+    start_date: Mapped[datetime] = mapped_column(DateTime)
+    end_date: Mapped[datetime] = mapped_column(DateTime)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    # Rewards
+    reward_type: Mapped[str] = mapped_column(String(50))
+    reward_config: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+
+    # Status
+    status: Mapped[str] = mapped_column(String(20), default="active")  # active, completed, cancelled
+
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class ChallengeProgress(Base):
+    """User progress in challenges."""
+
+    __tablename__ = "challenge_progress"
+    __table_args__ = (
+        UniqueConstraint("challenge_id", "user_id", name="uq_challenge_user"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    challenge_id: Mapped[int] = mapped_column(ForeignKey("group_challenges.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+
+    # Progress
+    contribution: Mapped[int] = mapped_column(Integer, default=0)
+    percent_complete: Mapped[float] = mapped_column(default=0.0)
+    rank: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Reward
+    reward_claimed: Mapped[bool] = mapped_column(Boolean, default=False)
+    claimed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now()
+    )
+
+
+# ============ TRUST SYSTEM MODELS ============
+
+
+class TrustConfig(Base):
+    """Trust system configuration per group."""
+
+    __tablename__ = "trust_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), unique=True)
+
+    # Feature toggles
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Weights
+    message_weight: Mapped[float] = mapped_column(default=1.0)
+    consistency_weight: Mapped[float] = mapped_column(default=1.0)
+    engagement_weight: Mapped[float] = mapped_column(default=1.0)
+    moderation_weight: Mapped[float] = mapped_column(default=1.0)
+
+    # Bonuses and penalties
+    quality_message_bonus: Mapped[int] = mapped_column(Integer, default=2)
+    positive_reaction_bonus: Mapped[int] = mapped_column(Integer, default=1)
+    report_penalty: Mapped[int] = mapped_column(Integer, default=-5)
+    warn_penalty: Mapped[int] = mapped_column(Integer, default=-10)
+    mute_penalty: Mapped[int] = mapped_column(Integer, default=-20)
+    ban_penalty: Mapped[int] = mapped_column(Integer, default=-50)
+    daily_streak_bonus: Mapped[int] = mapped_column(Integer, default=3)
+    helpful_action_bonus: Mapped[int] = mapped_column(Integer, default=5)
+    mentor_bonus: Mapped[int] = mapped_column(Integer, default=10)
+
+    # Thresholds
+    high_trust_threshold: Mapped[int] = mapped_column(Integer, default=80)
+    medium_trust_threshold: Mapped[int] = mapped_column(Integer, default=60)
+    low_trust_threshold: Mapped[int] = mapped_column(Integer, default=40)
+
+
+class TrustScoreHistory(Base):
+    """Trust score change history."""
+
+    __tablename__ = "trust_score_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+
+    # Change details
+    old_score: Mapped[int] = mapped_column(Integer)
+    new_score: Mapped[int] = mapped_column(Integer)
+    delta: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(200))
+    influencing_factors: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())

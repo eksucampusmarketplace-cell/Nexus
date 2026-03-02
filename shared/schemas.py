@@ -619,6 +619,7 @@ class AuthTokenResponse(BaseSchema):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+    user: "UserResponse"
 
 
 class UserPermissionsResponse(BaseSchema):
