@@ -222,6 +222,68 @@ curl https://nexus-4uxn.onrender.com/debug/mini-app-check | jq
 curl https://nexus-4uxn.onrender.com/debug/static-files | jq
 ```
 
+## Authentication Debugging
+
+### Issue: Mini App authentication fails with "Hash mismatch"
+
+**Error in logs:** `All validation attempts failed. Chat ID: None, Errors: ['Main BOT_TOKEN: hash mismatch']`
+
+**Possible causes:**
+1. BOT_TOKEN environment variable doesn't match the bot that opened the Mini App
+2. Mini App opened from a white-label bot without proper chat ID in initData
+3. Mini App opened from a private chat where chat ID cannot be extracted
+
+**Solutions:**
+
+1. **Verify BOT_TOKEN matches the bot:**
+   - Check that `BOT_TOKEN` environment variable matches the bot you're using to open the Mini App
+   - If using a white-label bot, ensure the group has the bot instance registered in the database
+
+2. **Use the auth debug endpoint:**
+   ```bash
+   curl -X POST https://nexus-4uxn.onrender.com/api/v1/auth/debug \
+     -H "Content-Type: application/json" \
+     -d '{"init_data": "paste_init_data_here"}'
+   ```
+
+3. **Development bypass (local testing only):**
+   Set environment variable to bypass hash validation:
+   ```bash
+   DISABLE_AUTH_VALIDATION=true
+   ENVIRONMENT=development
+   ```
+   **WARNING:** Only use this in development! Never enable in production.
+
+4. **Check logs for detailed debugging:**
+   The auth endpoint now logs detailed information:
+   - init_data length and content preview
+   - Parsed params keys
+   - User ID and chat info
+   - Computed vs received hash comparison
+
+### Understanding the Authentication Flow
+
+1. Mini App opens and gets `initData` from Telegram WebApp
+2. Frontend sends `initData` to `/api/v1/auth/token`
+3. Backend tries to validate hash with multiple bot tokens:
+   - Custom bot token from localStorage (if provided)
+   - Bot token from database (looked up by chat ID)
+   - Main BOT_TOKEN from environment
+4. If all validations fail, authentication is rejected
+
+### Common Auth Issues
+
+**Chat ID is None:**
+- Mini App opened from private chat (no group context)
+- `chat` field missing from initData
+- `start_param` not provided
+- **Solution:** Open Mini App from a group where the bot is a member, or ensure BOT_TOKEN matches
+
+**Hash mismatch with main token:**
+- Mini App opened from a different bot than configured
+- White-label bot being used but not properly registered
+- **Solution:** Verify BOT_TOKEN or register the white-label bot in the database
+
 ## Next Steps
 
 After running these debug endpoints:
