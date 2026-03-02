@@ -119,8 +119,8 @@ async def list_members(
     joined_after: Optional[str] = None,
     joined_before: Optional[str] = None,
     inactive_days: Optional[int] = Query(None, ge=0),
-    sort_by: str = Query("joined_at", regex="^(joined_at|last_active|trust_score|level|message_count|warn_count)$"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_by: str = Query("joined_at", pattern="^(joined_at|last_active|trust_score|level|message_count|warn_count)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -978,7 +978,7 @@ async def trust_member(
 async def promote_member(
     group_id: int,
     user_id: int,
-    role: str = Query(..., regex="^(admin|mod|trusted|member)$"),
+    role: str = Query(..., pattern="^(admin|mod|trusted|member)$"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1142,7 +1142,7 @@ async def get_new_members(
 @router.get("/groups/{group_id}/leaderboards")
 async def get_leaderboards(
     group_id: int,
-    type: str = Query("messages", regex="^(messages|coins|xp|trust|reputation)$"),
+    type: str = Query("messages", pattern="^(messages|coins|xp|trust|reputation)$"),
     limit: int = Query(10, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
