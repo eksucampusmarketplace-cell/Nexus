@@ -212,6 +212,10 @@ services:
       - key: VITE_API_URL
         value: https://nexus-4uxn.onrender.com
 
+# Note: MINI_APP_URL should be set to the URL of the static site above
+# Render will assign a URL like: https://nexus-mini-app.onrender.com
+# Or if using the API service to serve the mini-app, use: https://nexus-4uxn.onrender.com
+
 databases:
   - name: nexus-db
     plan: standard
