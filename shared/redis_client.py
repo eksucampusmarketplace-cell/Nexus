@@ -6,7 +6,20 @@ from typing import Any, Optional, Union
 
 import redis.asyncio as aioredis
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+# In production, REDIS_URL must be explicitly set
+_env_redis_url = os.getenv("REDIS_URL")
+_environment = os.getenv("ENVIRONMENT", "development")
+
+if _env_redis_url:
+    REDIS_URL = _env_redis_url
+elif _environment == "production":
+    raise RuntimeError(
+        "REDIS_URL environment variable is required in production. "
+        "Please configure a Redis service and set REDIS_URL."
+    )
+else:
+    # Development fallback
+    REDIS_URL = "redis://localhost:6379/0"
 
 
 class GroupScopedRedis:

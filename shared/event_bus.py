@@ -22,7 +22,8 @@ import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+# Use the redis_client module for consistent Redis URL handling
+from shared.redis_client import REDIS_URL
 
 
 class EventType(str, Enum):
