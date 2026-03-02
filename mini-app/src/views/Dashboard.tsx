@@ -21,12 +21,16 @@ type ViewMode = 'groups' | 'manage' | 'quick-actions'
 export default function Dashboard() {
   const navigate = useNavigate()
   const { groups, setGroups, isLoading, setLoading } = useGroupStore()
-  const { user } = useAuthStore()
+  const { user, isAuthenticated } = useAuthStore()
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('groups')
 
   useEffect(() => {
     const loadGroups = async () => {
+      if (!isAuthenticated) {
+        console.log('Skipping group load - not authenticated')
+        return
+      }
       setLoading(true)
       try {
         const data = await listGroups()
@@ -39,7 +43,7 @@ export default function Dashboard() {
     }
 
     loadGroups()
-  }, [])
+  }, [isAuthenticated])
 
   const handleSelectGroup = (groupId: number) => {
     setSelectedGroupId(groupId)
