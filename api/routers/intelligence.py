@@ -27,6 +27,7 @@ from shared.schemas_intelligence import (
     AutomationRuleResponse,
     BehavioralTripwireCreate,
     BehavioralTripwireResponse,
+    BehaviorPatternResponse,
     BroadcastCampaignCreate,
     BroadcastCampaignResponse,
     ChurnPredictionResponse,
@@ -190,7 +191,7 @@ async def get_predictive_scores(
     return [PredictiveScoreResponse.model_validate(s) for s in scores]
 
 
-@router.get("/groups/{group_id}/behavior-patterns", response_model=List[BehaviorPattern])
+@router.get("/groups/{group_id}/behavior-patterns", response_model=List[BehaviorPatternResponse])
 async def get_behavior_patterns(
     group_id: int,
     db: AsyncSession = Depends(get_db),
@@ -202,7 +203,8 @@ async def get_behavior_patterns(
     result = await db.execute(
         select(BehaviorPattern).where(BehaviorPattern.is_active == True)
     )
-    return result.scalars().all()
+    patterns = result.scalars().all()
+    return [BehaviorPatternResponse.model_validate(p) for p in patterns]
 
 
 # ============ CONVERSATION GRAPH ============
