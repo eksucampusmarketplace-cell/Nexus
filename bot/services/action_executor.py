@@ -31,6 +31,9 @@ class ActionResult:
     
     # For temporary actions
     expires_at: Optional[datetime] = None
+    
+    # For additional data
+    extra_data: Optional[Dict[str, Any]] = None
 
 
 class SharedActionExecutor:
@@ -630,3 +633,324 @@ class SharedActionExecutor:
             return f"{seconds // 3600}h"
         else:
             return f"{seconds // 86400}d"
+
+
+    async def delete_message(
+        self,
+        message_id: int,
+        user: Any,
+        deleted_by_user: Any,
+        deletion_reason: str,
+        content: Optional[str] = None,
+        content_type: str = "text",
+        media_file_id: Optional[str] = None,
+        trigger_word: Optional[str] = None,
+        lock_type: Optional[str] = None,
+        ai_confidence: Optional[float] = None,
+        extra_data: Optional[Dict[str, Any]] = None,
+    ) -> ActionResult:
+        """
+        Delete a message and archive it to the Message Graveyard.
+        
+        This is the single source of truth for all message deletions.
+        Every module that needs to delete a message should call this method.
+        
+        Args:
+            message_id: Telegram message ID
+            user: User object who sent the message
+            deleted_by_user: User object who is deleting (can be bot user for automated deletions)
+            deletion_reason: Reason for deletion (word_filter, flood, lock_violation, nsfw, etc.)
+            content: Text content of the message (if any)
+            content_type: Type of content (text, photo, video, etc.)
+            media_file_id: Telegram file ID for media messages
+            trigger_word: If word filter, which word triggered it
+            lock_type: If lock violation, which lock type
+            ai_confidence: If AI moderation, confidence score
+            extra_data: Additional metadata
+            
+        Returns:
+            ActionResult with success status
+        """
+        try:
+            # 1. Delete message from Telegram
+            try:
+                await self.bot.delete_message(
+                    chat_id=self.group_id,
+                    message_id=message_id
+                )
+            except Exception as e:
+                logger.warning(f"Could not delete message from Telegram: {e}")
+                # Continue anyway - might already be deleted
+            
+            # 2. Create deleted message record (archive to graveyard)
+            from shared.models import DeletedMessage
+            
+            deleted_msg = DeletedMessage(
+                group_id=self.group_id,
+                message_id=message_id,
+                user_id=user.id,
+                content=content,
+                content_type=content_type,
+                media_file_id=media_file_id,
+                deletion_reason=deletion_reason,
+                deleted_by=deleted_by_user.id,
+                can_restore=True,
+                trigger_word=trigger_word,
+                lock_type=lock_type,
+                ai_confidence=ai_confidence,
+                extra_data=extra_data,
+            )
+            self.db.add(deleted_msg)
+            
+            # 3. Log action
+            await self._log_action(
+                ActionType.DELETE,
+                user.id,
+                deleted_by_user.id,
+                reason=f"Message deleted: {deletion_reason}",
+                message_id=message_id,
+                message_content=content[:500] if content else None,  # Truncate for logging
+            )
+            
+            # 4. Update member stats if applicable
+            from sqlalchemy import select
+            from shared.models import Member
+            
+            result = await self.db.execute(
+                select(Member).where(
+                    Member.user_id == user.id,
+                    Member.group_id == self.group_id
+                )
+            )
+            member = result.scalar_one_or_none()
+            
+            if member:
+                # Decrease XP for deleted message (if not manual deletion by admin)
+                if deletion_reason != "manual" and member.xp > 0:
+                    member.xp = max(0, member.xp - 5)
+            
+            # 5. Commit transaction
+            await self.db.commit()
+            
+            # 6. Broadcast via WebSocket for real-time updates
+            await self._broadcast_deletion(deleted_msg, user, deleted_by_user)
+            
+            logger.info(
+                f"Message {message_id} deleted in group {self.group_id} "
+                f"by {deleted_by_user.id} for reason: {deletion_reason}"
+            )
+            
+            return ActionResult(
+                success=True,
+                action_type="delete",
+                message=f"Message deleted and archived to graveyard"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in delete_message: {e}", exc_info=True)
+            await self.db.rollback()
+            return ActionResult(
+                success=False,
+                action_type="delete",
+                error=str(e)
+            )
+    
+    async def restore_message(
+        self,
+        deleted_message_id: int,
+        restored_by_user: Any,
+    ) -> ActionResult:
+        """
+        Restore a deleted message from the graveyard.
+        
+        Re-sends the message to the group and marks it as restored.
+        Note: Media messages cannot be fully restored as Telegram doesn't allow
+        bots to re-send media with original attribution.
+        
+        Args:
+            deleted_message_id: ID of the DeletedMessage record
+            restored_by_user: User object who is restoring
+            
+        Returns:
+            ActionResult with success status and new message ID
+        """
+        try:
+            from sqlalchemy import select
+            from shared.models import DeletedMessage
+            
+            # 1. Get deleted message record
+            result = await self.db.execute(
+                select(DeletedMessage).where(DeletedMessage.id == deleted_message_id)
+            )
+            deleted_msg = result.scalar_one_or_none()
+            
+            if not deleted_msg:
+                return ActionResult(
+                    success=False,
+                    action_type="restore",
+                    error="Deleted message not found"
+                )
+            
+            if not deleted_msg.can_restore:
+                return ActionResult(
+                    success=False,
+                    action_type="restore",
+                    error="Message cannot be restored"
+                )
+            
+            if deleted_msg.restored_at:
+                return ActionResult(
+                    success=False,
+                    action_type="restore",
+                    error="Message already restored"
+                )
+            
+            # 2. Re-send message to group
+            try:
+                if deleted_msg.content_type == "text" and deleted_msg.content:
+                    # Send text message with attribution
+                    restored = await self.bot.send_message(
+                        chat_id=self.group_id,
+                        text=f"🔄 *Restored Message*\n\n{deleted_msg.content}",
+                        parse_mode="Markdown"
+                    )
+                    new_message_id = restored.message_id
+                elif deleted_msg.media_file_id:
+                    # Try to restore media
+                    if deleted_msg.content_type == "photo":
+                        restored = await self.bot.send_photo(
+                            chat_id=self.group_id,
+                            photo=deleted_msg.media_file_id,
+                            caption=f"🔄 Restored photo"
+                        )
+                    elif deleted_msg.content_type == "video":
+                        restored = await self.bot.send_video(
+                            chat_id=self.group_id,
+                            video=deleted_msg.media_file_id,
+                            caption=f"🔄 Restored video"
+                        )
+                    else:
+                        return ActionResult(
+                            success=False,
+                            action_type="restore",
+                            error=f"Cannot restore media type: {deleted_msg.content_type}"
+                        )
+                    new_message_id = restored.message_id
+                else:
+                    return ActionResult(
+                        success=False,
+                        action_type="restore",
+                        error="No content to restore"
+                    )
+                
+                # 3. Update deleted message record
+                deleted_msg.restored_at = datetime.utcnow()
+                deleted_msg.restored_by = restored_by_user.id
+                deleted_msg.restored_message_id = new_message_id
+                deleted_msg.can_restore = False
+                
+                # 4. Log restoration
+                await self._log_action(
+                    ActionType.RESTORE,
+                    deleted_msg.user_id,
+                    restored_by_user.id,
+                    reason=f"Message restored from graveyard",
+                    message_id=new_message_id,
+                )
+                
+                await self.db.commit()
+                
+                # 5. Broadcast restoration
+                await self._broadcast_restoration(deleted_msg, restored_by_user)
+                
+                logger.info(
+                    f"Message {deleted_msg.message_id} restored in group {self.group_id} "
+                    f"by {restored_by_user.id}, new message ID: {new_message_id}"
+                )
+                
+                return ActionResult(
+                    success=True,
+                    action_type="restore",
+                    message="Message restored successfully",
+                    extra_data={"new_message_id": new_message_id}
+                )
+                
+            except Exception as e:
+                logger.error(f"Error sending restored message: {e}")
+                await self.db.rollback()
+                return ActionResult(
+                    success=False,
+                    action_type="restore",
+                    error=f"Failed to send message: {str(e)}"
+                )
+                
+        except Exception as e:
+            logger.error(f"Error in restore_message: {e}", exc_info=True)
+            await self.db.rollback()
+            return ActionResult(
+                success=False,
+                action_type="restore",
+                error=str(e)
+            )
+    
+    async def _broadcast_deletion(self, deleted_msg: Any, user: Any, deleted_by: Any):
+        """Broadcast message deletion via WebSocket."""
+        try:
+            from shared.redis_client import get_redis
+            import json
+            
+            redis = await get_redis()
+            
+            event_data = {
+                "type": "message_deleted",
+                "group_id": self.group_id,
+                "data": {
+                    "id": deleted_msg.id,
+                    "message_id": deleted_msg.message_id,
+                    "user_id": user.id,
+                    "user_username": user.username,
+                    "user_first_name": user.first_name,
+                    "deletion_reason": deleted_msg.deletion_reason,
+                    "deleted_by": deleted_by.id,
+                    "deleted_by_username": deleted_by.username,
+                    "content_preview": deleted_msg.content[:100] if deleted_msg.content else None,
+                    "deleted_at": deleted_msg.deleted_at.isoformat(),
+                }
+            }
+            
+            await redis.publish(
+                f"nexus:group:{self.group_id}:events",
+                json.dumps(event_data)
+            )
+            
+        except Exception as e:
+            logger.error(f"Error broadcasting deletion: {e}")
+    
+    async def _broadcast_restoration(self, deleted_msg: Any, restored_by: Any):
+        """Broadcast message restoration via WebSocket."""
+        try:
+            from shared.redis_client import get_redis
+            import json
+            
+            redis = await get_redis()
+            
+            event_data = {
+                "type": "message_restored",
+                "group_id": self.group_id,
+                "data": {
+                    "id": deleted_msg.id,
+                    "original_message_id": deleted_msg.message_id,
+                    "new_message_id": deleted_msg.restored_message_id,
+                    "restored_by": restored_by.id,
+                    "restored_by_username": restored_by.username,
+                    "restored_at": deleted_msg.restored_at.isoformat(),
+                }
+            }
+            
+            await redis.publish(
+                f"nexus:group:{self.group_id}:events",
+                json.dumps(event_data)
+            )
+            
+        except Exception as e:
+            logger.error(f"Error broadcasting restoration: {e}")
