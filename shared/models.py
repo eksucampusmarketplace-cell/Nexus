@@ -2183,3 +2183,70 @@ class TrustScoreHistory(Base):
     influencing_factors: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+# ============ AI MODERATION MODELS ============
+
+
+class AIModerationConfig(Base):
+    """AI moderation configuration per group."""
+
+    __tablename__ = "ai_moderation_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), unique=True)
+
+    # Feature toggles
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Thresholds
+    auto_action_threshold: Mapped[int] = mapped_column(Integer, default=90)
+    queue_threshold: Mapped[int] = mapped_column(Integer, default=70)
+
+    # Scan options
+    scan_media: Mapped[bool] = mapped_column(Boolean, default=True)
+    scan_links: Mapped[bool] = mapped_column(Boolean, default=True)
+    scan_forwarded: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Categories to scan
+    categories: Mapped[List[str]] = mapped_column(JSON, default=list)
+
+    # Bypass options
+    trusted_bypass: Mapped[bool] = mapped_column(Boolean, default=True)
+    min_trust_bypass: Mapped[int] = mapped_column(Integer, default=80)
+
+    # Notifications
+    notify_admins: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class AIModerationQueue(Base):
+    """AI moderation queue for flagged content."""
+
+    __tablename__ = "ai_moderation_queue"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    message_id: Mapped[int] = mapped_column(BigInteger)
+
+    # Content details
+    message_content: Mapped[Optional[str]] = mapped_column(Text)
+    media_type: Mapped[Optional[str]] = mapped_column(String(50))
+    media_file_id: Mapped[Optional[str]] = mapped_column(String(200))
+
+    # AI analysis results
+    flagged_categories: Mapped[List[str]] = mapped_column(JSON, default=list)
+    confidence_score: Mapped[int] = mapped_column(Integer, default=0)
+    severity: Mapped[str] = mapped_column(String(20), default="low")
+    ai_reasoning: Mapped[Optional[str]] = mapped_column(Text)
+    suggested_action: Mapped[Optional[str]] = mapped_column(String(30))
+
+    # Status
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    reviewed_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    action_taken: Mapped[Optional[str]] = mapped_column(String(30))
+    false_positive: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
