@@ -59,7 +59,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def parse_init_data(init_data: str) -> Tuple[dict, dict, str]:
     """
     Parse Telegram WebApp initData without validation.
-    
+
     Returns:
         Tuple of (raw_params, parsed_data, received_hash)
     """
@@ -68,49 +68,52 @@ def parse_init_data(init_data: str) -> Tuple[dict, dict, str]:
         if "=" in param:
             key, value = param.split("=", 1)
             raw_params[key] = value
-    
+
     received_hash = raw_params.get("hash", "")
-    
+
     # Parse user data with proper URL decoding
     parsed_data = {}
-    
-    user_json = unquote(raw_params.get("user", "{}"))
-    if user_json:
+
+    user_raw = raw_params.get("user", "")
+    if user_raw:
         try:
+            user_json = unquote(user_raw)
             parsed_data["user"] = json.loads(user_json)
-        except json.JSONDecodeError:
-            pass
-    
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse user JSON: {e}, raw value: {user_raw[:100]!r}")
+
     # Parse chat info if present
-    if raw_params.get("chat"):
-        chat_json = unquote(raw_params.get("chat", "{}"))
+    chat_raw = raw_params.get("chat", "")
+    if chat_raw:
         try:
+            chat_json = unquote(chat_raw)
             parsed_data["chat"] = json.loads(chat_json)
-        except json.JSONDecodeError:
-            pass
-    
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse chat JSON: {e}, raw value: {chat_raw[:100]!r}")
+
     if raw_params.get("chat_type"):
         parsed_data["chat_type"] = raw_params.get("chat_type")
-    
+
     if raw_params.get("start_param"):
         parsed_data["start_param"] = raw_params.get("start_param")
-    
+
     if raw_params.get("auth_date"):
         parsed_data["auth_date"] = raw_params.get("auth_date")
-    
+
     return raw_params, parsed_data, received_hash
 
 
 def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     """
     Validate the hash of Telegram WebApp initData.
-    
+
     Returns True if valid, False otherwise.
     """
     received_hash = raw_params.get("hash", "")
     if not received_hash:
+        logger.warning("Missing hash in init data")
         return False
-    
+
     # Validate auth_date to prevent replay attacks (24 hour window)
     auth_date = raw_params.get("auth_date")
     if auth_date:
@@ -120,7 +123,7 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
         if current_time - auth_timestamp > 86400:  # 24 hours
             logger.warning(f"Init data expired: auth_date={auth_timestamp}, current={current_time}")
             return False
-    
+
     # Create data_check_string using RAW (URL-encoded) values
     # Sort alphabetically by key, exclude hash
     data_check_items = []
@@ -128,25 +131,27 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
         if key != "hash":
             data_check_items.append(f"{key}={raw_params[key]}")
     data_check_string = "\n".join(data_check_items)
-    
+
     # Compute secret key
     secret_key = hmac.new(
         key=b"WebAppData",
         msg=bot_token.encode(),
         digestmod=hashlib.sha256,
     ).digest()
-    
+
     # Compute hash
     computed_hash = hmac.new(
         key=secret_key,
         msg=data_check_string.encode(),
         digestmod=hashlib.sha256,
     ).hexdigest()
-    
+
     if computed_hash != received_hash:
-        logger.debug(f"Hash mismatch: computed={computed_hash[:16]}..., received={received_hash[:16]}...")
+        logger.warning(f"Hash mismatch: computed={computed_hash[:16]}..., received={received_hash[:16]}...")
+        logger.debug(f"Data check string (first 200 chars): {data_check_string[:200]!r}")
+        logger.debug(f"Bot token (first 20 chars): {bot_token[:20]!r}...")
         return False
-    
+
     return True
 
 
@@ -250,23 +255,36 @@ async def create_token(
     db: AsyncSession = Depends(get_db),
 ):
     """Create access token from Telegram initData.
-    
+
     This endpoint validates Telegram WebApp init data and creates a JWT token.
     It supports both shared bot mode and white-label mode (custom bot tokens).
-    
+
     The validation tries bot tokens in this order:
     1. Custom bot token provided in request (from localStorage)
     2. Bot token from BotInstance table (looked up by chat ID from init data)
     3. Main BOT_TOKEN environment variable
     """
     main_bot_token = os.getenv("BOT_TOKEN")
-    
+
+    # Log the incoming request for debugging
+    logger.info(f"Auth token request received. init_data length: {len(request.init_data) if request.init_data else 0}")
+    logger.debug(f"init_data (first 200 chars): {request.init_data[:200]!r}..." if request.init_data else "empty")
+    logger.debug(f"Custom bot token provided: {bool(request.bot_token)}")
+    logger.debug(f"Main bot token configured: {bool(main_bot_token)}")
+
     # Parse init data first to extract chat info
     raw_params, parsed_data, received_hash = parse_init_data(request.init_data)
-    
+
     if not received_hash:
         raise HTTPException(status_code=401, detail="Invalid init data: Missing hash")
-    
+
+    # Log parsed data for debugging
+    logger.debug(f"Raw params keys: {list(raw_params.keys())}")
+    logger.debug(f"Parsed data keys: {list(parsed_data.keys())}")
+    logger.debug(f"User ID: {parsed_data.get('user', {}).get('id') if parsed_data.get('user') else None}")
+    logger.debug(f"Chat from parsed_data: {parsed_data.get('chat')}")
+    logger.debug(f"Start param: {parsed_data.get('start_param')}")
+
     # Extract chat/telegram ID for bot token lookup
     chat_id = None
     if parsed_data.get("chat"):
@@ -321,8 +339,21 @@ async def create_token(
     error_detail = "Invalid init data: Hash mismatch"
     if validation_errors:
         error_detail += f" (tried: {', '.join(validation_errors)})"
-    
-    logger.error(f"All validation attempts failed. Chat ID: {chat_id}, Errors: {validation_errors}")
+
+    # Provide more helpful error message for common issues
+    if chat_id is None and not request.bot_token:
+        error_detail += ". Chat ID not found in initData and no custom bot token provided. "
+        error_detail += "Ensure BOT_TOKEN environment variable matches the bot that opened the Mini App."
+
+    # Development bypass: Allow authentication without hash validation in development
+    # This is useful for testing the Mini App in a browser without Telegram
+    dev_bypass = os.getenv("DISABLE_AUTH_VALIDATION", "").lower() in ("true", "1", "yes")
+    if dev_bypass and _environment == "development":
+        logger.warning(f"DEVELOPMENT MODE: Bypassing hash validation for user {parsed_data.get('user', {}).get('id')}")
+        if parsed_data.get("user"):
+            return await _create_user_token(parsed_data["user"], db)
+
+    logger.error(f"All validation attempts failed. Chat ID: {chat_id}, Raw params keys: {list(raw_params.keys())}, Errors: {validation_errors}")
     raise HTTPException(status_code=401, detail=error_detail)
 
 
