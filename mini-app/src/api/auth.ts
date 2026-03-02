@@ -19,12 +19,23 @@ export interface User {
 }
 
 export const telegramAuth = async (initData: string, customBotToken?: string): Promise<AuthResponse & { user: User }> => {
-  const payload: { init_data: string; bot_token?: string } = { init_data: initData }
-  if (customBotToken) {
-    payload.bot_token = customBotToken
+  try {
+    const payload: { init_data: string; bot_token?: string } = { init_data: initData }
+    if (customBotToken) {
+      payload.bot_token = customBotToken
+    }
+    const response = await api.post('/auth/token', payload)
+    
+    // Store token in localStorage
+    if (response.data.access_token) {
+      localStorage.setItem('nexus_token', response.data.access_token)
+    }
+    
+    return response.data
+  } catch (error: any) {
+    console.error('Telegram auth failed:', error.response?.data || error.message)
+    throw error
   }
-  const response = await api.post('/auth/token', payload)
-  return response.data
 }
 
 export const getMe = async (): Promise<User> => {

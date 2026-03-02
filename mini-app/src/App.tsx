@@ -67,6 +67,8 @@ function App() {
         return
       }
 
+      console.log('Running in Telegram WebApp context, initData length:', initDataRaw.length)
+
       // Get group ID from start_param or chat
       const startParam = tg?.initDataUnsafe?.start_param
       const chatId = tg?.initDataUnsafe?.chat?.id
