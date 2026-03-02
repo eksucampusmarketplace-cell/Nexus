@@ -38,6 +38,55 @@ async def list_groups(
     return groups
 
 
+@router.get("/groups/my-groups")
+async def list_my_groups(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List groups with member-specific details for the dashboard."""
+    from datetime import datetime
+
+    # Get groups with member details
+    result = await db.execute(
+        select(Group, Member)
+        .join(Member, Member.group_id == Group.id)
+        .where(Member.user_id == current_user.id)
+        .order_by(Group.title)
+    )
+    rows = result.all()
+
+    groups_data = []
+    for group, member in rows:
+        # Count enabled modules
+        modules_result = await db.execute(
+            select(func.count()).where(
+                ModuleConfig.group_id == group.id,
+                ModuleConfig.is_enabled == True
+            )
+        )
+        enabled_modules_count = modules_result.scalar() or 0
+
+        # Format last activity
+        last_activity = member.last_active.isoformat() if member.last_active else group.updated_at.isoformat() if group.updated_at else group.created_at.isoformat()
+
+        groups_data.append({
+            "id": group.id,
+            "telegramId": group.telegram_id,
+            "title": group.title,
+            "username": group.username,
+            "memberCount": group.member_count,
+            "isPremium": group.is_premium,
+            "role": member.role.value if hasattr(member.role, 'value') else str(member.role),
+            "enabledModulesCount": enabled_modules_count,
+            "lastActivity": last_activity,
+            "hasCustomBot": False,  # TODO: Implement custom bot check
+            "customBotUsername": None,
+            "avatar": None,
+        })
+
+    return groups_data
+
+
 @router.get("/groups/{group_id}", response_model=GroupResponse)
 async def get_group(
     group_id: int,
