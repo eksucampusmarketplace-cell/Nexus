@@ -10,7 +10,7 @@ import { useWebSocket, NexusEvent, EventTypes } from '../../hooks/useWebSocket';
 import api from '../../api/client';
 
 interface Message {
-  id: number;
+  id: string;
   message_id: number;
   sender_id: number;
   sender_telegram_id: number;
