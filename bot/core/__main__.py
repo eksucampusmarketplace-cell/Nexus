@@ -12,7 +12,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo, MenuButtonWebApp
 from aiogram.utils.markdown import hbold, hcode, hitalic
 from dotenv import load_dotenv
 
@@ -53,6 +53,21 @@ def get_mini_app_keyboard():
     return None
 
 
+async def set_private_chat_menu_button(bot: Bot, chat_id: int) -> None:
+    """Ensure the Mini App is available from the private chat menu button."""
+    mini_app_url = os.getenv("MINI_APP_URL", "")
+    if not mini_app_url:
+        return
+
+    try:
+        await bot.set_chat_menu_button(
+            chat_id=chat_id,
+            menu_button=MenuButtonWebApp(text="🚀 Mini App", web_app=WebAppInfo(url=mini_app_url)),
+        )
+    except Exception as error:
+        logger.warning(f"Failed to set chat menu button for {chat_id}: {error}")
+
+
 async def start_command(message: Message, bot: Bot):
     """Handle /start command in private chats."""
     text = f"👋 {hbold('Welcome to Nexus Bot!')} 🚀\n\n"
@@ -64,6 +79,9 @@ async def start_command(message: Message, bot: Bot):
 
     keyboard = get_mini_app_keyboard()
     await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+    if message.chat.type == "private":
+        await set_private_chat_menu_button(bot, message.chat.id)
 
 
 async def help_command(message: Message, bot: Bot):
@@ -79,6 +97,9 @@ async def help_command(message: Message, bot: Bot):
 
     keyboard = get_mini_app_keyboard()
     await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+    if message.chat.type == "private":
+        await set_private_chat_menu_button(bot, message.chat.id)
 
 
 async def ping_command(message: Message, bot: Bot):
@@ -104,6 +125,9 @@ async def settings_command(message: Message, bot: Bot):
             ]
         )
         await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+        if message.chat.type == "private":
+            await set_private_chat_menu_button(bot, message.chat.id)
     else:
         text = f"⚙️ {hbold('Nexus Settings')}\n\n"
         text += "Mini App URL is not configured. Please contact the bot administrator."
