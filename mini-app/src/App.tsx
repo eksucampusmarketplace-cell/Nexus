@@ -56,6 +56,19 @@ function App() {
 
       // Get Telegram init data
       const tg = (window as any).Telegram?.WebApp
+      
+      // Configure Telegram WebApp theme to match our dark theme
+      if (tg) {
+        // Set header color to match our dark background
+        tg.setHeaderColor('#020617')
+        // Set bottom bar color to match our dark background  
+        tg.setBottomBarColor('#020617')
+        // Set background color for the main content area
+        tg.setBackgroundColor('#020617')
+        // Expand the web app to full height
+        tg.expand()
+      }
+      
       const initDataRaw = tg?.initData || ''
       setInitData(initDataRaw)
 

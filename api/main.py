@@ -225,13 +225,23 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Mount Mini App static files
 dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
-assets_path = os.path.join(dist_path, "assets")
 
-if os.path.exists(assets_path):
-    app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
-    logger.info(f"Mini App assets mounted from: {assets_path}")
+# Check for dist folder
+if os.path.exists(dist_path):
+    # Mount assets folder
+    assets_path = os.path.join(dist_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+        logger.info(f"Mini App assets mounted from: {assets_path}")
+    
+    # Mount root-level static files (manifest.json, favicon, etc.) at /static
+    # This ensures manifest.json is accessible at /static/manifest.json
+    static_path = dist_path
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
+    logger.info(f"Mini App static files mounted from: {static_path}")
 else:
-    logger.warning(f"Mini App assets directory NOT found at: {assets_path}")
+    logger.warning(f"Mini App dist directory NOT found at: {dist_path}")
+    logger.warning("Mini App will not be available via /mini-app endpoint")
 
 
 @app.get("/vite.svg", include_in_schema=False)
@@ -241,6 +251,28 @@ async def serve_vite_svg():
     if os.path.exists(vite_svg_path):
         from fastapi.responses import FileResponse
         return FileResponse(vite_svg_path, media_type="image/svg+xml")
+    
+    # Fallback to public folder
+    public_vite_svg = os.path.join(os.getcwd(), "mini-app", "public", "vite.svg")
+    if os.path.exists(public_vite_svg):
+        from fastapi.responses import FileResponse
+        return FileResponse(public_vite_svg, media_type="image/svg+xml")
+    return HTMLResponse(content="Not found", status_code=404)
+
+
+@app.get("/manifest.json", include_in_schema=False)
+async def serve_manifest():
+    """Serve manifest.json for PWA."""
+    manifest_path = os.path.join(os.getcwd(), "mini-app", "dist", "manifest.json")
+    if os.path.exists(manifest_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(manifest_path, media_type="application/json")
+    
+    # Fallback to public folder
+    public_manifest = os.path.join(os.getcwd(), "mini-app", "public", "manifest.json")
+    if os.path.exists(public_manifest):
+        from fastapi.responses import FileResponse
+        return FileResponse(public_manifest, media_type="application/json")
     return HTMLResponse(content="Not found", status_code=404)
 
 
