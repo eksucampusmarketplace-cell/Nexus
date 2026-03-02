@@ -16,6 +16,7 @@ celery_app = Celery(
         "worker.tasks.moderation",
         "worker.tasks.economy",
         "worker.tasks.scheduled",
+        "worker.tasks.keepalive",
     ],
 )
 
@@ -33,6 +34,10 @@ celery_app.conf.update(
 
 # Beat schedule for periodic tasks
 celery_app.conf.beat_schedule = {
+    "keep-services-awake": {
+        "task": "worker.tasks.keepalive.ping_services",
+        "schedule": 60.0,  # Every minute
+    },
     "check-scheduled-messages": {
         "task": "worker.tasks.scheduled.check_scheduled_messages",
         "schedule": 60.0,  # Every minute
