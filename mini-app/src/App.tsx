@@ -60,8 +60,9 @@ function App() {
       setInitData(initDataRaw)
 
       if (!initDataRaw) {
-        // Not running in Telegram context
+        // Not running in Telegram context - allow local development
         console.log('Not running in Telegram WebApp context')
+        setAuth('mock-token', { id: 1, first_name: 'Developer', username: 'dev' } as any)
         setLoading(false)
         return
       }

@@ -10,13 +10,10 @@ const getApiUrl = () => {
     return import.meta.env.VITE_API_URL
   }
 
-  // If running on the same domain (served from API service), use current origin
+  // If running on Replit or localhost, use the current origin if possible
   if (typeof window !== 'undefined' && window.location.origin) {
     const hostname = window.location.hostname
-    // Use current origin if on production domain or localhost
-    if (hostname.includes('nexus-4uxn.onrender.com') ||
-        hostname === 'localhost' ||
-        hostname === '127.0.0.1') {
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('replit.app')) {
       return window.location.origin
     }
   }
