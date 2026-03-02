@@ -1,0 +1,1 @@
+- Updated understanding: Telegram WebApp initData validation should use URL-decoded params (via parse_qsl) for data_check_string; parse_init_data now uses parse_qsl and json.loads directly on decoded user/chat fields.

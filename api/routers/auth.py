@@ -7,7 +7,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
-from urllib.parse import parse_qsl, unquote
+from urllib.parse import parse_qsl
 
 from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -63,31 +63,23 @@ def parse_init_data(init_data: str) -> Tuple[dict, dict, str]:
     Returns:
         Tuple of (raw_params, parsed_data, received_hash)
     """
-    raw_params = {}
-    for param in init_data.split("&"):
-        if "=" in param:
-            key, value = param.split("=", 1)
-            raw_params[key] = value
+    raw_params = dict(parse_qsl(init_data, keep_blank_values=True))
 
     received_hash = raw_params.get("hash", "")
 
-    # Parse user data with proper URL decoding
     parsed_data = {}
 
     user_raw = raw_params.get("user", "")
     if user_raw:
         try:
-            user_json = unquote(user_raw)
-            parsed_data["user"] = json.loads(user_json)
+            parsed_data["user"] = json.loads(user_raw)
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse user JSON: {e}, raw value: {user_raw[:100]!r}")
 
-    # Parse chat info if present
     chat_raw = raw_params.get("chat", "")
     if chat_raw:
         try:
-            chat_json = unquote(chat_raw)
-            parsed_data["chat"] = json.loads(chat_json)
+            parsed_data["chat"] = json.loads(chat_raw)
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse chat JSON: {e}, raw value: {chat_raw[:100]!r}")
 
