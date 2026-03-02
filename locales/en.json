@@ -10,7 +10,19 @@
     "delete": "Delete",
     "edit": "Edit",
     "create": "Create",
-    "search": "Search"
+    "search": "Search",
+    "yes": "Yes",
+    "no": "No",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close",
+    "done": "Done",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "on": "On",
+    "off": "Off"
   },
   "moderation": {
     "warned": "⚠️ {target} has been warned.\nReason: {reason}",
@@ -24,19 +36,69 @@
     "no_permission": "❌ You don't have permission to use this command.",
     "user_not_found": "❌ User not found.",
     "invalid_duration": "❌ Invalid duration format. Use: 1m, 1h, 1d, 1w",
-    "action_complete": "✅ Action completed successfully."
+    "action_complete": "✅ Action completed successfully.",
+    "warn_limit_reached": "🚨 {target} has reached the warning limit!",
+    "auto_action": "⚡ Auto-action triggered: {action}",
+    "no_reason": "No reason provided",
+    "warn_count": "📊 Warnings: {count}/{limit}",
+    "mute_expired": "🔊 {target}'s mute has expired.",
+    "ban_expired": "✅ {target}'s ban has expired."
   },
   "welcome": {
     "welcome_message": "Welcome {mention} to {chatname}!",
     "goodbye_message": "Goodbye {mention}! We hope to see you again.",
     "new_member": "👋 A new member has joined!",
-    "member_left": "👋 A member has left."
+    "member_left": "👋 A member has left.",
+    "welcome_disabled": "Welcome messages are disabled.",
+    "goodbye_disabled": "Goodbye messages are disabled."
   },
   "errors": {
     "rate_limited": "⏳ Please slow down. Rate limit exceeded.",
     "flood_detected": "🌊 Flood detected. Please wait.",
     "not_admin": "❌ This command requires admin privileges.",
     "not_found": "🔍 Not found.",
-    "server_error": "😔 Something went wrong. Please try again."
+    "server_error": "😔 Something went wrong. Please try again.",
+    "invalid_args": "❌ Invalid arguments. Usage: {usage}",
+    "module_disabled": "❌ This module is not enabled for this group.",
+    "command_disabled": "❌ This command is disabled in this group.",
+    "user_not_member": "❌ User is not a member of this group.",
+    "cannot_action_admin": "❌ Cannot perform this action on an admin.",
+    "cannot_action_self": "❌ You cannot perform this action on yourself.",
+    "cannot_action_bot": "❌ You cannot perform this action on the bot."
+  },
+  "settings": {
+    "language_set": "🌐 Language set to {language}",
+    "language_current": "🌐 Current language: {language}",
+    "language_list": "🌐 Available languages:\n{languages}",
+    "setting_updated": "✅ Setting updated: {setting} = {value}",
+    "setting_reset": "🔄 Setting reset to default: {setting}",
+    "invalid_setting": "❌ Invalid setting: {setting}",
+    "config_saved": "✅ Configuration saved.",
+    "config_reset": "🔄 Configuration reset to defaults."
+  },
+  "economy": {
+    "coins_earned": "💰 You earned {amount} coins!",
+    "coins_spent": "💸 You spent {amount} coins.",
+    "insufficient_funds": "❌ Insufficient funds. You need {amount} coins.",
+    "balance": "💵 Your balance: {amount} coins",
+    "daily_claimed": "🎁 Daily bonus claimed! +{amount} coins",
+    "daily_streak": "🔥 Streak: {days} days",
+    "level_up": "🎉 Level up! You are now level {level}!",
+    "xp_gained": "✨ +{amount} XP"
+  },
+  "games": {
+    "game_start": "🎮 Game started: {game}",
+    "game_end": "🏆 Game ended! Winner: {winner}",
+    "correct_answer": "✅ Correct! +{points} points",
+    "wrong_answer": "❌ Wrong answer!",
+    "time_up": "⏰ Time's up!",
+    "no_participants": "😢 No one participated."
+  },
+  "help": {
+    "help_header": "📚 {bot_name} Help",
+    "command_help": "📖 Command: {command}",
+    "module_help": "📦 Module: {module}",
+    "no_help": "No help available for this command.",
+    "see_commands": "Use /commands to see all available commands."
   }
 }

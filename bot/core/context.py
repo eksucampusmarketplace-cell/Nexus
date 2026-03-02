@@ -148,29 +148,36 @@ class SchedulerClient:
 
 @dataclass
 class I18nClient:
-    """Internationalization client."""
+    """Internationalization client with multi-language support."""
 
     language: str = "en"
+    _service: Any = field(default=None, repr=False)
+
+    def __post_init__(self):
+        """Initialize the i18n service if not provided."""
+        if self._service is None:
+            from bot.services.i18n_service import get_i18n_service
+            self._service = get_i18n_service()
 
     def t(self, key: str, **kwargs) -> str:
-        """Translate a key."""
-        # Placeholder for i18n
-        translations = {
-            "en": {
-                "hello": "Hello {name}!",
-                "goodbye": "Goodbye {name}!",
-                "warned": "⚠️ {target} has been warned.\nReason: {reason}",
-                "muted": "🔇 {target} has been muted for {duration}.\nReason: {reason}",
-                "banned": "🚫 {target} has been banned.\nReason: {reason}",
-                "kicked": "👢 {target} has been kicked.\nReason: {reason}",
-                "no_permission": "❌ You don't have permission to use this command.",
-                "user_not_found": "❌ User not found.",
-                "invalid_duration": "❌ Invalid duration format. Use: 1m, 1h, 1d, 1w",
-                "action_complete": "✅ Action completed successfully.",
-            }
-        }
-        text = translations.get(self.language, translations["en"]).get(key, key)
-        return text.format(**kwargs) if kwargs else text
+        """Translate a key with variable substitution.
+        
+        Args:
+            key: Translation key in dot notation (e.g., "common.hello", "moderation.warned")
+            **kwargs: Variables to substitute in the translation
+            
+        Returns:
+            Translated and substituted string
+        """
+        return self._service.translate(key, self.language, **kwargs)
+
+    def set_language(self, language: str) -> None:
+        """Set the current language."""
+        self.language = self._service._normalize_language_code(language)
+
+    def get_supported_languages(self) -> List[Dict[str, str]]:
+        """Get list of supported languages."""
+        return self._service.get_supported_languages()
 
 
 @dataclass

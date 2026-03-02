@@ -1,0 +1,42 @@
+{
+  "common": {
+    "hello": "नमस्ते {name}!",
+    "goodbye": "अलविदा {name}!",
+    "success": "✅ सफल!",
+    "error": "❌ त्रुटि हुई",
+    "loading": "लोड हो रहा है...",
+    "cancel": "रद्द करें",
+    "save": "सहेजें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "create": "बनाएं",
+    "search": "खोजें"
+  },
+  "moderation": {
+    "warned": "⚠️ {target} को चेतावनी दी गई।\nकारण: {reason}",
+    "muted": "🔇 {target} को {duration} के लिए मौन कर दिया गया।\nकारण: {reason}",
+    "banned": "🚫 {target} को प्रतिबंधित कर दिया गया।\nकारण: {reason}",
+    "kicked": "👢 {target} को निकाल दिया गया।\nकारण: {reason}",
+    "unmuted": "🔊 {target} अब मौन नहीं हैं।",
+    "unbanned": "✅ {target} का प्रतिबंध हटा दिया गया।",
+    "promoted": "⭐ {target} को व्यवस्थापक बना दिया गया।",
+    "demoted": "📉 {target} को पदावनत कर दिया गया।",
+    "no_permission": "❌ आपको इस कमांड का उपयोग करने की अनुमति नहीं है।",
+    "user_not_found": "❌ उपयोगकर्ता नहीं मिला।",
+    "invalid_duration": "❌ अमान्य अवधि प्रारूप। उपयोग करें: 1m, 1h, 1d, 1w",
+    "action_complete": "✅ कार्रवाई सफलतापूर्वक पूरी हुई।"
+  },
+  "welcome": {
+    "welcome_message": "{chatname} में आपका स्वागत है {mention}!",
+    "goodbye_message": "अलविदा {mention}! हम आशा करते हैं कि आप जल्द फिर से मिलेंगे।",
+    "new_member": "👋 एक नया सदस्य शामिल हो गया!",
+    "member_left": "👋 एक सदस्य चला गया।"
+  },
+  "errors": {
+    "rate_limited": "⏳ कृपया धीमे चलें। दर सीमा पार हो गई।",
+    "flood_detected": "🌊 बाढ़ का पता चला। कृपया प्रतीक्षा करें।",
+    "not_admin": "❌ इस कमांड के लिए व्यवस्थापक विशेषाधिकार आवश्यक हैं।",
+    "not_found": "🔍 नहीं मिला।",
+    "server_error": "😔 कुछ गलत हो गया। कृपया पुनः प्रयास करें।"
+  }
+}
