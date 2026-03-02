@@ -1,215 +1,439 @@
-# Nexus - The Ultimate Telegram Bot Platform
+# Nexus — The Ultimate Telegram Bot Platform
 
-Nexus is a comprehensive, AI-native Telegram bot platform that consolidates features from major Telegram bots into a unified system with 27+ modules and 230+ commands.
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-teal)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-18%2B-61DAFB?logo=react)](https://react.dev/)
+[![aiogram](https://img.shields.io/badge/aiogram-3.x-blueviolet)](https://docs.aiogram.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## Key Features
+Nexus is a comprehensive, AI-native Telegram bot platform consolidating features from major Telegram bots into a unified system with **41+ pluggable modules**, **280+ commands**, and **72,000+ lines** of production code.
 
-### Dual Mode System
-- **Shared Bot Mode**: One central NexusBot can be added to any group
+---
+
+## 📊 Codebase Statistics
+
+| Component | Files | Lines of Code |
+|-----------|-------|---------------|
+| **Bot Engine** (aiogram) | 100+ | 34,559 |
+| **REST API** (FastAPI) | 20+ | 8,405 |
+| **Shared Layer** (Models/Schemas) | 10+ | 8,375 |
+| **Mini App** (React/TypeScript) | 50+ | 17,750 |
+| **Worker** (Celery) | 3+ | 581 |
+| **Migrations** (Alembic) | 5+ | 1,642 |
+| **Total** | **230+** | **~72,000** |
+
+---
+
+## 🚀 Key Features
+
+### Dual Bot Mode System
+- **Shared Bot Mode**: One central NexusBot added to any group
 - **White-Label Mode**: Bring your own BotFather token for custom branding
 
-### Dual Prefix Command System
-- `!command` - Activate/execute a feature
-- `!!command` - Deactivate/remove a feature
-- `/command` - Standard Telegram slash commands
+### Triple Command Interface
+- `!command` — Activate/execute features
+- `!!command` — Deactivate/remove features  
+- `/command` — Standard Telegram slash commands
 - Configurable prefix per group
 
 ### Mini App Dashboard
-- **Toggle Controls**: Enable/disable modules without sending commands
-- **Quick Actions**: Execute moderation instantly via UI
-- **Groups Manager**: Manage multiple groups from one interface
-- **Analytics Dashboard**: View group statistics and trends
+Full-featured Telegram WebApp for visual management:
+- **Module Toggles** — Enable/disable without commands
+- **Quick Actions** — Instant moderation via UI
+- **Group Manager** — Multi-group management
+- **Analytics Dashboard** — Statistics and trends
+- **Automation Center** — Visual workflow builder
 
-## Architecture
+---
+
+## 🏗️ Architecture
 
 ```
-├── bot/                    # Bot service (aiogram)
-│   ├── core/               # Core middleware and context
+┌─────────────────────────────────────────────────────────────────────┐
+│                        NEXUS PLATFORM                                │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
+│  │  Telegram    │  │   Mini App   │  │       Web Clients        │  │
+│  │    Bot       │  │  (React/TS)  │  │      (WebSocket)         │  │
+│  └──────┬───────┘  └──────┬───────┘  └────────────┬─────────────┘  │
+│         │                 │                       │                │
+│  ┌──────▼─────────────────▼───────────────────────▼─────────────┐  │
+│  │                    FASTAPI GATEWAY                             │  │
+│  │         REST API │ WebSocket │ Webhooks │ Auth                │  │
+│  └──────┬────────────────────────────────────────────────────────┘  │
+│         │                                                           │
+│  ┌──────▼────────────────────────────────────────────────────────┐  │
+│  │                    CORE SERVICES                               │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐    │  │
+│  │  │   Context    │  │   Module     │  │  Token Manager   │    │  │
+│  │  │   System     │  │   Registry   │  │  (Multi-bot)     │    │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────────┘    │  │
+│  └──────┬────────────────────────────────────────────────────────┘  │
+│         │                                                           │
+│  ┌──────▼────────────────────────────────────────────────────────┐  │
+│  │              41+ PLUGGABLE MODULES                             │  │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │  │
+│  │  │Moderation│ │Community │ │  Economy │ │   Games  │  ...    │  │
+│  │  │  Locks   │ │ Welcome  │ │Reputation│ │ Analytics│         │  │
+│  │  │ Antispam │ │Identity  │ │Scheduler │ │  AI Asst │         │  │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘         │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│         │                                                           │
+│  ┌──────▼────────────────────────────────────────────────────────┐  │
+│  │              DATA & INFRASTRUCTURE                             │  │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │  │
+│  │  │PostgreSQL│ │  Redis   │ │  Celery  │ │  Alembic │         │  │
+│  │  │SQLAlchemy│ │  Cache   │ │ Workers  │ │Migrations│         │  │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘         │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Project Structure
+
+```
+├── api/                    # FastAPI REST API
+│   ├── main.py             # Application entry point
+│   └── routers/            # 20+ endpoint modules
+│       ├── auth.py         # JWT authentication
+│       ├── groups.py       # Group management
+│       ├── toggles.py      # Module toggles
+│       ├── moderation.py   # Moderation actions
+│       ├── economy.py      # Economy system
+│       └── ...
+│
+├── bot/                    # Telegram Bot (aiogram 3.x)
+│   ├── core/               # Core framework
 │   │   ├── middleware.py   # Request processing pipeline
 │   │   ├── context.py      # NexusContext object
-│   │   ├── prefix_parser.py# Dual prefix parsing
-│   │   ├── token_manager.py# Multi-token management
-│   │   └── module_*.py     # Module system
-│   └── modules/            # All bot modules
-├── api/                    # FastAPI REST API
-│   ├── main.py             # App entry point
-│   └── routers/            # API endpoints
-├── mini-app/               # React Mini App
+│   │   ├── module_base.py  # Base class for modules
+│   │   ├── module_registry.py
+│   │   ├── prefix_parser.py
+│   │   └── token_manager.py
+│   └── modules/            # 41+ feature modules
+│       ├── moderation/
+│       ├── economy/
+│       ├── games/
+│       ├── ai_assistant/
+│       └── ...
+│
+├── mini-app/               # React 18 + TypeScript
 │   └── src/
-│       ├── views/          # Page components
-│       ├── components/     # Reusable components
-│       └── api/            # API client
-├── shared/                 # Shared utilities
-│   ├── models.py           # SQLAlchemy models
+│       ├── App.tsx         # Main application
+│       ├── views/          # 25+ page components
+│       ├── components/     # Reusable UI components
+│       ├── stores/         # Zustand state management
+│       └── api/            # API client layer
+│
+├── shared/                 # Shared components
+│   ├── models.py           # SQLAlchemy ORM models
+│   ├── models_intelligence.py
 │   ├── schemas.py          # Pydantic schemas
-│   └── database.py         # Database config
-├── worker/                 # Celery tasks
+│   ├── database.py         # Database configuration
+│   └── redis_client.py     # Redis cache layer
+│
+├── worker/                 # Celery background workers
+│   └── celery_app.py       # Task queue processing
+│
 └── alembic/                # Database migrations
+    └── versions/           # Migration scripts
 ```
 
-## Quick Start
+---
 
-### Using Docker Compose
+## 📦 Available Modules (41+)
+
+### 🛡️ Moderation
+| Module | Description | Commands |
+|--------|-------------|----------|
+| `moderation` | Warn, mute, ban, kick, history | `/warn`, `/mute`, `/ban`, `/kick` |
+| `locks` | Content-type restrictions | `!lock`, `!lockall` |
+| `antispam` | Anti-flood and spam protection | `!antispam` |
+| `antiraid` | Mass join detection | `!antiraid` |
+| `word_filter` | Banned words filtering | `!filter` |
+| `ai_moderation` | AI-powered content moderation | Auto |
+
+### 👥 Community
+| Module | Description | Commands |
+|--------|-------------|----------|
+| `welcome` | Welcome/goodbye messages | `!welcome` |
+| `rules` | Group rules management | `/rules` |
+| `economy` | Virtual currency system | `/balance`, `/pay`, `/shop` |
+| `reputation` | Community reputation | `+rep`, `-rep` |
+| `identity` | XP, levels, badges | `/profile`, `/rank` |
+| `community` | Community features | — |
+| `member_booster` | Member engagement tools | — |
+
+### 🎮 Games & Fun
+| Module | Description |
+|--------|-------------|
+| `games` | 20+ games with rewards |
+| `games_hub` | Game management interface |
+| `challenges` | Group challenges |
+| `gamification_hub` | Gamification dashboard |
+
+### 🤖 AI & Intelligence
+| Module | Description |
+|--------|-------------|
+| `ai_assistant` | GPT-4 powered assistant |
+| `group_intelligence` | Smart group insights |
+| `advanced_analytics` | Deep analytics |
+| `nl_interface` | Natural language commands |
+
+### 🛠️ Utility
+| Module | Description | Commands |
+|--------|-------------|----------|
+| `notes` | Saved notes with keywords | `/save`, `/get` |
+| `filters` | Auto-responses | `!filter` |
+| `scheduler` | Scheduled messages | `/schedule` |
+| `polls` | Advanced polls | `/poll` |
+| `notes_filters` | Combined notes & filters | — |
+
+### 🔒 Security & Management
+| Module | Description |
+|--------|-------------|
+| `captcha` | Verification challenges |
+| `trust_system` | Trust-based permissions |
+| `blocklist` | User blocking |
+| `graveyard` | Deleted message recovery |
+| `security_center` | Security dashboard |
+
+### 🔧 Advanced
+| Module | Description |
+|--------|-------------|
+| `automation` | Workflow automation |
+| `bot_builder` | Custom bot creation |
+| `federations` | Cross-group moderation |
+| `integrations` | Third-party integrations |
+| `channels` | Channel management |
+| `scraping` | Content aggregation |
+| `formatting` | Message formatting tools |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.11+
+- PostgreSQL 14+
+- Redis 6+
+- Node.js 18+ (for Mini App development)
+
+### Docker Compose (Recommended)
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/nexus.git
+git clone https://github.com/your-org/nexus.git
 cd nexus
 
-# Copy environment file
+# Configure environment
 cp .env.example .env
-
-# Edit .env with your values
-nano .env
+# Edit .env with your:
+# - TELEGRAM_BOT_TOKEN
+# - DATABASE_URL
+# - REDIS_URL
+# - OPENAI_API_KEY (optional)
 
 # Start all services
 docker-compose up -d
+
+# Run migrations
+docker-compose exec api alembic upgrade head
 ```
 
-### Manual Setup
+### Manual Development Setup
 
 ```bash
-# Install dependencies
+# 1. Install Python dependencies
 pip install -r requirements.txt
 
-# Run database migrations
+# 2. Install Mini App dependencies
+cd mini-app && npm install && cd ..
+
+# 3. Run database migrations
 alembic upgrade head
 
-# Start the API server
-uvicorn api.main:app --reload
+# 4. Start services (in separate terminals)
+# API Server
+uvicorn api.main:app --reload --port 8000
 
-# Start the bot service
+# Bot Service
 python -m bot.core
 
-# Start the Celery worker
-celery -A worker.celery_app worker --loglevel=info
+# Celery Worker
+celery -A worker.celery_app worker --loglevel=info --concurrency=4
+
+# Mini App (dev mode)
+cd mini-app && npm run dev
 ```
 
-## Available Modules
+---
 
-### Moderation
-- **moderation**: Warn, mute, ban, kick, history
-- **locks**: Lock content types (links, stickers, etc.)
-- **antispam**: Anti-flood and spam protection
-- **antiraid**: Mass join detection
-- **word_filter**: Banned words filtering
-
-### Community
-- **welcome**: Welcome/goodbye messages
-- **rules**: Group rules management
-- **economy**: Virtual currency system
-- **reputation**: Community reputation
-- **games**: 20+ games with rewards
-- **identity**: XP, levels, badges
-
-### Utility
-- **notes**: Saved notes with keywords
-- **filters**: Auto-responses
-- **scheduler**: Scheduled messages
-- **polls**: Advanced polls
-
-### AI
-- **ai_assistant**: GPT-4 powered assistant
-- **analytics**: Group insights
-
-## Mini App Features
-
-### Toggle Manager
-Manage all modules without sending commands:
-```typescript
-// Toggle a module
-await toggleApi.toggleModule(groupId, 'moderation', true)
-
-// Update a feature
-await toggleApi.updateFeature(groupId, 'moderation', 'warn_threshold', 3)
-```
-
-### Quick Actions Panel
-Execute moderation actions instantly:
-```typescript
-// Warn a user
-await moderationToggleApi.warnUser(groupId, userId, 'Spam')
-
-// Mute a user
-await moderationToggleApi.muteUser(groupId, userId, '1h', 'Inappropriate behavior')
-```
-
-### Groups Manager
-Manage multiple groups from one interface:
-```typescript
-// Get all managed groups
-const groups = await api.get('/groups/my-groups')
-
-// Switch between groups
-<GroupCard onSelect={(groupId) => setSelectedGroup(groupId)} />
-```
-
-## API Endpoints
+## 🔌 API Reference
 
 ### Authentication
-- `POST /api/v1/auth/token` - Get API token
+```bash
+POST /api/v1/auth/token
+Authorization: Bearer {telegram_init_data}
+```
 
 ### Groups
-- `GET /api/v1/groups/my-groups` - List managed groups
-- `GET /api/v1/groups/{id}` - Get group info
-- `PATCH /api/v1/groups/{id}` - Update settings
+```bash
+GET    /api/v1/groups/my-groups           # List managed groups
+GET    /api/v1/groups/{id}                # Group details
+PATCH  /api/v1/groups/{id}                # Update settings
+DELETE /api/v1/groups/{id}                # Leave group
+```
 
-### Modules
-- `GET /api/v1/groups/{id}/toggles` - Get all module toggles
-- `PATCH /api/v1/groups/{id}/modules/{name}` - Toggle module
-- `PATCH /api/v1/groups/{id}/modules/{name}/features/{key}` - Update feature
+### Module Toggles
+```bash
+GET    /api/v1/groups/{id}/toggles        # Get all toggles
+PATCH  /api/v1/groups/{id}/modules/{name} # Toggle module
+PATCH  /api/v1/groups/{id}/modules/{name}/features/{key}  # Update feature
+```
 
 ### Moderation
-- `POST /api/v1/groups/{id}/moderation/warn` - Warn user
-- `POST /api/v1/groups/{id}/moderation/mute` - Mute user
-- `POST /api/v1/groups/{id}/moderation/ban` - Ban user
+```bash
+POST /api/v1/groups/{id}/moderation/warn  # Warn user
+POST /api/v1/groups/{id}/moderation/mute  # Mute user
+POST /api/v1/groups/{id}/moderation/ban   # Ban user
+POST /api/v1/groups/{id}/moderation/kick  # Kick user
+```
 
-### Locks
-- `GET /api/v1/groups/{id}/locks` - Get all locks
-- `PATCH /api/v1/groups/{id}/locks/{type}` - Toggle lock
-- `POST /api/v1/groups/{id}/locks/{type}/timed` - Set timed lock
+### Economy
+```bash
+GET  /api/v1/groups/{id}/economy/leaderboard
+GET  /api/v1/groups/{id}/members/{user_id}/balance
+POST /api/v1/groups/{id}/economy/transfer
+```
 
-## Development
+---
+
+## 🧩 Creating a Module
+
+```python
+from bot.core.module_base import NexusModule, CommandDef, ModuleCategory
+from bot.core.context import NexusContext
+
+class MyModule(NexusModule):
+    name = "my_module"
+    version = "1.0.0"
+    description = "My custom module"
+    category = ModuleCategory.UTILITY
+    
+    commands = [
+        CommandDef(
+            name="hello",
+            description="Say hello",
+            usage="/hello [name]"
+        )
+    ]
+    
+    async def on_load(self, app):
+        self.register_command("hello", self.cmd_hello)
+    
+    async def cmd_hello(self, ctx: NexusContext):
+        name = ctx.args or "World"
+        await ctx.reply(f"Hello, {name}! 👋")
+```
+
+---
+
+## 🧪 Development
 
 ### Running Tests
 ```bash
 pytest tests/ -v --cov=bot --cov=api
 ```
 
-### Code Style
+### Code Quality
 ```bash
-# Format code
+# Format Python code
 black .
-
-# Sort imports
 isort .
 
 # Type checking
-mypy bot api
+mypy bot api shared
+
+# Lint Mini App
+cd mini-app && npm run lint
 ```
 
-### Creating Migrations
+### Database Migrations
 ```bash
-alembic revision --autogenerate -m "Description of changes"
+# Create migration
+alembic revision --autogenerate -m "Description"
+
+# Apply migrations
 alembic upgrade head
+
+# Rollback
+alembic downgrade -1
 ```
 
-## Deployment
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [ADVANCED_FEATURES.md](ADVANCED_FEATURES.md) | Advanced feature overview |
+| [ADVANCED_FEATURES_GUIDE.md](ADVANCED_FEATURES_GUIDE.md) | Implementation guide |
+| [GROUP_INTELLIGENCE_GUIDE.md](GROUP_INTELLIGENCE_GUIDE.md) | AI intelligence features |
+| [MESSAGE_GRAVEYARD_IMPLEMENTATION.md](MESSAGE_GRAVEYARD_IMPLEMENTATION.md) | Deleted message recovery |
+| [DEBUG_GUIDE.md](DEBUG_GUIDE.md) | Troubleshooting |
+
+---
+
+## 🚢 Deployment
 
 ### Docker
 ```bash
-docker-compose -f docker-compose.yml up -d
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 ### Render.com
-The project includes a `render.yaml` for one-click deployment.
+One-click deployment with included `render.yaml`.
 
-## License
+### Environment Variables
+```bash
+# Required
+TELEGRAM_BOT_TOKEN=your_bot_token
+DATABASE_URL=postgresql://user:pass@localhost/nexus
+REDIS_URL=redis://localhost:6379
 
-MIT License - See LICENSE file for details.
+# Optional
+OPENAI_API_KEY=sk-...        # For AI features
+SENTRY_DSN=...               # Error tracking
+WEBHOOK_URL=https://...      # For production bot mode
+```
 
-## Support
+---
 
-- Documentation: `/docs` directory
-- Issues: GitHub Issues
-- Community: Telegram Group
+## 📜 License
+
+MIT License — See [LICENSE](LICENSE) for details.
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing`)
+5. Open a Pull Request
+
+---
+
+## 💬 Support
+
+- **Issues**: [GitHub Issues](https://github.com/your-org/nexus/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/nexus/discussions)
+- **Telegram**: [@NexusSupport](https://t.me/nexussupport)
+
+---
+
+<p align="center">
+  Built with ❤️ by the Nexus Team
+</p>
