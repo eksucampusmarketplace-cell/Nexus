@@ -2250,3 +2250,108 @@ class AIModerationQueue(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+# ============ NL INTERFACE MODELS ============
+class NLInteraction(Base):
+    """Natural language interaction log for learning."""
+
+    __tablename__ = "nl_interactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+
+    # Input
+    original_text: Mapped[str] = mapped_column(Text)
+
+    # Analysis
+    detected_intent: Mapped[Optional[str]] = mapped_column(String(50))
+    confidence: Mapped[Optional[float]] = mapped_column(Integer)
+
+    # Execution
+    executed_command: Mapped[Optional[str]] = mapped_column(String(50))
+    success: Mapped[bool] = mapped_column(Boolean, default=False)
+    error_message: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+# ============ GROUP INTELLIGENCE MODELS ============
+class IntelligenceConfig(Base):
+    """Configuration for group intelligence features."""
+
+    __tablename__ = "intelligence_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), unique=True)
+
+    # Feature toggles
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    influence_moderation: Mapped[bool] = mapped_column(Boolean, default=True)
+    enable_spotlight: Mapped[bool] = mapped_column(Boolean, default=True)
+    enable_challenges: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Thresholds
+    trust_threshold_high: Mapped[int] = mapped_column(Integer, default=80)
+    trust_threshold_medium: Mapped[int] = mapped_column(Integer, default=60)
+    trust_threshold_low: Mapped[int] = mapped_column(Integer, default=40)
+
+    # Weights for composite scoring
+    weight_trust: Mapped[float] = mapped_column(Integer, default=25)
+    weight_xp: Mapped[float] = mapped_column(Integer, default=15)
+    weight_reputation: Mapped[float] = mapped_column(Integer, default=20)
+    weight_activity: Mapped[float] = mapped_column(Integer, default=20)
+    weight_economy: Mapped[float] = mapped_column(Integer, default=10)
+    weight_badges: Mapped[float] = mapped_column(Integer, default=10)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now()
+    )
+
+
+class MemberIntelligence(Base):
+    """Calculated intelligence profile for members."""
+
+    __tablename__ = "member_intelligence"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+
+    # Calculation timestamp
+    calculated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+    # Tier classifications
+    trust_tier: Mapped[str] = mapped_column(String(20), default="neutral")
+    engagement_tier: Mapped[str] = mapped_column(String(20), default="average")
+    reputation_tier: Mapped[str] = mapped_column(String(20), default="neutral")
+    activity_tier: Mapped[str] = mapped_column(String(20), default="regular")
+
+    # Composite influence scores
+    moderation_influence: Mapped[float] = mapped_column(Integer, default=0)
+    visibility_boost: Mapped[float] = mapped_column(Integer, default=0)
+    privilege_level: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Factor breakdown (stored as percentages 0-100)
+    factor_trust: Mapped[float] = mapped_column(Integer, default=0)
+    factor_xp: Mapped[float] = mapped_column(Integer, default=0)
+    factor_warnings: Mapped[float] = mapped_column(Integer, default=0)
+    factor_streak: Mapped[float] = mapped_column(Integer, default=0)
+    factor_badges: Mapped[float] = mapped_column(Integer, default=0)
+    factor_reputation: Mapped[float] = mapped_column(Integer, default=0)
+    factor_economy: Mapped[float] = mapped_column(Integer, default=0)
+
+    # Recommendations
+    recommended_actions: Mapped[Optional[List[str]]] = mapped_column(JSON, default=list)
+
+    # Unique constraint
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_member_intelligence"),
+    )
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now()
+    )
