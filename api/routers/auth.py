@@ -6,6 +6,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -40,14 +41,36 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
     """Verify Telegram WebApp initData."""
     try:
-        # Parse init data
-        parsed = dict(param.split("=") for param in init_data.split("&"))
-        received_hash = parsed.pop("hash", None)
+        if not init_data or not bot_token:
+            raise ValueError("Missing init_data or bot_token")
 
-        # Create data_check_string
-        data_check_string = "\n".join(
-            f"{k}={v}" for k, v in sorted(parsed.items())
-        )
+        # Parse init data - keep raw values for hash, decode for reading
+        raw_params = {}
+        for param in init_data.split("&"):
+            if "=" in param:
+                key, value = param.split("=", 1)
+                raw_params[key] = value
+
+        received_hash = raw_params.get("hash")
+        if not received_hash:
+            raise ValueError("Missing hash in init data")
+
+        # Validate auth_date to prevent replay attacks (24 hour window)
+        auth_date = raw_params.get("auth_date")
+        if auth_date:
+            import time
+            auth_timestamp = int(auth_date)
+            current_time = int(time.time())
+            if current_time - auth_timestamp > 86400:  # 24 hours
+                raise ValueError("Init data expired")
+
+        # Create data_check_string using RAW (URL-encoded) values
+        # Sort alphabetically by key, exclude hash
+        data_check_items = []
+        for key in sorted(raw_params.keys()):
+            if key != "hash":
+                data_check_items.append(f"{key}={raw_params[key]}")
+        data_check_string = "\n".join(data_check_items)
 
         # Compute secret key
         secret_key = hmac.new(
@@ -64,14 +87,18 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
         ).hexdigest()
 
         if computed_hash != received_hash:
-            raise ValueError("Invalid hash")
+            raise ValueError("Hash mismatch")
 
-        # Parse user data
-        user_data = json.loads(parsed.get("user", "{}"))
+        # Parse user data with proper URL decoding
+        from urllib.parse import unquote
+        user_json = unquote(raw_params.get("user", "{}"))
+        user_data = json.loads(user_json)
         return user_data
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid init data")
+        raise HTTPException(status_code=401, detail=f"Invalid init data: {str(e)}")
 
 
 async def get_current_user(
