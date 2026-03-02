@@ -18,7 +18,7 @@ if (tg) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/mini-app">
       <App />
       <Toaster
         position="top-center"
