@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import api from '../../api/client'
 import toast from 'react-hot-toast'
+import { useAuthStore } from '../../stores/authStore'
 
 interface ManagedGroup {
   id: number
@@ -34,12 +35,16 @@ export default function GroupsManager({ onSelectGroup, selectedGroupId }: Groups
   const [searchQuery, setSearchQuery] = useState('')
   const [filterRole, setFilterRole] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'name' | 'members' | 'activity'>('activity')
+  const { isAuthenticated } = useAuthStore()
 
   useEffect(() => {
-    loadGroups()
-  }, [])
+    if (isAuthenticated) {
+      loadGroups()
+    }
+  }, [isAuthenticated])
 
   const loadGroups = async () => {
+    if (!isAuthenticated) return
     try {
       setLoading(true)
       const response = await api.get('/groups/my-groups')
