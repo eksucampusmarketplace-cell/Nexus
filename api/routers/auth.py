@@ -39,40 +39,45 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
-    """Verify Telegram WebApp initData."""
+    """Verify Telegram WebApp initData.
+    
+    According to Telegram's documentation:
+    1. Parse the query string
+    2. URL-decode each value
+    3. Sort by key alphabetically (excluding hash)
+    4. Create data_check_string with decoded values
+    5. Compute HMAC-SHA256 with secret derived from bot_token
+    """
     try:
         if not init_data or not bot_token:
             raise ValueError("Missing init_data or bot_token")
 
-        # Parse init data - keep raw values for hash, decode for reading
-        raw_params = {}
-        for param in init_data.split("&"):
-            if "=" in param:
-                key, value = param.split("=", 1)
-                raw_params[key] = value
+        # Parse init data - values are URL-encoded in the query string
+        # parse_qsl automatically decodes URL-encoded values
+        parsed_params = dict(parse_qsl(init_data, keep_blank_values=True))
 
-        received_hash = raw_params.get("hash")
+        received_hash = parsed_params.get("hash")
         if not received_hash:
             raise ValueError("Missing hash in init data")
 
-        # Validate auth_date to prevent replay attacks (24 hour window)
-        auth_date = raw_params.get("auth_date")
+        # Validate auth_date to prevent replay attacks (7 day window for better UX)
+        auth_date = parsed_params.get("auth_date")
         if auth_date:
             import time
             auth_timestamp = int(auth_date)
             current_time = int(time.time())
-            if current_time - auth_timestamp > 86400:  # 24 hours
+            if current_time - auth_timestamp > 604800:  # 7 days
                 raise ValueError("Init data expired")
 
-        # Create data_check_string using RAW (URL-encoded) values
+        # Create data_check_string using DECODED values
         # Sort alphabetically by key, exclude hash
         data_check_items = []
-        for key in sorted(raw_params.keys()):
+        for key in sorted(parsed_params.keys()):
             if key != "hash":
-                data_check_items.append(f"{key}={raw_params[key]}")
+                data_check_items.append(f"{key}={parsed_params[key]}")
         data_check_string = "\n".join(data_check_items)
 
-        # Compute secret key
+        # Compute secret key from bot_token
         secret_key = hmac.new(
             key=b"WebAppData",
             msg=bot_token.encode(),
@@ -89,18 +94,17 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
         if computed_hash != received_hash:
             raise ValueError("Hash mismatch")
 
-        # Parse user data with proper URL decoding
-        from urllib.parse import unquote
-        user_json = unquote(raw_params.get("user", "{}"))
-        user_data = json.loads(user_json)
+        # Parse user data (already decoded by parse_qsl)
+        user_json = parsed_params.get("user", "{}")
+        user_data = json.loads(user_json) if user_json else {}
 
         # Also return chat info if present
         result = user_data.copy() if user_data else {}
-        if raw_params.get("chat"):
-            chat_json = unquote(raw_params.get("chat", "{}"))
-            result["chat"] = json.loads(chat_json)
-        if raw_params.get("chat_type"):
-            result["chat_type"] = raw_params.get("chat_type")
+        if parsed_params.get("chat"):
+            chat_json = parsed_params.get("chat", "{}")
+            result["chat"] = json.loads(chat_json) if chat_json else {}
+        if parsed_params.get("chat_type"):
+            result["chat_type"] = parsed_params.get("chat_type")
 
         return result
 
