@@ -21,7 +21,21 @@ from shared.schemas import AuthTokenRequest, AuthTokenResponse, UserPermissionsR
 router = APIRouter()
 security = HTTPBearer()
 
-SECRET_KEY = os.getenv("ENCRYPTION_KEY", "your-secret-key-min-32-characters-long")
+# In production, ENCRYPTION_KEY must be explicitly set
+_env_encryption_key = os.getenv("ENCRYPTION_KEY")
+_environment = os.getenv("ENVIRONMENT", "development")
+
+if _env_encryption_key:
+    SECRET_KEY = _env_encryption_key
+elif _environment == "production":
+    raise RuntimeError(
+        "ENCRYPTION_KEY environment variable is required in production. "
+        "Please set a secure encryption key (min 32 characters)."
+    )
+else:
+    # Development fallback - DO NOT use in production
+    SECRET_KEY = "your-secret-key-min-32-characters-long"
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 

@@ -10,10 +10,20 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import declarative_base
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://nexus:nexus_secret@localhost:5432/nexus",
-)
+# In production, DATABASE_URL must be explicitly set
+_env_database_url = os.getenv("DATABASE_URL")
+_environment = os.getenv("ENVIRONMENT", "development")
+
+if _env_database_url:
+    DATABASE_URL = _env_database_url
+elif _environment == "production":
+    raise RuntimeError(
+        "DATABASE_URL environment variable is required in production. "
+        "Please configure a database service and set DATABASE_URL."
+    )
+else:
+    # Development fallback
+    DATABASE_URL = "postgresql+asyncpg://nexus:nexus_secret@localhost:5432/nexus"
 
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace(
