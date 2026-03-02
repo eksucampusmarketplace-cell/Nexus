@@ -749,6 +749,56 @@ async def command_router_middleware(ctx: NexusContext) -> bool:
     return True
 
 
+async def feed_publisher_middleware(ctx: NexusContext) -> bool:
+    """
+    Publish message events to the group's Redis feed channel for live feed.
+    Runs after auth so we have user/group context.
+    """
+    if not ctx.group or not ctx.user or not ctx.message:
+        return True
+
+    if not ctx.message.text and not ctx.message.caption:
+        return True
+
+    try:
+        import json as _json
+        from datetime import datetime
+        from shared.redis_client import get_redis as _get_redis
+
+        text = ctx.message.text or ctx.message.caption or ""
+        redis = await _get_redis()
+        channel = f"nexus:g{ctx.group.id}:feed"
+
+        event = {
+            "type": "message",
+            "id": ctx.message.message_id,
+            "text": text[:500],
+            "sender": {
+                "id": ctx.user.user_id,
+                "first_name": ctx.user.first_name,
+                "username": ctx.user.username,
+                "trust_score": ctx.user.trust_score,
+                "level": ctx.user.level,
+                "role": ctx.user.role.value if ctx.user.role else "member",
+                "is_muted": ctx.user.is_muted,
+            },
+            "timestamp": datetime.utcnow().isoformat(),
+            "ai_flagged": False,
+            "ai_confidence": None,
+        }
+
+        payload = _json.dumps(event)
+        await redis.publish(channel, payload)
+
+        history_key = f"nexus:g{ctx.group.id}:feed:history"
+        await redis.lpush(history_key, payload)
+        await redis.ltrim(history_key, 0, 199)
+    except Exception as e:
+        logger.debug(f"Feed publisher error (non-critical): {e}")
+
+    return True
+
+
 # Setup pipeline
 def setup_pipeline():
     """Set up the middleware pipeline in the correct order."""
@@ -762,3 +812,4 @@ def setup_pipeline():
     pipeline.add_middleware(rate_limit_middleware)
     pipeline.add_middleware(antiflood_middleware)
     pipeline.add_middleware(command_router_middleware)
+    pipeline.add_middleware(feed_publisher_middleware)

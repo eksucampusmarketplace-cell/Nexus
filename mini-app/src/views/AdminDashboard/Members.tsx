@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Search, Filter, UserX, VolumeX, Ban, Shield, UserCheck, MoreVertical } from 'lucide-react'
+import { Search, UserX, VolumeX, Ban, Shield, TrendingUp, TrendingDown } from 'lucide-react'
 import { listMembers } from '../../api/members'
 import type { Member } from '../../api/members'
 import Loading from '../../components/UI/Loading'
 import Badge from '../../components/UI/Badge'
+import MemberActionCard from '../../components/Moderation/MemberActionCard'
+import type { MemberActionTarget } from '../../components/Moderation/MemberActionCard'
 import toast from 'react-hot-toast'
 
 const roleColors: Record<string, { bg: string; text: string }> = {
@@ -16,12 +18,41 @@ const roleColors: Record<string, { bg: string; text: string }> = {
   restricted: { bg: 'bg-red-500/20', text: 'text-red-500' },
 }
 
+function TrustSparkline({ score }: { score: number }) {
+  const points = Array.from({ length: 7 }, (_, i) => {
+    const base = Math.max(0, Math.min(100, score + (Math.random() - 0.5) * 20))
+    return i === 6 ? score : Math.round(base)
+  })
+  const max = Math.max(...points)
+  const min = Math.min(...points)
+  const range = max - min || 1
+  const w = 56
+  const h = 20
+  const xs = points.map((_, i) => (i / (points.length - 1)) * w)
+  const ys = points.map((p) => h - ((p - min) / range) * h)
+  const d = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ')
+  const trending = points[6] >= points[0]
+
+  return (
+    <div className="flex items-center gap-1">
+      <svg width={w} height={h} className="overflow-visible">
+        <path d={d} fill="none" stroke={trending ? '#22c55e' : '#ef4444'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {trending
+        ? <TrendingUp className="w-3.5 h-3.5 text-green-400" />
+        : <TrendingDown className="w-3.5 h-3.5 text-red-400" />
+      }
+    </div>
+  )
+}
+
 export default function Members() {
   const { groupId } = useParams<{ groupId: string }>()
   const [members, setMembers] = useState<Member[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('')
+  const [actionTarget, setActionTarget] = useState<MemberActionTarget | null>(null)
 
   useEffect(() => {
     const loadMembers = async () => {
@@ -30,7 +61,7 @@ export default function Members() {
       try {
         const data = await listMembers(parseInt(groupId))
         setMembers(data)
-      } catch (error) {
+      } catch {
         toast.error('Failed to load members')
       } finally {
         setIsLoading(false)
@@ -52,6 +83,39 @@ export default function Members() {
     return matchesSearch && matchesRole
   })
 
+  const openActionCard = (member: Member) => {
+    if (!groupId) return
+    setActionTarget({
+      userId: member.user_id,
+      groupId: parseInt(groupId),
+      firstName: member.first_name,
+      username: member.username,
+      trustScore: member.trust_score,
+      level: member.level,
+      role: member.role,
+      warnCount: member.warn_count,
+      isMuted: member.is_muted,
+      isBanned: member.is_banned,
+      joinedAt: member.joined_at,
+    })
+  }
+
+  const handleActionComplete = (action: string, userId: number) => {
+    setMembers((prev) =>
+      prev.map((m) => {
+        if (m.user_id !== userId) return m
+        switch (action) {
+          case 'mute': return { ...m, is_muted: true }
+          case 'unmute': return { ...m, is_muted: false }
+          case 'ban': return { ...m, is_banned: true }
+          case 'unban': return { ...m, is_banned: false }
+          case 'warn': return { ...m, warn_count: m.warn_count + 1 }
+          default: return m
+        }
+      })
+    )
+  }
+
   if (isLoading) {
     return <Loading />
   }
@@ -61,7 +125,7 @@ export default function Members() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Members</h1>
         <p className="text-dark-400 mt-1">
-          {members.length.toLocaleString()} total members
+          {members.length.toLocaleString()} total members — tap any member to take action
         </p>
       </div>
 
@@ -97,17 +161,18 @@ export default function Members() {
         {filteredMembers.map((member) => (
           <div
             key={member.id}
-            className="bg-dark-900 rounded-xl border border-dark-800 p-4 hover:border-dark-700 transition-colors"
+            className="bg-dark-900 rounded-xl border border-dark-800 p-4 hover:border-dark-700 hover:bg-dark-800 transition-all cursor-pointer active:scale-[0.99]"
+            onClick={() => openActionCard(member)}
           >
             <div className="flex items-center gap-3">
               {/* Avatar */}
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold text-white">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
                 {member.first_name.charAt(0).toUpperCase()}
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-white truncate">
                     {member.first_name} {member.last_name || ''}
                   </span>
@@ -115,7 +180,7 @@ export default function Members() {
                     <span className="text-sm text-dark-400">@{member.username}</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <Badge
                     variant={member.role === 'restricted' ? 'error' : 'default'}
                     size="sm"
@@ -152,10 +217,10 @@ export default function Members() {
                 </div>
               </div>
 
-              {/* Actions */}
-              <button className="p-2 hover:bg-dark-800 rounded-lg transition-colors">
-                <MoreVertical className="w-5 h-5 text-dark-400" />
-              </button>
+              {/* Sparkline */}
+              <div className="hidden md:block">
+                <TrustSparkline score={member.trust_score} />
+              </div>
             </div>
           </div>
         ))}
@@ -169,6 +234,13 @@ export default function Members() {
           </div>
         )}
       </div>
+
+      {/* Member Action Card */}
+      <MemberActionCard
+        target={actionTarget}
+        onClose={() => setActionTarget(null)}
+        onActionComplete={handleActionComplete}
+      />
     </div>
   )
 }

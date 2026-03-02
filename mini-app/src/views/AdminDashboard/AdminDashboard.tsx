@@ -28,6 +28,7 @@ import {
   Workflow,
   Type,
   Search,
+  Radio,
 } from 'lucide-react'
 import { useGroupStore } from '../../stores/groupStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -38,6 +39,7 @@ import Loading from '../../components/UI/Loading'
 import toast from 'react-hot-toast'
 
 const menuItems = [
+  { icon: Radio, label: 'Live Feed', path: 'live-feed', color: 'text-green-400' },
   { icon: Users, label: 'Members', path: 'members', color: 'text-blue-500' },
   { icon: AlertTriangle, label: 'Moderation', path: 'moderation', color: 'text-red-500' },
   { icon: Shield, label: 'Modules', path: 'modules', color: 'text-purple-500' },

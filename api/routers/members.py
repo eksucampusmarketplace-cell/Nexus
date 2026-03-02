@@ -22,6 +22,25 @@ from shared.schemas import (
     WarningResponse,
 )
 
+
+async def _publish_mod_event(group_id: int, action: str, target_user_id: int, actor_id: int, reason: Optional[str] = None):
+    """Publish a moderation action event to the live feed."""
+    try:
+        import json
+        from shared.redis_client import get_redis
+        redis = await get_redis()
+        channel = f"nexus:g{group_id}:feed"
+        event = {
+            "type": "mod_action",
+            "action": action,
+            "target_user_id": target_user_id,
+            "actor_id": actor_id,
+            "reason": reason,
+        }
+        await redis.publish(channel, json.dumps(event))
+    except Exception:
+        pass
+
 router = APIRouter()
 
 
@@ -227,6 +246,8 @@ async def warn_member(
 
     await db.commit()
 
+    await _publish_mod_event(group_id, "warn", user_id, current_user.id, request.reason)
+
     return {
         "success": True,
         "warn_count": target.warn_count,
@@ -295,6 +316,8 @@ async def mute_member(
 
     await db.commit()
 
+    await _publish_mod_event(group_id, "mute", user_id, current_user.id, request.reason)
+
     return {
         "success": True,
         "duration": request.duration,
@@ -347,6 +370,8 @@ async def unmute_member(
     db.add(action)
 
     await db.commit()
+
+    await _publish_mod_event(group_id, "unmute", user_id, current_user.id)
 
     return {"success": True, "message": "User has been unmuted"}
 
@@ -411,6 +436,8 @@ async def ban_member(
     db.add(action)
 
     await db.commit()
+
+    await _publish_mod_event(group_id, "ban", user_id, current_user.id, request.reason)
 
     return {
         "success": True,
