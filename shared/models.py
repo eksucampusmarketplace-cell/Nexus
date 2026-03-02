@@ -1708,3 +1708,233 @@ class NotificationLog(Base):
     # Digest
     is_digest: Mapped[bool] = mapped_column(Boolean, default=False)
     digest_count: Mapped[int] = mapped_column(Integer, default=1)
+
+
+# ============ MESSAGE CUSTOMIZATION SYSTEM ============
+
+
+class MessageTemplateCategory(Base):
+    """Categories for message templates."""
+
+    __tablename__ = "message_template_categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    icon: Mapped[str] = mapped_column(String(50))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class MessageTemplateDefinition(Base):
+    """Definition of all possible bot messages."""
+
+    __tablename__ = "message_template_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    identifier: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    category_slug: Mapped[str] = mapped_column(String(50))
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str] = mapped_column(Text)
+    default_text: Mapped[str] = mapped_column(Text)
+    default_tone: Mapped[str] = mapped_column(String(20), default="formal")
+    
+    # Where this message can be sent
+    allowed_destinations: Mapped[List[str]] = mapped_column(JSON)
+    supports_self_destruct: Mapped[bool] = mapped_column(Boolean, default=True)
+    supports_variables: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Variables available for this message type
+    available_variables: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    
+    # Tone variations for AI-generated defaults
+    tone_variations: Mapped[Optional[Dict[str, str]]] = mapped_column(JSON)
+    
+    # Module this message belongs to
+    module_name: Mapped[str] = mapped_column(String(50))
+    
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class MessageTemplate(Base):
+    """Custom message templates per group."""
+
+    __tablename__ = "message_templates"
+    __table_args__ = (
+        UniqueConstraint("group_id", "identifier", "language", name="uq_group_identifier_lang"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    identifier: Mapped[str] = mapped_column(String(100), index=True)
+    language: Mapped[str] = mapped_column(String(10), default="en")
+    
+    # Template content
+    custom_text: Mapped[str] = mapped_column(Text)
+    custom_text_formatted: Mapped[Optional[str]] = mapped_column(Text)
+    
+    # Tone selection (if using AI-generated default)
+    tone: Mapped[Optional[str]] = mapped_column(String(20))
+    
+    # Destination settings
+    destination: Mapped[str] = mapped_column(String(20), default="public")
+    # "public" = group, "private_user" = DM to user, "private_admin" = DM to admin, "log" = log channel
+    
+    # Self-destruct timer (seconds)
+    self_destruct_seconds: Mapped[Optional[int]] = mapped_column(Integer)
+    
+    # Enable/disable this message type for the group
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now()
+    )
+    created_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+
+
+# ============ COMMAND CUSTOMIZATION SYSTEM ============
+
+
+class CommandDefinition(Base):
+    """Definition of all available bot commands."""
+
+    __tablename__ = "command_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    command_id: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    module_name: Mapped[str] = mapped_column(String(50))
+    
+    # Display info
+    name: Mapped[str] = mapped_column(String(50))
+    description: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String(30))
+    usage: Mapped[Optional[str]] = mapped_column(String(200))
+    examples: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    
+    # Default settings
+    default_prefix: Mapped[str] = mapped_column(String(5), default="!")
+    default_aliases: Mapped[List[str]] = mapped_column(JSON, default=list)
+    default_min_role: Mapped[str] = mapped_column(String(20), default="mod")
+    default_cooldown_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    default_admin_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Features
+    supports_cooldown: Mapped[bool] = mapped_column(Boolean, default=True)
+    supports_aliases: Mapped[bool] = mapped_column(Boolean, default=True)
+    supports_prefix_change: Mapped[bool] = mapped_column(Boolean, default=True)
+    supports_permission_change: Mapped[bool] = mapped_column(Boolean, default=True)
+    supports_topic_restriction: Mapped[bool] = mapped_column(Boolean, default=False)
+    supports_confirmation: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Response behavior
+    default_delete_trigger: Mapped[bool] = mapped_column(Boolean, default=False)
+    default_reply_mode: Mapped[bool] = mapped_column(Boolean, default=True)
+    default_pin_mode: Mapped[str] = mapped_column(String(20), default="none")
+    # "none", "temporary", "permanent"
+    
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class CommandConfig(Base):
+    """Per-group command customizations."""
+
+    __tablename__ = "command_configs"
+    __table_args__ = (
+        UniqueConstraint("group_id", "command_id", name="uq_group_command"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    command_id: Mapped[str] = mapped_column(String(50), index=True)
+    
+    # Custom name and aliases
+    custom_name: Mapped[Optional[str]] = mapped_column(String(50))
+    custom_aliases: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    
+    # Custom prefix (empty string = use group default)
+    custom_prefix: Mapped[Optional[str]] = mapped_column(String(5))
+    
+    # Permission settings
+    min_role: Mapped[Optional[str]] = mapped_column(String(20))
+    admin_only: Mapped[Optional[bool]] = mapped_column(Boolean)
+    
+    # Cooldown settings
+    cooldown_seconds: Mapped[Optional[int]] = mapped_column(Integer)
+    
+    # Topic restriction
+    allowed_topics: Mapped[Optional[List[int]]] = mapped_column(JSON)
+    denied_topics: Mapped[Optional[List[int]]] = mapped_column(JSON)
+    
+    # Response behavior
+    delete_trigger: Mapped[Optional[bool]] = mapped_column(Boolean)
+    reply_mode: Mapped[Optional[bool]] = mapped_column(Boolean)
+    pin_mode: Mapped[Optional[str]] = mapped_column(String(20))
+    
+    # Enable/disable
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Confirmation for destructive commands
+    require_confirmation: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now()
+    )
+    updated_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+
+
+# ============ ENHANCED MEMBER MANAGEMENT ============
+
+
+class MemberNote(Base):
+    """Admin notes on members (private to admins)."""
+
+    __tablename__ = "member_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    content: Mapped[str] = mapped_column(Text)
+    is_private: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class TrustScoreHistory(Base):
+    """Historical trust score tracking."""
+
+    __tablename__ = "trust_score_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    old_score: Mapped[int] = mapped_column(Integer)
+    new_score: Mapped[int] = mapped_column(Integer)
+    change_reason: Mapped[Optional[str]] = mapped_column(String(100))
+    changed_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class MemberActivitySnapshot(Base):
+    """Periodic activity snapshots for analytics."""
+
+    __tablename__ = "member_activity_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    snapshot_date: Mapped[date] = mapped_column(Date, index=True)
+    
+    # Activity metrics
+    messages_sent: Mapped[int] = mapped_column(Integer, default=0)
+    reactions_given: Mapped[int] = mapped_column(Integer, default=0)
+    reactions_received: Mapped[int] = mapped_column(Integer, default=0)
+    commands_used: Mapped[int] = mapped_column(Integer, default=0)
+    games_played: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Engagement
+    active_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    peak_hour: Mapped[Optional[int]] = mapped_column(Integer)

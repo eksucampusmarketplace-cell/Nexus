@@ -211,10 +211,12 @@ from api.routers import (
     analytics,
     auth,
     bot_builder,
+    commands,
     economy,
     federations,
     groups,
     members,
+    messages,
     modules,
     scheduled,
     toggles,
@@ -233,6 +235,8 @@ app.include_router(bot_builder.router, prefix="/api/v1", tags=["Bot Builder"])
 app.include_router(advanced.router, prefix="/api/v1", tags=["Advanced Features"])
 app.include_router(toggles.router, prefix="/api/v1", tags=["toggles"])
 app.include_router(webhooks.router, prefix="/webhook", tags=["webhooks"])
+app.include_router(messages.router, prefix="/api/v1", tags=["Message Templates"])
+app.include_router(commands.router, prefix="/api/v1", tags=["Commands"])
 
 
 @app.get("/", include_in_schema=False)
