@@ -1903,19 +1903,6 @@ class MemberNote(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
 
-class TrustScoreHistory(Base):
-    """Historical trust score tracking."""
-
-    __tablename__ = "trust_score_history"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
-    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
-    old_score: Mapped[int] = mapped_column(Integer)
-    new_score: Mapped[int] = mapped_column(Integer)
-    change_reason: Mapped[Optional[str]] = mapped_column(String(100))
-    changed_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
 
 class MemberActivitySnapshot(Base):
