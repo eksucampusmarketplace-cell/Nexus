@@ -7,6 +7,7 @@ from .mood_service import MoodService
 from .spotlight_service import SpotlightService
 from .challenge_service import ChallengeService
 from .intelligence_orchestrator import IntelligenceOrchestrator
+from .i18n_service import I18nService, get_i18n_service, t
 
 __all__ = [
     "AnalyticsEngine",
@@ -16,4 +17,7 @@ __all__ = [
     "SpotlightService",
     "ChallengeService",
     "IntelligenceOrchestrator",
+    "I18nService",
+    "get_i18n_service",
+    "t",
 ]

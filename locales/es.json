@@ -1,0 +1,42 @@
+{
+  "common": {
+    "hello": "¡Hola {name}!",
+    "goodbye": "¡Adiós {name}!",
+    "success": "✅ ¡Éxito!",
+    "error": "❌ Se produjo un error",
+    "loading": "Cargando...",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "create": "Crear",
+    "search": "Buscar"
+  },
+  "moderation": {
+    "warned": "⚠️ {target} ha sido advertido.\nRazón: {reason}",
+    "muted": "🔇 {target} ha sido silenciado por {duration}.\nRazón: {reason}",
+    "banned": "🚫 {target} ha sido baneado.\nRazón: {reason}",
+    "kicked": "👢 {target} ha sido expulsado.\nRazón: {reason}",
+    "unmuted": "🔊 {target} ya no está silenciado.",
+    "unbanned": "✅ {target} ha sido desbaneado.",
+    "promoted": "⭐ {target} ha sido promovido a administrador.",
+    "demoted": "📉 {target} ha sido degradado.",
+    "no_permission": "❌ No tienes permiso para usar este comando.",
+    "user_not_found": "❌ Usuario no encontrado.",
+    "invalid_duration": "❌ Formato de duración inválido. Usa: 1m, 1h, 1d, 1s",
+    "action_complete": "✅ Acción completada exitosamente."
+  },
+  "welcome": {
+    "welcome_message": "¡Bienvenido {mention} a {chatname}!",
+    "goodbye_message": "¡Adiós {mention}! Esperamos verte de nuevo pronto.",
+    "new_member": "👋 ¡Un nuevo miembro se ha unido!",
+    "member_left": "👋 Un miembro se ha ido."
+  },
+  "errors": {
+    "rate_limited": "⏳ Por favor, más despacio. Límite de tasa excedido.",
+    "flood_detected": "🌊 Inundación detectada. Por favor espera.",
+    "not_admin": "❌ Este comando requiere privilegios de administrador.",
+    "not_found": "🔍 No encontrado.",
+    "server_error": "😔 Algo salió mal. Por favor, inténtalo de nuevo."
+  }
+}
