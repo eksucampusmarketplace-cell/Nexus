@@ -51,16 +51,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="py-6 animate-fade-in space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">
+    <div className="animate-fade-in space-y-4 sm:space-y-6">
+      {/* Header - Responsive layout */}
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white truncate">
               {viewMode === 'groups' ? 'Nexus Dashboard' : 
                viewMode === 'manage' ? 'Manage Modules' : 'Quick Actions'}
             </h1>
-            <p className="text-dark-400 mt-1">
+            <p className="text-dark-400 mt-1 text-sm sm:text-base">
               {viewMode === 'groups' ? 'Manage all your Telegram groups in one place' :
                viewMode === 'manage' ? 'Toggle features on and off without commands' :
                'Execute moderation actions instantly'}
@@ -71,49 +71,50 @@ export default function Dashboard() {
             onClick={() => {
               window.open(`https://t.me/nexusbot?startgroup=true`, '_blank')
             }}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
+            className="btn-primary whitespace-nowrap flex-shrink-0 self-start sm:self-auto"
           >
-            <Plus className="w-5 h-5" />
-            Add to Group
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Add to Group</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
 
-        {/* View Mode Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        {/* View Mode Tabs - Horizontal scroll on mobile */}
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 hide-scrollbar-mobile">
           <button
             onClick={() => setViewMode('groups')}
-            className={`px-4 py-2 rounded-lg whitespace-nowrap flex items-center gap-2 transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg whitespace-nowrap flex items-center gap-2 transition-colors touch-target ${
               viewMode === 'groups' 
                 ? 'bg-primary-600 text-white' 
                 : 'bg-dark-800 text-dark-300 hover:text-white'
             }`}
           >
             <Users className="w-4 h-4" />
-            My Groups
+            <span className="text-sm sm:text-base">My Groups</span>
           </button>
           <button
             onClick={() => setViewMode('manage')}
             disabled={!selectedGroupId}
-            className={`px-4 py-2 rounded-lg whitespace-nowrap flex items-center gap-2 transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg whitespace-nowrap flex items-center gap-2 transition-colors touch-target ${
               viewMode === 'manage' 
                 ? 'bg-primary-600 text-white' 
                 : 'bg-dark-800 text-dark-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed'
             }`}
           >
             <Settings className="w-4 h-4" />
-            Manage Modules
+            <span className="text-sm sm:text-base">Manage</span>
           </button>
           <button
             onClick={() => setViewMode('quick-actions')}
             disabled={!selectedGroupId}
-            className={`px-4 py-2 rounded-lg whitespace-nowrap flex items-center gap-2 transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg whitespace-nowrap flex items-center gap-2 transition-colors touch-target ${
               viewMode === 'quick-actions' 
                 ? 'bg-primary-600 text-white' 
                 : 'bg-dark-800 text-dark-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed'
             }`}
           >
             <Zap className="w-4 h-4" />
-            Quick Actions
+            <span className="text-sm sm:text-base">Quick Actions</span>
           </button>
         </div>
       </div>
@@ -130,33 +131,33 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-6"
+          className="space-y-4 sm:space-y-6"
         >
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {/* Quick Stats - Responsive grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <QuickStatCard
-              icon={<Shield className="w-5 h-5" />}
+              icon={<Shield className="w-4 h-4 sm:w-5 sm:h-5" />}
               label="Moderation"
               color="text-red-500"
               bgColor="bg-red-500/20"
               onClick={() => navigate(`/admin/${selectedGroupId}/moderation`)}
             />
             <QuickStatCard
-              icon={<Lock className="w-5 h-5" />}
+              icon={<Lock className="w-4 h-4 sm:w-5 sm:h-5" />}
               label="Locks"
               color="text-orange-500"
               bgColor="bg-orange-500/20"
               onClick={() => navigate(`/admin/${selectedGroupId}/locks`)}
             />
             <QuickStatCard
-              icon={<Bell className="w-5 h-5" />}
+              icon={<Bell className="w-4 h-4 sm:w-5 sm:h-5" />}
               label="Welcome"
               color="text-green-500"
               bgColor="bg-green-500/20"
               onClick={() => navigate(`/admin/${selectedGroupId}/rules-greetings`)}
             />
             <QuickStatCard
-              icon={<Gamepad2 className="w-5 h-5" />}
+              icon={<Gamepad2 className="w-4 h-4 sm:w-5 sm:h-5" />}
               label="Games"
               color="text-purple-500"
               bgColor="bg-purple-500/20"
@@ -178,7 +179,7 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-6"
+          className="space-y-4 sm:space-y-6"
         >
           {/* Quick Actions Panel */}
           <QuickActionsPanel
@@ -188,8 +189,8 @@ export default function Dashboard() {
             }}
           />
 
-          {/* Quick Access Cards */}
-          <div className="grid sm:grid-cols-2 gap-4">
+          {/* Quick Access Cards - Responsive grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <QuickAccessCard
               title="Manage Members"
               description="View, search, and manage all group members"
@@ -220,19 +221,19 @@ export default function Dashboard() {
 
       {/* Empty State */}
       {groups.length === 0 && viewMode === 'groups' && (
-        <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto mb-4 bg-dark-800 rounded-full flex items-center justify-center">
-            <Shield className="w-8 h-8 text-dark-500" />
+        <div className="text-center py-8 sm:py-12 px-4">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-dark-800 rounded-full flex items-center justify-center">
+            <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-dark-500" />
           </div>
-          <h3 className="text-lg font-medium text-white mb-2">No groups yet</h3>
-          <p className="text-dark-400 max-w-sm mx-auto mb-6">
+          <h3 className="text-base sm:text-lg font-medium text-white mb-2">No groups yet</h3>
+          <p className="text-dark-400 max-w-sm mx-auto mb-4 sm:mb-6 text-sm sm:text-base">
             Add the Nexus bot to your Telegram group to get started with advanced management features.
           </p>
           <button
             onClick={() => {
               window.open(`https://t.me/nexusbot?startgroup=true`, '_blank')
             }}
-            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            className="btn-primary"
           >
             Add Nexus to Group
           </button>
@@ -242,7 +243,7 @@ export default function Dashboard() {
   )
 }
 
-// Quick Stat Card Component
+// Quick Stat Card Component - Touch-friendly
 function QuickStatCard({
   icon,
   label,
@@ -259,17 +260,17 @@ function QuickStatCard({
   return (
     <button
       onClick={onClick}
-      className="p-4 bg-dark-800 rounded-xl border border-dark-700 hover:border-dark-600 transition-all group"
+      className="p-3 sm:p-4 bg-dark-800 rounded-xl border border-dark-700 hover:border-dark-600 transition-all group touch-target text-left"
     >
-      <div className={`w-10 h-10 rounded-lg ${bgColor} flex items-center justify-center ${color} mb-3`}>
+      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg ${bgColor} flex items-center justify-center ${color} mb-2 sm:mb-3`}>
         {icon}
       </div>
-      <p className="text-sm font-medium text-white">{label}</p>
+      <p className="text-xs sm:text-sm font-medium text-white">{label}</p>
     </button>
   )
 }
 
-// Quick Access Card Component
+// Quick Access Card Component - Responsive
 function QuickAccessCard({
   title,
   description,
@@ -284,16 +285,16 @@ function QuickAccessCard({
   return (
     <button
       onClick={onClick}
-      className="p-4 bg-dark-800 rounded-xl border border-dark-700 hover:border-dark-600 transition-all text-left group"
+      className="p-3 sm:p-4 bg-dark-800 rounded-xl border border-dark-700 hover:border-dark-600 transition-all text-left group touch-target"
     >
       <div className="flex items-start justify-between">
-        <div className="w-10 h-10 rounded-lg bg-primary-600/20 text-primary-500 flex items-center justify-center">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary-600/20 text-primary-500 flex items-center justify-center flex-shrink-0">
           {icon}
         </div>
-        <ChevronRight className="w-5 h-5 text-dark-500 group-hover:text-white transition-colors" />
+        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-dark-500 group-hover:text-white transition-colors flex-shrink-0" />
       </div>
-      <h3 className="font-medium text-white mt-3">{title}</h3>
-      <p className="text-sm text-dark-400 mt-1">{description}</p>
+      <h3 className="font-medium text-white mt-2 sm:mt-3 text-sm sm:text-base">{title}</h3>
+      <p className="text-xs sm:text-sm text-dark-400 mt-1 line-clamp-2">{description}</p>
     </button>
   )
 }

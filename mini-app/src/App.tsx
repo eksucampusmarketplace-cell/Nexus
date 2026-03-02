@@ -60,14 +60,11 @@ function App() {
       setInitData(initDataRaw)
 
       if (!initDataRaw) {
-        // Not running in Telegram context - allow local development
+        // Not running in Telegram context
         console.log('Not running in Telegram WebApp context')
-        setAuth('mock-token', { id: 1, first_name: 'Developer', username: 'dev' } as any)
         setLoading(false)
         return
       }
-
-      console.log('Running in Telegram WebApp context, initData length:', initDataRaw.length)
 
       // Get group ID from start_param or chat
       const startParam = tg?.initDataUnsafe?.start_param
