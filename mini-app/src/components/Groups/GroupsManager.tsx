@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Settings, Shield, Bell, BarChart3, ChevronRight,
@@ -35,27 +35,42 @@ export default function GroupsManager({ onSelectGroup, selectedGroupId }: Groups
   const [searchQuery, setSearchQuery] = useState('')
   const [filterRole, setFilterRole] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'name' | 'members' | 'activity'>('activity')
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, hasStoredToken } = useAuthStore()
+  const hasLoadedGroups = useRef(false)
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadGroups()
+    const loadGroups = async () => {
+      // Check both isAuthenticated and hasStoredToken
+      const wasAuthenticated = hasStoredToken()
+      if (!isAuthenticated && !wasAuthenticated) {
+        console.log('GroupsManager: Not authenticated, skipping load')
+        return
+      }
+      
+      // Prevent double-loading
+      if (hasLoadedGroups.current) {
+        console.log('GroupsManager: Already loaded, skipping')
+        return
+      }
+      
+      console.log('GroupsManager: Loading groups...', { isAuthenticated, wasAuthenticated })
+      hasLoadedGroups.current = true
+      
+      try {
+        setLoading(true)
+        const response = await api.get('/groups/my-groups')
+        setGroups(response.data)
+      } catch (error) {
+        console.error('Failed to load groups:', error)
+        toast.error('Failed to load groups')
+        hasLoadedGroups.current = false // Allow retry on error
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [isAuthenticated])
 
-  const loadGroups = async () => {
-    if (!isAuthenticated) return
-    try {
-      setLoading(true)
-      const response = await api.get('/groups/my-groups')
-      setGroups(response.data)
-    } catch (error) {
-      console.error('Failed to load groups:', error)
-      toast.error('Failed to load groups')
-    } finally {
-      setLoading(false)
-    }
-  }
+    loadGroups()
+  }, [isAuthenticated])
 
   // Filter and sort groups
   const filteredGroups = groups

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, StateStorage } from 'zustand/middleware'
 
 export interface User {
   id: number
@@ -21,6 +21,34 @@ interface AuthState {
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   logout: () => void
+  // Helper to check if we have a stored token
+  hasStoredToken: () => boolean
+}
+
+// Custom storage that also syncs the token to nexus_token
+const customStorage: StateStorage = {
+  getItem: (name: string): string | null => {
+    const value = localStorage.getItem(name)
+    return value
+  },
+  setItem: (name: string, value: string): void => {
+    // Also sync to nexus_token for the API client
+    try {
+      const parsed = JSON.parse(value)
+      if (parsed.state?.token) {
+        localStorage.setItem('nexus_token', parsed.state.token)
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+    localStorage.setItem(name, value)
+  },
+  removeItem: (name: string): void => {
+    if (name === 'nexus-auth') {
+      localStorage.removeItem('nexus_token')
+    }
+    localStorage.removeItem(name)
+  },
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -41,9 +69,13 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem('nexus_token')
         set({ isAuthenticated: false, token: null, user: null })
       },
+      hasStoredToken: () => {
+        return !!localStorage.getItem('nexus_token')
+      }
     }),
     {
       name: 'nexus-auth',
+      storage: customStorage,
     }
   )
 )
