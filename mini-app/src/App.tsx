@@ -38,6 +38,7 @@ import BroadcastCenter from './views/AdminDashboard/BroadcastCenter'
 import AutomationCenter from './views/AdminDashboard/AutomationCenter'
 import FormattingTools from './views/AdminDashboard/FormattingTools'
 import AdvancedSearch from './views/AdminDashboard/AdvancedSearch'
+import LiveFeed from './views/AdminDashboard/LiveFeed'
 
 function App() {
   const { isAuthenticated, isLoading, error, setAuth, setLoading, setError } = useAuthStore()
@@ -163,6 +164,9 @@ function App() {
         {/* New Hubs - Low Priority */}
         <Route path="/admin/:groupId/formatting" element={<FormattingTools />} />
         <Route path="/admin/:groupId/search" element={<AdvancedSearch />} />
+
+        {/* Live Feed */}
+        <Route path="/admin/:groupId/live-feed" element={<LiveFeed />} />
       </Routes>
     </MainLayout>
   )

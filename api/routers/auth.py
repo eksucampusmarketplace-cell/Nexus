@@ -110,6 +110,20 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
         raise HTTPException(status_code=401, detail=f"Invalid init data: {str(e)}")
 
 
+async def verify_token(token: str, db: AsyncSession) -> Optional[User]:
+    """Verify a raw token string and return the user, or None if invalid."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            return None
+    except JWTError:
+        return None
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar()
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
