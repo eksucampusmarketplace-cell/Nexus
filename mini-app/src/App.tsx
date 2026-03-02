@@ -48,6 +48,7 @@ function App() {
   const { isAuthenticated, isLoading, error, setAuth, setLoading, setError } = useAuthStore()
   const { currentGroup, setCurrentGroup } = useGroupStore()
   const [initData, setInitData] = useState<string>('')
+  const [errorDetail, setErrorDetail] = useState<string>('')
 
   useEffect(() => {
     const init = async () => {
@@ -65,24 +66,32 @@ function App() {
         return
       }
 
-      // Get group ID from start_param to find custom bot token
+      // Get group ID from start_param or chat
       const startParam = tg?.initDataUnsafe?.start_param
-      const groupId = startParam ? parseInt(startParam) : null
+      const chatId = tg?.initDataUnsafe?.chat?.id
+      const groupId = startParam ? parseInt(startParam) : (chatId || null)
 
-      // Try to get custom bot token from localStorage (stored when user registers custom bot)
+      // Try to get custom bot token from localStorage (optional - backend handles lookup now)
       let customBotToken: string | undefined
       if (groupId) {
-        const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
-        customBotToken = storedTokens[groupId]
+        try {
+          const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
+          customBotToken = storedTokens[groupId]
+        } catch (e) {
+          console.warn('Failed to read custom bot tokens from localStorage:', e)
+        }
       }
 
       try {
-        // Authenticate with backend (pass custom bot token if available)
+        // Authenticate with backend
+        // Backend now handles bot token lookup automatically
         const authData = await telegramAuth(initDataRaw, customBotToken)
         setAuth(authData.access_token, authData.user)
       } catch (err: any) {
         console.error('Auth error:', err)
-        setError(err.response?.data?.detail || 'Authentication failed')
+        const detail = err.response?.data?.detail || 'Authentication failed'
+        setError('Authentication Failed')
+        setErrorDetail(detail)
       }
 
       setLoading(false)
@@ -101,8 +110,17 @@ function App() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center max-w-md p-6">
           <h1 className="text-3xl font-bold mb-4 gradient-text">Nexus</h1>
-          <p className="text-red-400 mb-4">{error}</p>
+          <p className="text-red-400 mb-2">{error}</p>
+          {errorDetail && (
+            <p className="text-dark-500 text-sm mb-4 font-mono text-xs break-all">{errorDetail}</p>
+          )}
           <p className="text-dark-400 text-sm">Please try opening the Mini App again from Telegram.</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     )
