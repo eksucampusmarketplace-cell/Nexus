@@ -1,5 +1,7 @@
 import api from './client'
 
+export { default as api } from './client'
+
 export interface AuthResponse {
   access_token: string
   token_type: string
