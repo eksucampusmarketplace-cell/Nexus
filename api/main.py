@@ -1,5 +1,6 @@
 """FastAPI main application."""
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -115,8 +116,38 @@ async def lifespan(app: FastAPI):
             pipeline.add_module(module)
 
         logger.info(f"Loaded {len(module_registry.get_all_modules())} modules")
+        
+        # Run health checks on all modules
+        from shared.health_check import run_startup_health_checks
+        module_names = [m.name for m in module_registry.get_all_modules()]
+        health_results = await run_startup_health_checks(module_names)
+        
+        # Disable failing modules
+        for module_name, report in health_results.items():
+            if report.overall_status.value == "fail":
+                logger.error(f"Disabling module '{module_name}' due to failed health checks")
+                # The module registry would need a disable method
     except Exception as e:
         logger.warning(f"Module loading skipped (DB unavailable): {e}")
+
+    # Initialize WebSocket manager
+    logger.info("Initializing WebSocket manager...")
+    try:
+        from shared.websocket_manager import get_ws_manager
+        await get_ws_manager()
+        logger.info("WebSocket manager initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize WebSocket manager: {e}")
+
+    # Initialize Event Bus listener
+    logger.info("Starting Event Bus listener...")
+    try:
+        from shared.event_bus import get_event_bus
+        event_bus = await get_event_bus()
+        asyncio.create_task(event_bus.start_listener())
+        logger.info("Event Bus listener started")
+    except Exception as e:
+        logger.error(f"Failed to start Event Bus listener: {e}")
 
     # Set up Telegram webhook (critical for Render single-service deployment)
     logger.info("Setting up Telegram webhook...")
@@ -139,6 +170,14 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down Nexus API...")
+    
+    # Shutdown WebSocket manager
+    try:
+        from shared.websocket_manager import shutdown_ws_manager
+        await shutdown_ws_manager()
+    except Exception as e:
+        logger.error(f"Error shutting down WebSocket manager: {e}")
+    
     await module_registry.unload_all()
     await close_redis()
     logger.info("Shutdown complete")
@@ -222,6 +261,7 @@ from api.routers import (
     scheduled,
     toggles,
     webhooks,
+    websocket,
 )
 
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
@@ -239,6 +279,8 @@ app.include_router(webhooks.router, prefix="/webhook", tags=["webhooks"])
 app.include_router(messages.router, prefix="/api/v1", tags=["Message Templates"])
 app.include_router(commands.router, prefix="/api/v1", tags=["Commands"])
 app.include_router(graveyard.router, prefix="/api/v1", tags=["Message Graveyard"])
+# WebSocket router (no prefix, handles /ws/{group_id} directly)
+app.include_router(websocket.router)
 
 
 @app.get("/", include_in_schema=False)

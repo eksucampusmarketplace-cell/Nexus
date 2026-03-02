@@ -626,30 +626,162 @@ async def bulk_moderation_action(
 async def warn_member(
     group_id: int,
     user_id: int,
-    reason: str = Query(...),
+    reason: str = Query("No reason provided"),
+    silent: bool = Query(False),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Warn a member."""
+    """Warn a member using the shared action executor."""
     admin = await check_admin_access(group_id, current_user, db)
     
-    # This would call the shared action executor
-    return {"success": True, "action": "warn"}
+    # Get group telegram ID
+    from shared.models import Group
+    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_result.scalar_one_or_none()
+    
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    
+    # Get target user telegram ID
+    target_result = await db.execute(select(User).where(User.id == user_id))
+    target_user = target_result.scalar_one_or_none()
+    
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    try:
+        from shared.action_executor import ActionContext, get_action_executor
+        
+        executor = await get_action_executor()
+        
+        ctx = ActionContext(
+            group_id=group_id,
+            actor_id=current_user.id,
+            target_id=user_id,
+            group_telegram_id=group.telegram_id,
+            actor_telegram_id=current_user.telegram_id,
+            target_telegram_id=target_user.telegram_id,
+            action_type="warn",
+            reason=reason,
+            silent=silent,
+            source="api"
+        )
+        
+        result = await executor.warn(ctx)
+        
+        return {
+            "success": result.success,
+            "action": "warn",
+            "message": result.message,
+            "trust_score_change": (result.trust_score_after or 0) - (result.trust_score_before or 0),
+            "warn_count": result.data.get("warn_count") if result.data else None,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/groups/{group_id}/members/{user_id}/mute")
 async def mute_member(
     group_id: int,
     user_id: int,
-    duration: int = Query(..., description="Duration in seconds"),
-    reason: str = Query(""),
+    duration: int = Query(3600, description="Duration in seconds"),
+    reason: str = Query("No reason provided"),
+    silent: bool = Query(False),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Mute a member."""
+    """Mute a member using the shared action executor."""
     admin = await check_admin_access(group_id, current_user, db)
     
-    return {"success": True, "action": "mute", "duration": duration}
+    from shared.models import Group
+    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_result.scalar_one_or_none()
+    
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    
+    target_result = await db.execute(select(User).where(User.id == user_id))
+    target_user = target_result.scalar_one_or_none()
+    
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    try:
+        from shared.action_executor import ActionContext, get_action_executor
+        
+        executor = await get_action_executor()
+        
+        ctx = ActionContext(
+            group_id=group_id,
+            actor_id=current_user.id,
+            target_id=user_id,
+            group_telegram_id=group.telegram_id,
+            actor_telegram_id=current_user.telegram_id,
+            target_telegram_id=target_user.telegram_id,
+            action_type="mute",
+            reason=reason,
+            duration_seconds=duration,
+            silent=silent,
+            source="api"
+        )
+        
+        result = await executor.mute(ctx)
+        
+        return {
+            "success": result.success,
+            "action": "mute",
+            "message": result.message,
+            "trust_score_change": (result.trust_score_after or 0) - (result.trust_score_before or 0),
+            "mute_until": result.data.get("mute_until") if result.data else None,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/groups/{group_id}/members/{user_id}/unmute")
+async def unmute_member(
+    group_id: int,
+    user_id: int,
+    reason: str = Query("Unmuted via API"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unmute a member."""
+    admin = await check_admin_access(group_id, current_user, db)
+    
+    from shared.models import Group
+    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_result.scalar_one_or_none()
+    
+    target_result = await db.execute(select(User).where(User.id == user_id))
+    target_user = target_result.scalar_one_or_none()
+    
+    try:
+        from shared.action_executor import ActionContext, get_action_executor
+        
+        executor = await get_action_executor()
+        
+        ctx = ActionContext(
+            group_id=group_id,
+            actor_id=current_user.id,
+            target_id=user_id,
+            group_telegram_id=group.telegram_id if group else 0,
+            actor_telegram_id=current_user.telegram_id,
+            target_telegram_id=target_user.telegram_id if target_user else 0,
+            action_type="unmute",
+            reason=reason,
+            source="api"
+        )
+        
+        result = await executor.unmute(ctx)
+        
+        return {
+            "success": result.success,
+            "action": "unmute",
+            "message": result.message,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/groups/{group_id}/members/{user_id}/ban")
@@ -657,31 +789,161 @@ async def ban_member(
     group_id: int,
     user_id: int,
     duration: Optional[int] = Query(None, description="Duration in seconds, None for permanent"),
-    reason: str = Query(""),
+    reason: str = Query("No reason provided"),
+    silent: bool = Query(False),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Ban a member."""
+    """Ban a member using the shared action executor."""
     admin = await check_admin_access(group_id, current_user, db)
     
     if admin.role not in ("owner", "admin"):
         raise HTTPException(status_code=403, detail="Only admins can ban users")
     
-    return {"success": True, "action": "ban", "duration": duration}
+    from shared.models import Group
+    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_result.scalar_one_or_none()
+    
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    
+    target_result = await db.execute(select(User).where(User.id == user_id))
+    target_user = target_result.scalar_one_or_none()
+    
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    try:
+        from shared.action_executor import ActionContext, get_action_executor
+        
+        executor = await get_action_executor()
+        
+        ctx = ActionContext(
+            group_id=group_id,
+            actor_id=current_user.id,
+            target_id=user_id,
+            group_telegram_id=group.telegram_id,
+            actor_telegram_id=current_user.telegram_id,
+            target_telegram_id=target_user.telegram_id,
+            action_type="ban",
+            reason=reason,
+            duration_seconds=duration,
+            silent=silent,
+            source="api"
+        )
+        
+        result = await executor.ban(ctx)
+        
+        return {
+            "success": result.success,
+            "action": "ban",
+            "message": result.message,
+            "trust_score_change": (result.trust_score_after or 0) - (result.trust_score_before or 0),
+            "ban_until": result.data.get("ban_until") if result.data else None,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/groups/{group_id}/members/{user_id}/unban")
+async def unban_member(
+    group_id: int,
+    user_id: int,
+    reason: str = Query("Unbanned via API"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unban a member."""
+    admin = await check_admin_access(group_id, current_user, db)
+    
+    from shared.models import Group
+    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_result.scalar_one_or_none()
+    
+    target_result = await db.execute(select(User).where(User.id == user_id))
+    target_user = target_result.scalar_one_or_none()
+    
+    try:
+        from shared.action_executor import ActionContext, get_action_executor
+        
+        executor = await get_action_executor()
+        
+        ctx = ActionContext(
+            group_id=group_id,
+            actor_id=current_user.id,
+            target_id=user_id,
+            group_telegram_id=group.telegram_id if group else 0,
+            actor_telegram_id=current_user.telegram_id,
+            target_telegram_id=target_user.telegram_id if target_user else 0,
+            action_type="unban",
+            reason=reason,
+            source="api"
+        )
+        
+        result = await executor.unban(ctx)
+        
+        return {
+            "success": result.success,
+            "action": "unban",
+            "message": result.message,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/groups/{group_id}/members/{user_id}/kick")
 async def kick_member(
     group_id: int,
     user_id: int,
-    reason: str = Query(""),
+    reason: str = Query("No reason provided"),
+    silent: bool = Query(False),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Kick a member."""
+    """Kick a member using the shared action executor."""
     admin = await check_admin_access(group_id, current_user, db)
     
-    return {"success": True, "action": "kick"}
+    from shared.models import Group
+    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_result.scalar_one_or_none()
+    
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    
+    target_result = await db.execute(select(User).where(User.id == user_id))
+    target_user = target_result.scalar_one_or_none()
+    
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    try:
+        from shared.action_executor import ActionContext, get_action_executor
+        
+        executor = await get_action_executor()
+        
+        ctx = ActionContext(
+            group_id=group_id,
+            actor_id=current_user.id,
+            target_id=user_id,
+            group_telegram_id=group.telegram_id,
+            actor_telegram_id=current_user.telegram_id,
+            target_telegram_id=target_user.telegram_id,
+            action_type="kick",
+            reason=reason,
+            silent=silent,
+            source="api"
+        )
+        
+        result = await executor.kick(ctx)
+        
+        return {
+            "success": result.success,
+            "action": "kick",
+            "message": result.message,
+            "trust_score_change": (result.trust_score_after or 0) - (result.trust_score_before or 0),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/groups/{group_id}/members/{user_id}/free")
