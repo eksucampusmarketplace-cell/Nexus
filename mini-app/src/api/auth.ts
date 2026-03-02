@@ -16,8 +16,12 @@ export interface User {
   is_premium: boolean
 }
 
-export const telegramAuth = async (initData: string): Promise<AuthResponse & { user: User }> => {
-  const response = await api.post('/auth/token', { init_data: initData })
+export const telegramAuth = async (initData: string, customBotToken?: string): Promise<AuthResponse & { user: User }> => {
+  const payload: { init_data: string; bot_token?: string } = { init_data: initData }
+  if (customBotToken) {
+    payload.bot_token = customBotToken
+  }
+  const response = await api.post('/auth/token', payload)
   return response.data
 }
 

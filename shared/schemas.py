@@ -610,6 +610,7 @@ class BotTokenResponse(BaseSchema):
 # Auth schemas
 class AuthTokenRequest(BaseSchema):
     init_data: str  # Telegram WebApp initData
+    bot_token: Optional[str] = None  # Optional custom bot token for white-label mode
 
 
 class AuthTokenResponse(BaseSchema):

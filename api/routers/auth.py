@@ -93,7 +93,16 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
         from urllib.parse import unquote
         user_json = unquote(raw_params.get("user", "{}"))
         user_data = json.loads(user_json)
-        return user_data
+
+        # Also return chat info if present
+        result = user_data.copy() if user_data else {}
+        if raw_params.get("chat"):
+            chat_json = unquote(raw_params.get("chat", "{}"))
+            result["chat"] = json.loads(chat_json)
+        if raw_params.get("chat_type"):
+            result["chat_type"] = raw_params.get("chat_type")
+
+        return result
 
     except HTTPException:
         raise
@@ -168,7 +177,8 @@ async def create_token(
     db: AsyncSession = Depends(get_db),
 ):
     """Create access token from Telegram initData."""
-    bot_token = os.getenv("BOT_TOKEN")
+    # Use custom bot token if provided (white-label mode), otherwise use main bot token
+    bot_token = request.bot_token or os.getenv("BOT_TOKEN")
     if not bot_token:
         raise HTTPException(status_code=500, detail="Bot token not configured")
 

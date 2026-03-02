@@ -48,6 +48,16 @@ export default function CustomBotToken() {
     try {
       const data = await getBotToken(parseInt(groupId))
       setBotToken(data)
+
+      // Also load token from localStorage (for authentication purposes)
+      if (!data) {
+        const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
+        if (storedTokens[groupId]) {
+          // Token exists in localStorage but not registered in backend
+          // This can happen if user cleared browser data but localStorage persists
+          console.log('Found token in localStorage but not registered in backend')
+        }
+      }
     } catch (error) {
       setBotToken(null)
     } finally {
@@ -87,6 +97,11 @@ export default function CustomBotToken() {
       setTokenInput('')
       setValidatedBot(null)
       toast.success('Bot token registered successfully!')
+
+      // Store the bot token in localStorage for authentication
+      const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
+      storedTokens[groupId] = tokenInput
+      localStorage.setItem('nexus_custom_bot_tokens', JSON.stringify(storedTokens))
     } catch (error) {
       toast.error('Failed to register token')
     } finally {
@@ -101,6 +116,11 @@ export default function CustomBotToken() {
       setBotToken(null)
       setShowConfirmRevoke(false)
       toast.success('Bot token revoked')
+
+      // Remove the bot token from localStorage
+      const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
+      delete storedTokens[groupId]
+      localStorage.setItem('nexus_custom_bot_tokens', JSON.stringify(storedTokens))
     } catch (error) {
       toast.error('Failed to revoke token')
     }
