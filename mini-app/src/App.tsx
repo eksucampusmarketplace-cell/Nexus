@@ -40,37 +40,56 @@ import FormattingTools from './views/AdminDashboard/FormattingTools'
 import AdvancedSearch from './views/AdminDashboard/AdvancedSearch'
 
 function App() {
-  const { isAuthenticated, isLoading, error, setAuth, setLoading } = useAuthStore()
+  const { isAuthenticated, isLoading, error, setAuth, setLoading, setError } = useAuthStore()
   const { currentGroup, setCurrentGroup } = useGroupStore()
   const [initData, setInitData] = useState<string>('')
-  
+
   useEffect(() => {
     const init = async () => {
       setLoading(true)
-      
+
       // Get Telegram init data
       const tg = (window as any).Telegram?.WebApp
       const initDataRaw = tg?.initData || ''
       setInitData(initDataRaw)
-  
-      if (initDataRaw) {
-        try {
-          // Authenticate with backend
-          const authData = await telegramAuth(initDataRaw)
-          setAuth(authData.access_token, authData.user)
-        } catch (err) {
-          console.error('Auth error:', err)
-        }
+
+      if (!initDataRaw) {
+        // Not running in Telegram context
+        console.log('Not running in Telegram WebApp context')
+        setLoading(false)
+        return
       }
-  
+
+      try {
+        // Authenticate with backend
+        const authData = await telegramAuth(initDataRaw)
+        setAuth(authData.access_token, authData.user)
+      } catch (err: any) {
+        console.error('Auth error:', err)
+        setError(err.response?.data?.detail || 'Authentication failed')
+      }
+
       setLoading(false)
     }
-  
+
     init()
-  }, [])
-  
+  }, [setAuth, setLoading, setError])
+
   if (isLoading) {
     return <Loading />
+  }
+
+  // Show error if authentication failed
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center max-w-md p-6">
+          <h1 className="text-3xl font-bold mb-4 gradient-text">Nexus</h1>
+          <p className="text-red-400 mb-4">{error}</p>
+          <p className="text-dark-400 text-sm">Please try opening the Mini App again from Telegram.</p>
+        </div>
+      </div>
+    )
   }
   
   // Check if opened from a specific group
