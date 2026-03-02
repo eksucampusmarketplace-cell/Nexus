@@ -60,9 +60,20 @@ function App() {
         return
       }
 
+      // Get group ID from start_param to find custom bot token
+      const startParam = tg?.initDataUnsafe?.start_param
+      const groupId = startParam ? parseInt(startParam) : null
+
+      // Try to get custom bot token from localStorage (stored when user registers custom bot)
+      let customBotToken: string | undefined
+      if (groupId) {
+        const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
+        customBotToken = storedTokens[groupId]
+      }
+
       try {
-        // Authenticate with backend
-        const authData = await telegramAuth(initDataRaw)
+        // Authenticate with backend (pass custom bot token if available)
+        const authData = await telegramAuth(initDataRaw, customBotToken)
         setAuth(authData.access_token, authData.user)
       } catch (err: any) {
         console.error('Auth error:', err)
