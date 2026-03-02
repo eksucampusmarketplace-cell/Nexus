@@ -40,6 +40,10 @@ import FormattingTools from './views/AdminDashboard/FormattingTools'
 import AdvancedSearch from './views/AdminDashboard/AdvancedSearch'
 import Graveyard from './views/AdminDashboard/Graveyard'
 
+// New Intelligence Views
+import GroupIntelligence from './views/AdminDashboard/GroupIntelligence'
+import AutomationCenterEnhanced from './views/AdminDashboard/AutomationCenterEnhanced'
+
 function App() {
   const { isAuthenticated, isLoading, error, setAuth, setLoading, setError } = useAuthStore()
   const { currentGroup, setCurrentGroup } = useGroupStore()
@@ -167,6 +171,10 @@ function App() {
         
         {/* Message Graveyard */}
         <Route path="/admin/:groupId/graveyard" element={<Graveyard />} />
+        
+        {/* Group Intelligence */}
+        <Route path="/admin/:groupId/intelligence" element={<GroupIntelligence />} />
+        <Route path="/admin/:groupId/automation-enhanced" element={<AutomationCenterEnhanced />} />
       </Routes>
     </MainLayout>
   )
