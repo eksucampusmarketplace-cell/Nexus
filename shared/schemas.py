@@ -30,6 +30,8 @@ class ActionType(str, Enum):
     RESTRICT = "restrict"
     TRUST = "trust"
     UNTRUST = "untrust"
+    DELETE = "delete"
+    RESTORE = "restore"
 
 
 class ModuleCategory(str, Enum):
@@ -1187,3 +1189,69 @@ class UserSubscriptionResponse(BaseSchema):
     started_at: datetime
     expires_at: Optional[datetime]
     cancelled_at: Optional[datetime]
+
+
+# Deleted Message (Message Graveyard) schemas
+class DeletionReason(str, Enum):
+    WORD_FILTER = "word_filter"
+    FLOOD = "flood"
+    LOCK_VIOLATION = "lock_violation"
+    NSFW = "nsfw"
+    SPAM = "spam"
+    MANUAL = "manual"
+    AI_MODERATION = "ai_moderation"
+    OTHER = "other"
+
+
+class DeletedMessageBase(BaseSchema):
+    message_id: int
+    user_id: int
+    content: Optional[str] = None
+    content_type: str = "text"
+    deletion_reason: str
+    trigger_word: Optional[str] = None
+    lock_type: Optional[str] = None
+    ai_confidence: Optional[float] = None
+
+
+class DeletedMessageCreate(DeletedMessageBase):
+    media_file_id: Optional[str] = None
+    media_group_id: Optional[str] = None
+    extra_data: Optional[Dict[str, Any]] = None
+
+
+class DeletedMessageResponse(DeletedMessageBase):
+    id: int
+    group_id: int
+    deleted_by: int
+    deleted_at: datetime
+    can_restore: bool
+    restored_at: Optional[datetime] = None
+    restored_by: Optional[int] = None
+    restored_message_id: Optional[int] = None
+    
+    # User details (joined)
+    user_username: Optional[str] = None
+    user_first_name: Optional[str] = None
+    user_last_name: Optional[str] = None
+    
+    # Deleter details (joined)
+    deleter_username: Optional[str] = None
+    deleter_first_name: Optional[str] = None
+
+
+class DeletedMessageListResponse(BaseSchema):
+    items: List[DeletedMessageResponse]
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+
+
+class DeletedMessageStats(BaseSchema):
+    total_deleted: int
+    by_reason: Dict[str, int]
+    by_content_type: Dict[str, int]
+    recent_deletions_24h: int
+    restored_count: int
+    restoration_rate: float

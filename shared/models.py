@@ -1938,3 +1938,47 @@ class MemberActivitySnapshot(Base):
     # Engagement
     active_minutes: Mapped[int] = mapped_column(Integer, default=0)
     peak_hour: Mapped[Optional[int]] = mapped_column(Integer)
+
+
+class DeletedMessage(Base):
+    """Message Graveyard - Archive of all deleted messages."""
+
+    __tablename__ = "deleted_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    
+    # Original message info
+    message_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    
+    # Message content (stored for review/restore)
+    content: Mapped[Optional[str]] = mapped_column(Text)
+    content_type: Mapped[str] = mapped_column(String(50), default="text")  # text, photo, video, etc.
+    media_file_id: Mapped[Optional[str]] = mapped_column(String(255))  # Telegram file ID if media
+    media_group_id: Mapped[Optional[str]] = mapped_column(String(255))  # For albums
+    
+    # Deletion details
+    deletion_reason: Mapped[str] = mapped_column(String(50), index=True)  # word_filter, flood, lock_violation, nsfw, etc.
+    deleted_by: Mapped[int] = mapped_column(ForeignKey("users.id"))  # User or bot
+    deleted_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), index=True)
+    
+    # Restoration tracking
+    can_restore: Mapped[bool] = mapped_column(Boolean, default=True)
+    restored_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    restored_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+    restored_message_id: Mapped[Optional[int]] = mapped_column(BigInteger)  # New message ID after restore
+    
+    # Context
+    trigger_word: Mapped[Optional[str]] = mapped_column(String(255))  # If word filter
+    lock_type: Mapped[Optional[str]] = mapped_column(String(50))  # If lock violation
+    ai_confidence: Mapped[Optional[float]] = mapped_column(Integer)  # If AI-moderated
+    
+    # Additional metadata
+    extra_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, name="metadata")
+    
+    # Relationships
+    group: Mapped["Group"] = relationship("Group")
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    deleter: Mapped["User"] = relationship("User", foreign_keys=[deleted_by])
+    restorer: Mapped[Optional["User"]] = relationship("User", foreign_keys=[restored_by])

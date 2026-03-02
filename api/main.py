@@ -214,6 +214,7 @@ from api.routers import (
     commands,
     economy,
     federations,
+    graveyard,
     groups,
     members,
     messages,
@@ -237,6 +238,7 @@ app.include_router(toggles.router, prefix="/api/v1", tags=["toggles"])
 app.include_router(webhooks.router, prefix="/webhook", tags=["webhooks"])
 app.include_router(messages.router, prefix="/api/v1", tags=["Message Templates"])
 app.include_router(commands.router, prefix="/api/v1", tags=["Commands"])
+app.include_router(graveyard.router, prefix="/api/v1", tags=["Message Graveyard"])
 
 
 @app.get("/", include_in_schema=False)
