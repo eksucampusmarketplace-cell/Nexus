@@ -6,8 +6,8 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useWebSocket, NexusEvent, EventTypes } from '../hooks/useWebSocket';
-import { api } from '../api/client';
+import { useWebSocket, NexusEvent, EventTypes } from '../../hooks/useWebSocket';
+import api from '../../api/client';
 
 interface Message {
   id: number;
@@ -82,7 +82,7 @@ export default function LiveFeed({
     telegramId,
     username,
     autoConnect: true,
-    onEvent: (event) => {
+    onEvent: (event: NexusEvent) => {
       // Handle new messages
       if (event.event_type === EventTypes.MESSAGE_NEW) {
         handleNewMessage(event);
