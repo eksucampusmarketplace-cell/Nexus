@@ -1,0 +1,12 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "Nexus is a comprehensive, AI-native Telegram bot platform that consolidates features from major Telegram bots into a unified system with 27+ modules and 230+ commands.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
