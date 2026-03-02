@@ -1413,3 +1413,298 @@ class UserSubscription(Base):
     payment_method: Mapped[Optional[str]] = mapped_column(String(50))
     last_payment_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     next_payment_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+
+# ============ ADVANCED FEATURES MODELS ============
+
+
+class Thread(Base):
+    """Conversation threads for message threading system."""
+
+    __tablename__ = "threads"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    thread_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    root_message_id: Mapped[int] = mapped_column(BigInteger)
+    
+    # Thread properties
+    thread_type: Mapped[str] = mapped_column(String(20), default="general")
+    status: Mapped[str] = mapped_column(String(20), default="active")
+    title: Mapped[Optional[str]] = mapped_column(String(200))
+    topic: Mapped[Optional[str]] = mapped_column(String(200))
+    
+    # Statistics
+    message_count: Mapped[int] = mapped_column(Integer, default=0)
+    unique_participants: Mapped[int] = mapped_column(Integer, default=0)
+    reply_count: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    last_activity: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now()
+    )
+    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    
+    # Summary
+    summary_text: Mapped[Optional[str]] = mapped_column(Text)
+    summary_keywords: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    sentiment_overall: Mapped[str] = mapped_column(String(20), default="neutral")
+    
+    # Moderation
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_announcement: Mapped[bool] = mapped_column(Boolean, default=False)
+    locked_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+    locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    lock_reason: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class ThreadParticipant(Base):
+    """Participants in threads."""
+
+    __tablename__ = "thread_participants"
+    __table_args__ = (
+        UniqueConstraint("thread_id", "user_id", name="uq_thread_user"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    thread_id: Mapped[str] = mapped_column(String(100), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    
+    # Participation stats
+    message_count: Mapped[int] = mapped_column(Integer, default=0)
+    join_time: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    last_active: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class NotificationRuleModel(Base):
+    """Notification rules for smart notification system."""
+
+    __tablename__ = "notification_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rule_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    
+    # Configuration
+    action_categories: Mapped[List[str]] = mapped_column(JSON)
+    specific_actions: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    min_severity: Mapped[int] = mapped_column(Integer, default=1)
+    
+    # Delivery
+    priority: Mapped[str] = mapped_column(String(20), default="normal")
+    channels: Mapped[List[str]] = mapped_column(JSON)
+    target_roles: Mapped[List[str]] = mapped_column(JSON)
+    specific_users: Mapped[Optional[List[int]]] = mapped_column(JSON)
+    
+    # Settings
+    digest_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    digest_schedule: Mapped[str] = mapped_column(String(20), default="hourly")
+    quiet_hours_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    quiet_hours_start: Mapped[Optional[str]] = mapped_column(String(5))
+    quiet_hours_end: Mapped[Optional[str]] = mapped_column(String(5))
+    
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now()
+    )
+
+
+class AdvancedPollModel(Base):
+    """Extended polls with vote actions and analytics."""
+
+    __tablename__ = "advanced_polls"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    poll_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    
+    # Content
+    question: Mapped[str] = mapped_column(String(500))
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    options: Mapped[List[Dict[str, Any]]] = mapped_column(JSON)
+    poll_type: Mapped[str] = mapped_column(String(20), default="single")
+    
+    # Configuration
+    is_anonymous: Mapped[bool] = mapped_column(Boolean, default=True)
+    allows_multiple: Mapped[bool] = mapped_column(Boolean, default=False)
+    max_choices: Mapped[int] = mapped_column(Integer, default=1)
+    visibility: Mapped[str] = mapped_column(String(20), default="always")
+    allow_change_vote: Mapped[bool] = mapped_column(Boolean, default=True)
+    weight_by_role: Mapped[bool] = mapped_column(Boolean, default=False)
+    weight_by_reputation: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Scheduling
+    status: Mapped[str] = mapped_column(String(20), default="active")
+    opens_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    closes_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    
+    # Recurring
+    is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
+    recurrence_pattern: Mapped[Optional[str]] = mapped_column(String(100))
+    parent_poll_id: Mapped[Optional[str]] = mapped_column(String(100))
+    
+    # Vote actions
+    vote_actions: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON)
+    
+    # Results
+    final_results: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    winning_option_id: Mapped[Optional[str]] = mapped_column(String(100))
+    
+    # Analytics
+    total_votes: Mapped[int] = mapped_column(Integer, default=0)
+    unique_voters: Mapped[int] = mapped_column(Integer, default=0)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+
+class AdvancedPollVote(Base):
+    """Votes in advanced polls."""
+
+    __tablename__ = "advanced_poll_votes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    poll_id: Mapped[str] = mapped_column(String(100), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    
+    # Vote details
+    option_ids: Mapped[List[str]] = mapped_column(JSON)
+    weight: Mapped[float] = mapped_column(default=1.0)
+    
+    voted_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    changed_vote: Mapped[bool] = mapped_column(Boolean, default=False)
+    previous_vote: Mapped[Optional[List[str]]] = mapped_column(JSON)
+
+
+class ContentModerationRecord(Base):
+    """Records from content moderation pipeline."""
+
+    __tablename__ = "content_moderation_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    record_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    message_id: Mapped[int] = mapped_column(BigInteger)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    
+    # Content
+    content_type: Mapped[str] = mapped_column(String(20))
+    text_preview: Mapped[Optional[str]] = mapped_column(String(500))
+    
+    # Analysis
+    features: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    analysis_results: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON)
+    
+    # Decision
+    decision: Mapped[str] = mapped_column(String(20))
+    risk_level: Mapped[str] = mapped_column(String(20))
+    confidence: Mapped[float] = mapped_column(default=0.0)
+    primary_reason: Mapped[str] = mapped_column(Text)
+    
+    # Status
+    status: Mapped[str] = mapped_column(String(20), default="completed")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    processing_time_ms: Mapped[float] = mapped_column(default=0.0)
+    
+    # Moderation
+    moderated_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+    moderated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    
+    # Appeal
+    appeal_status: Mapped[Optional[str]] = mapped_column(String(20))
+    appeal_reason: Mapped[Optional[str]] = mapped_column(Text)
+    appeal_resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    appeal_resolved_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+
+
+class FlowInstanceModel(Base):
+    """Conversation flow instances."""
+
+    __tablename__ = "flow_instances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    instance_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    flow_id: Mapped[str] = mapped_column(String(50), index=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    
+    # State
+    current_step_id: Mapped[Optional[str]] = mapped_column(String(50))
+    step_history: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    results: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    
+    # Status
+    status: Mapped[str] = mapped_column(String(20), default="active")
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    last_activity: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now()
+    )
+    
+    # Error tracking
+    error_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[Optional[str]] = mapped_column(Text)
+    cancel_reason: Mapped[Optional[str]] = mapped_column(String(100))
+
+
+class KeyboardStateModel(Base):
+    """Persistent keyboard state sessions."""
+
+    __tablename__ = "keyboard_states"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    state_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    message_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    
+    # State
+    flow_type: Mapped[str] = mapped_column(String(50))
+    current_step: Mapped[str] = mapped_column(String(50))
+    data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    history: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON)
+    
+    # Status
+    status: Mapped[str] = mapped_column(String(20), default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+
+class NotificationLog(Base):
+    """Log of sent notifications."""
+
+    __tablename__ = "notification_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    notification_id: Mapped[str] = mapped_column(String(100), index=True)
+    rule_id: Mapped[Optional[str]] = mapped_column(String(100))
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), index=True)
+    
+    # Content
+    title: Mapped[str] = mapped_column(String(200))
+    message: Mapped[str] = mapped_column(Text)
+    priority: Mapped[str] = mapped_column(String(20))
+    category: Mapped[str] = mapped_column(String(30))
+    action: Mapped[str] = mapped_column(String(50))
+    
+    # Context
+    actor_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+    target_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+    context_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    
+    # Delivery
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    delivered_to: Mapped[Optional[Dict[str, str]]] = mapped_column(JSON)
+    failed_channels: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    
+    # Digest
+    is_digest: Mapped[bool] = mapped_column(Boolean, default=False)
+    digest_count: Mapped[int] = mapped_column(Integer, default=1)
