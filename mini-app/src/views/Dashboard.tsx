@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -21,22 +21,38 @@ type ViewMode = 'groups' | 'manage' | 'quick-actions'
 export default function Dashboard() {
   const navigate = useNavigate()
   const { groups, setGroups, isLoading, setLoading } = useGroupStore()
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasStoredToken } = useAuthStore()
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('groups')
+  const hasLoadedGroups = useRef(false)
 
   useEffect(() => {
     const loadGroups = async () => {
-      if (!isAuthenticated) {
-        console.log('Skipping group load - not authenticated')
+      // Wait a bit for zustand persist to hydrate
+      // Check if we have a stored token that indicates user was previously authenticated
+      const wasAuthenticated = hasStoredToken()
+      
+      if (!isAuthenticated && !wasAuthenticated) {
+        console.log('Skipping group load - not authenticated and no stored token')
         return
       }
+      
+      // Prevent double-loading
+      if (hasLoadedGroups.current) {
+        console.log('Skipping group load - already loaded')
+        return
+      }
+      
+      console.log('Loading groups...', { isAuthenticated, wasAuthenticated })
+      hasLoadedGroups.current = true
       setLoading(true)
       try {
         const data = await listGroups()
         setGroups(data)
       } catch (error) {
+        console.error('Failed to load groups:', error)
         toast.error('Failed to load groups')
+        hasLoadedGroups.current = false // Allow retry on error
       } finally {
         setLoading(false)
       }
