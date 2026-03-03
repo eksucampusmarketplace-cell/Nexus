@@ -52,6 +52,13 @@ api.interceptors.request.use((config) => {
     console.log(`[API Client] Adding token to ${config.url}:`, token.substring(0, 20) + '...')
   } else {
     console.log(`[API Client] No token found for request to ${config.url}`)
+    // Debug: Check if we're in Telegram context
+    const tg = (window as any).Telegram?.WebApp
+    if (!tg) {
+      console.log('[API Client] Not running in Telegram WebApp context')
+    } else if (!tg.initData) {
+      console.log('[API Client] Telegram WebApp exists but no initData')
+    }
   }
   return config
 })
@@ -76,14 +83,27 @@ api.interceptors.response.use(
       console.log('[API Client] 401 received, clearing token')
       localStorage.removeItem('nexus_token')
       
-      // Delay reload slightly to prevent rapid loops
-      setTimeout(() => {
-        // Only reload if not already on auth page to avoid loops
-        if (!window.location.pathname.includes('/auth')) {
-          console.log('[API Client] Reloading page due to 401')
-          window.location.reload()
-        }
-      }, 500)
+      // Check if we have valid Telegram initData - if not, we can't re-auth
+      const tg = (window as any).Telegram?.WebApp
+      const hasValidInitData = tg?.initData && tg?.initData.length > 0
+      
+      if (!hasValidInitData) {
+        // Not in Telegram context - can't re-authenticate, show error
+        console.log('[API Client] Not in Telegram context, cannot re-authenticate')
+        // Dispatch a custom event so the app can show appropriate error
+        window.dispatchEvent(new CustomEvent('nexus:authFailed', { 
+          detail: { reason: 'not_in_telegram' } 
+        }))
+      } else {
+        // Delay reload slightly to prevent rapid loops
+        setTimeout(() => {
+          // Only reload if not already on auth page to avoid loops
+          if (!window.location.pathname.includes('/auth')) {
+            console.log('[API Client] Reloading page due to 401')
+            window.location.reload()
+          }
+        }, 500)
+      }
     }
     return Promise.reject(error)
   }
