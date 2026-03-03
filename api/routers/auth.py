@@ -146,11 +146,9 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
             logger.warning(f"Init data expired: auth_date={auth_timestamp}, current={current_time}")
             return False
 
-    # Parse all key=value pairs and URL-decode the values
-    # The hash is computed using decoded values, not raw URL-encoded ones
-    parsed = {}
-    for key, value in raw_params.items():
-        parsed[key] = urllib.parse.unquote(value)
+    # Use raw values as-is (URL-encoded) for hash computation
+    # Telegram signs the URL-encoded init data, not decoded values
+    parsed = dict(raw_params)
 
     # Extract and remove the hash — it must NOT be part of the check string
     parsed.pop("hash", None)
@@ -159,7 +157,7 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     parsed.pop("signature", None)
 
     # Build the data_check_string: sorted keys alphabetically, joined by \n
-    # Use the URL-decoded values as per Telegram's algorithm
+    # Use the raw URL-encoded values as per Telegram's algorithm
     data_check_string = "\n".join(
         f"{k}={v}" for k, v in sorted(parsed.items())
     )
@@ -183,7 +181,7 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     if not hmac.compare_digest(computed_hash, received_hash):
         logger.warning(f"Hash mismatch: computed={computed_hash}, received={received_hash}")
         logger.info(f"Data check string (full): {data_check_string!r}")
-        logger.info("Parsed params keys and values (URL-decoded):")
+        logger.info("Parsed params keys and values (URL-encoded):")
         for key in sorted(parsed.keys()):
             val = parsed[key]
             logger.info(f"  {key}={val!r}")
