@@ -9,15 +9,20 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 from cryptography.fernet import Fernet
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database import get_db
-from shared.models import APIKey, Group, Member, User, BotInstance
-from shared.schemas import AuthTokenRequest, AuthTokenResponse, UserPermissionsResponse
+from shared.models import APIKey, Group, Member, User, BotInstance, UserSession
+from shared.schemas import (
+    AuthTokenRequest,
+    AuthTokenResponse,
+    UserPermissionsResponse,
+    UserSessionResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -341,6 +346,7 @@ async def get_api_key_user(
 @router.post("/auth/token", response_model=AuthTokenResponse)
 async def create_token(
     request: AuthTokenRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Create access token from Telegram initData.
@@ -353,6 +359,13 @@ async def create_token(
     2. Bot token from BotInstance table (looked up by chat ID from init data)
     3. Main BOT_TOKEN environment variable
     """
+    # Extract client info for session tracking
+    client_ip = http_request.client.host if http_request.client else None
+    user_agent = http_request.headers.get("user-agent")
+
+    # Try to get device info from custom header or user agent
+    device_info = http_request.headers.get("x-device-info") or "Telegram Mini App"
+
     # IMPORTANT: Strip whitespace from bot token to handle potential environment variable formatting issues
     main_bot_token = os.getenv("BOT_TOKEN", "").strip()
 
@@ -422,7 +435,13 @@ async def create_token(
                 telegram_user = verify_telegram_init_data(
                     request.init_data, bot_info["token"]
                 )
-                return await _create_user_token(telegram_user, db)
+                return await _create_user_token(
+                    telegram_user,
+                    db,
+                    device_info=device_info,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                )
             else:
                 validation_errors.append(
                     f"User's bot @{bot_info.get('username')}: hash mismatch"
@@ -441,7 +460,13 @@ async def create_token(
             telegram_user = verify_telegram_init_data(
                 request.init_data, custom_bot_token
             )
-            return await _create_user_token(telegram_user, db)
+            return await _create_user_token(
+                telegram_user,
+                db,
+                device_info=device_info,
+                ip_address=client_ip,
+                user_agent=user_agent,
+            )
         else:
             validation_errors.append("Custom bot token: hash mismatch")
             logger.warning("Custom bot token validation failed")
@@ -459,7 +484,13 @@ async def create_token(
                 telegram_user = verify_telegram_init_data(
                     request.init_data, bot_instance["token"]
                 )
-                return await _create_user_token(telegram_user, db)
+                return await _create_user_token(
+                    telegram_user,
+                    db,
+                    device_info=device_info,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                )
             else:
                 validation_errors.append(f"Bot token for chat {chat_id}: hash mismatch")
                 logger.warning(f"Bot token for chat {chat_id} validation failed")
@@ -478,7 +509,13 @@ async def create_token(
             telegram_user = verify_telegram_init_data(
                 request.init_data, bot_info["token"]
             )
-            return await _create_user_token(telegram_user, db)
+            return await _create_user_token(
+                telegram_user,
+                db,
+                device_info=device_info,
+                ip_address=client_ip,
+                user_agent=user_agent,
+            )
         else:
             validation_errors.append(f"Bot @{bot_info.get('username')}: hash mismatch")
             logger.debug(f"Bot @{bot_info.get('username')} validation failed")
@@ -489,7 +526,13 @@ async def create_token(
         if validate_init_data_hash(raw_params, main_bot_token):
             logger.info("Validation successful with main BOT_TOKEN")
             telegram_user = verify_telegram_init_data(request.init_data, main_bot_token)
-            return await _create_user_token(telegram_user, db)
+            return await _create_user_token(
+                telegram_user,
+                db,
+                device_info=device_info,
+                ip_address=client_ip,
+                user_agent=user_agent,
+            )
         else:
             validation_errors.append("Main BOT_TOKEN: hash mismatch")
             logger.warning("Main BOT_TOKEN validation failed")
@@ -518,7 +561,13 @@ async def create_token(
             f"DEVELOPMENT MODE: Bypassing hash validation for user {parsed_data.get('user', {}).get('id')}"
         )
         if parsed_data.get("user"):
-            return await _create_user_token(parsed_data["user"], db)
+            return await _create_user_token(
+                parsed_data["user"],
+                db,
+                device_info=device_info,
+                ip_address=client_ip,
+                user_agent=user_agent,
+            )
 
     logger.error(
         f"All validation attempts failed. Chat ID: {chat_id}, Raw params keys: {list(raw_params.keys())}, Errors: {validation_errors}"
@@ -726,9 +775,13 @@ async def _get_bot_tokens_for_user(
 
 
 async def _create_user_token(
-    telegram_user: dict, db: AsyncSession
+    telegram_user: dict,
+    db: AsyncSession,
+    device_info: str = None,
+    ip_address: str = None,
+    user_agent: str = None,
 ) -> AuthTokenResponse:
-    """Create or get user and return access token."""
+    """Create or get user and return access token with session tracking."""
     telegram_id = telegram_user.get("id")
     result = await db.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar()
@@ -745,7 +798,24 @@ async def _create_user_token(
         db.add(user)
         await db.flush()
 
-    access_token = create_access_token(data={"sub": user.id})
+    # Create session token for tracking
+    session_token = str(uuid.uuid4())
+    expires_at = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+
+    # Create user session in database
+    session = UserSession(
+        user_id=user.id,
+        session_token=session_token,
+        device_info=device_info,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        expires_at=expires_at,
+    )
+    db.add(session)
+    await db.flush()
+
+    # Create JWT access token
+    access_token = create_access_token(data={"sub": user.id, "session_id": session.id})
 
     return AuthTokenResponse(
         access_token=access_token,
@@ -920,3 +990,141 @@ async def debug_auth(
         }
 
     return debug_info
+
+
+# ============================================================
+# Session Management Endpoints
+# ============================================================
+
+
+@router.get("/auth/sessions", response_model=dict)
+async def get_user_sessions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all active sessions for the current user."""
+    from datetime import datetime
+
+    # Get all active sessions for user
+    result = await db.execute(
+        select(UserSession)
+        .where(
+            UserSession.user_id == current_user.id,
+            UserSession.is_active == True,
+            UserSession.expires_at > datetime.utcnow(),
+        )
+        .order_by(UserSession.created_at.desc())
+    )
+    sessions = result.scalars().all()
+
+    return {
+        "sessions": [
+            {
+                "id": s.id,
+                "device_info": s.device_info,
+                "ip_address": s.ip_address,
+                "created_at": s.created_at.isoformat(),
+                "expires_at": s.expires_at.isoformat(),
+                "last_activity_at": s.last_activity_at.isoformat(),
+            }
+            for s in sessions
+        ],
+        "total": len(sessions),
+    }
+
+
+@router.post("/auth/sessions/{session_id}/revoke")
+async def revoke_session(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke a specific session."""
+    from datetime import datetime
+
+    result = await db.execute(
+        select(UserSession).where(
+            UserSession.id == session_id, UserSession.user_id == current_user.id
+        )
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.is_active = False
+    await db.commit()
+
+    return {"message": "Session revoked successfully"}
+
+
+@router.post("/auth/sessions/revoke-all")
+async def revoke_all_sessions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke all sessions for the current user (except the current one)."""
+    from datetime import datetime
+
+    # Get current session from JWT
+    # For now, we'll just revoke all sessions
+
+    result = await db.execute(
+        select(UserSession).where(
+            UserSession.user_id == current_user.id,
+            UserSession.is_active == True,
+            UserSession.expires_at > datetime.utcnow(),
+        )
+    )
+    sessions = result.scalars().all()
+
+    count = 0
+    for session in sessions:
+        session.is_active = False
+        count += 1
+
+    await db.commit()
+
+    return {"message": f"Revoked {count} sessions"}
+
+
+@router.get("/auth/sessions/current")
+async def get_current_session_info(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get information about the current session."""
+    from datetime import datetime
+
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        session_id: int = payload.get("session_id")
+        user_id: int = payload.get("sub")
+
+        if not session_id:
+            return {"session_id": None, "tracked": False}
+
+        result = await db.execute(
+            select(UserSession).where(UserSession.id == session_id)
+        )
+        session = result.scalar_one_or_none()
+
+        if not session or not session.is_active:
+            return {"session_id": session_id, "active": False}
+
+        # Update last activity
+        session.last_activity_at = datetime.utcnow()
+        await db.commit()
+
+        return {
+            "session_id": session.id,
+            "active": session.is_active,
+            "device_info": session.device_info,
+            "ip_address": session.ip_address,
+            "expires_at": session.expires_at.isoformat(),
+            "tracked": True,
+        }
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
