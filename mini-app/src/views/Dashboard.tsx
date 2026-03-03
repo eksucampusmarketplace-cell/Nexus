@@ -9,6 +9,7 @@ import {
 import { useGroupStore } from '../stores/groupStore'
 import { useAuthStore } from '../stores/authStore'
 import { listGroups } from '../api/groups'
+import { getAddToGroupUrl } from '../api/config'
 import Card from '../components/UI/Card'
 import Loading from '../components/UI/Loading'
 import ModuleToggleManager from '../components/Modules/ModuleToggleManager'
@@ -96,8 +97,9 @@ export default function Dashboard() {
           </div>
           
           <button
-            onClick={() => {
-              window.open(`https://t.me/nexusbot?startgroup=true`, '_blank')
+            onClick={async () => {
+              const url = await getAddToGroupUrl()
+              window.open(url, '_blank')
             }}
             className="btn-primary whitespace-nowrap flex-shrink-0 self-start sm:self-auto"
           >
@@ -278,8 +280,9 @@ export default function Dashboard() {
             Add the Nexus bot to your Telegram group to get started with advanced management features.
           </p>
           <button
-            onClick={() => {
-              window.open(`https://t.me/nexusbot?startgroup=true`, '_blank')
+            onClick={async () => {
+              const url = await getAddToGroupUrl()
+              window.open(url, '_blank')
             }}
             className="btn-primary"
           >

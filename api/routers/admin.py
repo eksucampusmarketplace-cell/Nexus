@@ -2,7 +2,6 @@
 
 import os
 from datetime import datetime, timedelta
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -171,6 +170,19 @@ async def get_system_config(
             "custom_bots_enabled": True,
             "webhooks_enabled": bool(os.getenv("WEBHOOK_URL")),
         }
+    }
+
+
+@router.get("/config")
+async def get_public_config():
+    """Get public configuration for the Mini App.
+    
+    This endpoint returns safe, non-sensitive configuration
+    values that the Mini App needs to function properly.
+    """
+    return {
+        "bot_username": os.getenv("BOT_USERNAME", "nexusbot"),
+        "environment": os.getenv("ENVIRONMENT", "production"),
     }
 
 

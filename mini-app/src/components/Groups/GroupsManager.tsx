@@ -6,6 +6,7 @@ import {
   MessageSquare, Clock, Activity, RefreshCw
 } from 'lucide-react'
 import api from '../../api/client'
+import { getAddToGroupUrl } from '../../api/config'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -223,7 +224,10 @@ export default function GroupsManager({ onSelectGroup, selectedGroupId }: Groups
           </p>
           {!searchQuery && !filterRole && (
             <button
-              onClick={() => window.open(`https://t.me/nexusbot?startgroup=true`, '_blank')}
+              onClick={async () => {
+                const url = await getAddToGroupUrl()
+                window.open(url, '_blank')
+              }}
               className="mt-4 px-4 py-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-sm transition-colors inline-flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
