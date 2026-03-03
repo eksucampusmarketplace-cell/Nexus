@@ -438,6 +438,25 @@ async def create_token(
                 validation_errors.append(f"Bot token for chat {chat_id}: hash mismatch")
                 logger.warning(f"Bot token for chat {chat_id} validation failed")
 
+    # Try 2b: Try ALL bot instances from database (for private chat opens where no chat_id available)
+    # This allows white-label/clone bots to authenticate from private chats
+    all_bot_tokens = await _get_all_bot_tokens(db)
+    for bot_info in all_bot_tokens:
+        logger.info(
+            f"Trying bot instance @{bot_info.get('username', 'unknown')} (group_id: {bot_info.get('group_id')})"
+        )
+        if validate_init_data_hash(raw_params, bot_info["token"]):
+            logger.info(
+                f"Validation successful with bot @{bot_info.get('username')} (group_id: {bot_info.get('group_id')})"
+            )
+            telegram_user = verify_telegram_init_data(
+                request.init_data, bot_info["token"]
+            )
+            return await _create_user_token(telegram_user, db)
+        else:
+            validation_errors.append(f"Bot @{bot_info.get('username')}: hash mismatch")
+            logger.debug(f"Bot @{bot_info.get('username')} validation failed")
+
     # Try 3: Main bot token from environment
     if main_bot_token:
         logger.info("Trying main BOT_TOKEN from environment")
@@ -532,6 +551,62 @@ async def _get_bot_token_for_chat(
     except Exception as e:
         logger.error(f"Error getting bot token for chat {telegram_chat_id}: {e}")
         return None
+
+
+async def _get_all_bot_tokens(db: AsyncSession) -> list[dict]:
+    """
+    Get all active bot tokens from the BotInstance table.
+
+    This is used when the Mini App is opened from a private chat (no chat_id),
+    so we can try all registered bots to find the one that signed the initData.
+
+    Returns list of dicts with 'token', 'username', 'bot_id', and 'group_id'.
+    """
+    try:
+        # Get all active bot instances
+        bot_result = await db.execute(
+            select(BotInstance).where(BotInstance.is_active == True)
+        )
+        bot_instances = bot_result.scalars().all()
+
+        if not bot_instances:
+            logger.debug("No active bot instances found")
+            return []
+
+        # Decrypt each token
+        encryption_key = os.getenv("ENCRYPTION_KEY")
+        if not encryption_key:
+            logger.warning("ENCRYPTION_KEY not set, cannot decrypt bot tokens")
+            return []
+
+        fernet = Fernet(encryption_key.encode())
+
+        bots = []
+        for bot_instance in bot_instances:
+            try:
+                decrypted_token = fernet.decrypt(
+                    bot_instance.token_hash.encode()
+                ).decode()
+                bots.append(
+                    {
+                        "token": decrypted_token,
+                        "username": bot_instance.bot_username,
+                        "bot_id": bot_instance.bot_telegram_id,
+                        "group_id": bot_instance.group_id,
+                    }
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to decrypt bot token for {bot_instance.bot_username}: {e}"
+                )
+                continue
+
+        logger.info(f"Found {len(bots)} active bot instances to try")
+        return bots
+
+    except Exception as e:
+        logger.error(f"Error getting all bot tokens: {e}")
+        return []
 
 
 async def _create_user_token(
@@ -688,7 +763,7 @@ async def debug_auth(
     # Try validation with each token
     if request.bot_token:
         debug_info["validation_results"]["custom_token"] = {
-            "valid": validate_init_data_hash(raw_params, request.bot_token),
+            "valid": validate_init_data_hash(raw_params, request.bot_token.strip()),
             "token_length": len(request.bot_token),
         }
 
@@ -701,6 +776,27 @@ async def debug_auth(
             }
         else:
             debug_info["validation_results"]["db_token"] = {"found": False}
+
+    # Try all bot instances from database (for private chat scenarios)
+    all_bots = await _get_all_bot_tokens(db)
+    if all_bots:
+        debug_info["validation_results"]["all_bot_instances"] = {
+            "count": len(all_bots),
+            "results": [],
+        }
+        for bot in all_bots:
+            is_valid = validate_init_data_hash(raw_params, bot["token"])
+            debug_info["validation_results"]["all_bot_instances"]["results"].append(
+                {
+                    "username": bot.get("username"),
+                    "group_id": bot.get("group_id"),
+                    "valid": is_valid,
+                }
+            )
+            if is_valid:
+                debug_info["validation_results"]["all_bot_instances"]["matched"] = (
+                    bot.get("username")
+                )
 
     if main_bot_token:
         debug_info["validation_results"]["main_token"] = {
