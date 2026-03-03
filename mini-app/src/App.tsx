@@ -82,16 +82,20 @@ function App() {
       }
 
       // Get group ID from start_param or chat
+      // IMPORTANT: Keep as string to avoid JavaScript number precision loss
+      // Telegram IDs can exceed Number.MAX_SAFE_INTEGER (2^53-1)
       const startParam = tg?.initDataUnsafe?.start_param
       const chatId = tg?.initDataUnsafe?.chat?.id
-      const groupId = startParam ? parseInt(startParam) : (chatId || null)
+      const groupIdStr = startParam ? String(startParam) : (chatId ? String(chatId) : null)
+      // Also keep numeric version for navigation/routing that expects numbers
+      const groupIdNum = groupIdStr ? Number(groupIdStr) : null
 
       // Try to get custom bot token from localStorage (optional - backend handles lookup now)
       let customBotToken: string | undefined
-      if (groupId) {
+      if (groupIdStr) {
         try {
           const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
-          customBotToken = storedTokens[groupId]
+          customBotToken = storedTokens[groupIdStr]
         } catch (e) {
           console.warn('Failed to read custom bot tokens from localStorage:', e)
         }
@@ -147,9 +151,10 @@ function App() {
   }
   
   // Check if opened from a specific group
+  // Keep as string to avoid JavaScript number precision loss with large Telegram IDs
   const tg = (window as any).Telegram?.WebApp
   const startParam = tg?.initDataUnsafe?.start_param
-  const groupId = startParam ? parseInt(startParam) : null
+  const groupId = startParam ? String(startParam) : null
   
   return (
     <MainLayout>
