@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from aiogram.types import Message
 from pydantic import BaseModel
+from sqlalchemy import text
 
 from bot.core.context import NexusContext
 from bot.core.module_base import CommandDef, ModuleCategory, NexusModule
@@ -14,6 +15,7 @@ from bot.core.module_base import CommandDef, ModuleCategory, NexusModule
 
 class IdentityConfig(BaseModel):
     """Configuration for identity module."""
+
     xp_per_message: int = 1
     xp_per_reaction: int = 2
     xp_per_voice_minute: int = 5
@@ -28,6 +30,7 @@ class IdentityConfig(BaseModel):
 @dataclass
 class UserStats:
     """User statistics."""
+
     messages_today: int
     reactions_today: int
     streak_days: int
@@ -40,7 +43,9 @@ class IdentityModule(NexusModule):
     name = "identity"
     version = "1.0.0"
     author = "Nexus Team"
-    description = "Complete identity system with XP, levels, achievements, badges, and profiles"
+    description = (
+        "Complete identity system with XP, levels, achievements, badges, and profiles"
+    )
     category = ModuleCategory.COMMUNITY
 
     config_schema = IdentityConfig
@@ -48,26 +53,106 @@ class IdentityModule(NexusModule):
 
     # Achievement definitions
     achievements = {
-        "first_message": {"name": "First Steps", "emoji": "👋", "description": "Sent your first message"},
-        "messages_100": {"name": "Chatty", "emoji": "💬", "description": "Sent 100 messages"},
-        "messages_500": {"name": "Talkative", "emoji": "🗣️", "description": "Sent 500 messages"},
-        "messages_1000": {"name": "Conversationalist", "emoji": "📢", "description": "Sent 1000 messages"},
-        "messages_5000": {"name": "Message Master", "emoji": "🎤", "description": "Sent 5000 messages"},
-        "level_5": {"name": "Rising Star", "emoji": "⭐", "description": "Reached level 5"},
-        "level_10": {"name": "Celebrity", "emoji": "🌟", "description": "Reached level 10"},
-        "level_25": {"name": "Superstar", "emoji": "💫", "description": "Reached level 25"},
-        "level_50": {"name": "Legend", "emoji": "🏆", "description": "Reached level 50"},
-        "streak_7": {"name": "Week Warrior", "emoji": "🔥", "description": "7-day streak"},
-        "streak_30": {"name": "Monthly Champion", "emoji": "🔥🔥", "description": "30-day streak"},
-        "reactions_100": {"name": "Reactive", "emoji": "❤️", "description": "Received 100 reactions"},
-        "reactions_500": {"name": "Reaction Master", "emoji": "💕", "description": "Received 500 reactions"},
-        "coins_1000": {"name": "Coin Collector", "emoji": "💰", "description": "Earned 1000 coins"},
-        "coins_10000": {"name": "Coin Tycoon", "emoji": "💎", "description": "Earned 10000 coins"},
-        "top_10": {"name": "Top 10", "emoji": "🏅", "description": "Reached top 10 in leaderboard"},
-        "mod_actions_10": {"name": "Guardian", "emoji": "🛡️", "description": "Performed 10 moderation actions"},
-        "mod_actions_100": {"name": "Peacekeeper", "emoji": "🕊️", "description": "Performed 100 moderation actions"},
-        "early_member": {"name": "OG Member", "emoji": "👴", "description": "Joined within first week"},
-        "year_active": {"name": "Veteran", "emoji": "🎖️", "description": "Active for 1 year"},
+        "first_message": {
+            "name": "First Steps",
+            "emoji": "👋",
+            "description": "Sent your first message",
+        },
+        "messages_100": {
+            "name": "Chatty",
+            "emoji": "💬",
+            "description": "Sent 100 messages",
+        },
+        "messages_500": {
+            "name": "Talkative",
+            "emoji": "🗣️",
+            "description": "Sent 500 messages",
+        },
+        "messages_1000": {
+            "name": "Conversationalist",
+            "emoji": "📢",
+            "description": "Sent 1000 messages",
+        },
+        "messages_5000": {
+            "name": "Message Master",
+            "emoji": "🎤",
+            "description": "Sent 5000 messages",
+        },
+        "level_5": {
+            "name": "Rising Star",
+            "emoji": "⭐",
+            "description": "Reached level 5",
+        },
+        "level_10": {
+            "name": "Celebrity",
+            "emoji": "🌟",
+            "description": "Reached level 10",
+        },
+        "level_25": {
+            "name": "Superstar",
+            "emoji": "💫",
+            "description": "Reached level 25",
+        },
+        "level_50": {
+            "name": "Legend",
+            "emoji": "🏆",
+            "description": "Reached level 50",
+        },
+        "streak_7": {
+            "name": "Week Warrior",
+            "emoji": "🔥",
+            "description": "7-day streak",
+        },
+        "streak_30": {
+            "name": "Monthly Champion",
+            "emoji": "🔥🔥",
+            "description": "30-day streak",
+        },
+        "reactions_100": {
+            "name": "Reactive",
+            "emoji": "❤️",
+            "description": "Received 100 reactions",
+        },
+        "reactions_500": {
+            "name": "Reaction Master",
+            "emoji": "💕",
+            "description": "Received 500 reactions",
+        },
+        "coins_1000": {
+            "name": "Coin Collector",
+            "emoji": "💰",
+            "description": "Earned 1000 coins",
+        },
+        "coins_10000": {
+            "name": "Coin Tycoon",
+            "emoji": "💎",
+            "description": "Earned 10000 coins",
+        },
+        "top_10": {
+            "name": "Top 10",
+            "emoji": "🏅",
+            "description": "Reached top 10 in leaderboard",
+        },
+        "mod_actions_10": {
+            "name": "Guardian",
+            "emoji": "🛡️",
+            "description": "Performed 10 moderation actions",
+        },
+        "mod_actions_100": {
+            "name": "Peacekeeper",
+            "emoji": "🕊️",
+            "description": "Performed 100 moderation actions",
+        },
+        "early_member": {
+            "name": "OG Member",
+            "emoji": "👴",
+            "description": "Joined within first week",
+        },
+        "year_active": {
+            "name": "Veteran",
+            "emoji": "🎖️",
+            "description": "Active for 1 year",
+        },
     }
 
     commands = [
@@ -180,8 +265,10 @@ class IdentityModule(NexusModule):
         """Check for early member achievement."""
         # Get group creation date
         from shared.models import Group
+
         result = ctx.db.execute(
-            f"SELECT created_at FROM groups WHERE id = {ctx.group.id} LIMIT 1"
+            text("SELECT created_at FROM groups WHERE id = :group_id LIMIT 1"),
+            {"group_id": ctx.group.id},
         )
         row = result.fetchone()
 
@@ -209,6 +296,7 @@ class IdentityModule(NexusModule):
 
         # Get current XP
         from shared.models import MemberProfile
+
         current_xp = ctx.user.xp
         current_level = self._calculate_level(current_xp, config)
 
@@ -238,7 +326,10 @@ class IdentityModule(NexusModule):
         from shared.models import MemberBadge
 
         result = ctx.db.execute(
-            f"SELECT id FROM member_badges WHERE member_id = {user.member_id} AND badge_slug = '{achievement_id}' LIMIT 1"
+            text(
+                "SELECT id FROM member_badges WHERE member_id = :member_id AND badge_slug = :badge_slug LIMIT 1"
+            ),
+            {"member_id": user.member_id, "badge_slug": achievement_id},
         )
         row = result.fetchone()
 
@@ -292,7 +383,10 @@ class IdentityModule(NexusModule):
         elif category == "coins":
             # Get coin count
             result = ctx.db.execute(
-                f"SELECT balance FROM wallets WHERE user_id = {ctx.user.user_id} AND group_id = {ctx.group.id} LIMIT 1"
+                text(
+                    "SELECT balance FROM wallets WHERE user_id = :user_id AND group_id = :group_id LIMIT 1"
+                ),
+                {"user_id": ctx.user.user_id, "group_id": ctx.group.id},
             )
             row = result.fetchone()
 
@@ -320,7 +414,8 @@ class IdentityModule(NexusModule):
         elif last_active and (today - last_active.date()) > timedelta(days=1):
             # Missed a day, reset streak
             ctx.db.execute(
-                f"UPDATE members SET streak_days = 0 WHERE id = {ctx.user.member_id}"
+                text("UPDATE members SET streak_days = 0 WHERE id = :member_id"),
+                {"member_id": ctx.user.member_id},
             )
             ctx.db.commit()
         else:
@@ -354,7 +449,10 @@ class IdentityModule(NexusModule):
         from shared.models import User, MemberProfile, MemberBadge, Wallet
 
         user_result = ctx.db.execute(
-            f"SELECT id, username, first_name, last_name, created_at FROM users WHERE telegram_id = {user_id} LIMIT 1"
+            text(
+                "SELECT id, username, first_name, last_name, created_at FROM users WHERE telegram_id = :telegram_id LIMIT 1"
+            ),
+            {"telegram_id": user_id},
         )
         user_row = user_result.fetchone()
 
@@ -370,13 +468,14 @@ class IdentityModule(NexusModule):
 
         # Get member data
         member_result = ctx.db.execute(
-            f"""
+            text("""
             SELECT m.*, u.telegram_id
             FROM members m
             JOIN users u ON m.user_id = u.id
-            WHERE m.group_id = {ctx.group.id} AND m.user_id = {user_db_id}
+            WHERE m.group_id = :group_id AND m.user_id = :user_id
             LIMIT 1
-            """
+            """),
+            {"group_id": ctx.group.id, "user_id": user_db_id},
         )
         member_row = member_result.fetchone()
 
@@ -386,19 +485,23 @@ class IdentityModule(NexusModule):
 
         # Get badges
         badge_result = ctx.db.execute(
-            f"""
+            text("""
             SELECT badge_slug, earned_at
             FROM member_badges
-            WHERE member_id = {member_row[0]}
+            WHERE member_id = :member_id
             ORDER BY earned_at DESC
             LIMIT 20
-            """
+            """),
+            {"member_id": member_row[0]},
         )
         badges = badge_result.fetchall()
 
         # Get wallet
         wallet_result = ctx.db.execute(
-            f"SELECT balance, bank_balance FROM wallets WHERE user_id = {user_db_id} AND group_id = {ctx.group.id} LIMIT 1"
+            text(
+                "SELECT balance, bank_balance FROM wallets WHERE user_id = :user_id AND group_id = :group_id LIMIT 1"
+            ),
+            {"user_id": user_db_id, "group_id": ctx.group.id},
         )
         wallet_row = wallet_result.fetchone()
 
@@ -450,8 +553,12 @@ class IdentityModule(NexusModule):
             if username:
                 if ctx.db:
                     from shared.models import User
+
                     result = ctx.db.execute(
-                        f"SELECT telegram_id FROM users WHERE username = '{username}' LIMIT 1"
+                        text(
+                            "SELECT telegram_id FROM users WHERE username = :username LIMIT 1"
+                        ),
+                        {"username": username},
                     )
                     row = result.fetchone()
                     if row:
@@ -471,13 +578,18 @@ class IdentityModule(NexusModule):
 
         # Get user's XP
         from shared.models import MemberProfile
+
         user_result = ctx.db.execute(
-            f"SELECT id FROM users WHERE telegram_id = {user_id} LIMIT 1"
+            text("SELECT id FROM users WHERE telegram_id = :telegram_id LIMIT 1"),
+            {"telegram_id": user_id},
         )
         user_db_id = user_result.scalar()
 
         member_result = ctx.db.execute(
-            f"SELECT xp FROM members WHERE user_id = {user_db_id} AND group_id = {ctx.group.id} LIMIT 1"
+            text(
+                "SELECT xp FROM members WHERE user_id = :user_id AND group_id = :group_id LIMIT 1"
+            ),
+            {"user_id": user_db_id, "group_id": ctx.group.id},
         )
         member_row = member_result.fetchone()
 
@@ -490,18 +602,20 @@ class IdentityModule(NexusModule):
 
         # Calculate rank
         result = ctx.db.execute(
-            f"""
+            text("""
             SELECT COUNT(*) + 1
             FROM members
-            WHERE group_id = {ctx.group.id}
-              AND xp > {xp}
-            """
+            WHERE group_id = :group_id
+              AND xp > :xp
+            """),
+            {"group_id": ctx.group.id, "xp": xp},
         )
         rank = result.scalar()
 
         # Get total members
         result = ctx.db.execute(
-            f"SELECT COUNT(*) FROM members WHERE group_id = {ctx.group.id}"
+            text("SELECT COUNT(*) FROM members WHERE group_id = :group_id"),
+            {"group_id": ctx.group.id},
         )
         total = result.scalar()
 
@@ -521,7 +635,7 @@ class IdentityModule(NexusModule):
         level = self._calculate_level(ctx.user.xp, config)
         xp_needed = self._calculate_xp_needed(level + 1, config) - ctx.user.xp
 
-        progress = (ctx.user.xp % 100)
+        progress = ctx.user.xp % 100
 
         text = f"⭐ {ctx.user.mention}'s Level\n\n"
         text += f"Level: {level}/{config.max_level}\n"
@@ -549,7 +663,9 @@ class IdentityModule(NexusModule):
         # Calculate XP to next milestones
         for milestone in [5, 10, 25, 50]:
             if level < milestone:
-                xp_to_milestone = self._calculate_xp_needed(milestone, config) - ctx.user.xp
+                xp_to_milestone = (
+                    self._calculate_xp_needed(milestone, config) - ctx.user.xp
+                )
                 text += f"\nTo level {milestone}: +{xp_to_milestone:,} XP"
 
         await ctx.reply(text)
@@ -580,13 +696,14 @@ class IdentityModule(NexusModule):
         from shared.models import MemberBadge
 
         result = ctx.db.execute(
-            f"""
+            text("""
             SELECT badge_slug, earned_at
             FROM member_badges
-            WHERE member_id = {ctx.user.member_id}
+            WHERE member_id = :member_id
             ORDER BY earned_at DESC
             LIMIT 50
-            """
+            """),
+            {"member_id": ctx.user.member_id},
         )
         badges = result.fetchall()
 
@@ -600,7 +717,7 @@ class IdentityModule(NexusModule):
         for badge_slug, earned_at in badges:
             achievement = self.achievements.get(badge_slug)
             if achievement:
-                date_str = earned_at.strftime('%Y-%m-%d')
+                date_str = earned_at.strftime("%Y-%m-%d")
                 text += f"{achievement['emoji']} {achievement['name']}\n"
                 text += f"   {achievement['description']}\n"
                 text += f"   📅 {date_str}\n\n"
@@ -613,7 +730,8 @@ class IdentityModule(NexusModule):
         from shared.models import MemberBadge
 
         result = ctx.db.execute(
-            f"SELECT badge_slug FROM member_badges WHERE member_id = {ctx.user.member_id}"
+            text("SELECT badge_slug FROM member_badges WHERE member_id = :member_id"),
+            {"member_id": ctx.user.member_id},
         )
         earned = set(row[0] for row in result.fetchall())
 
@@ -671,10 +789,7 @@ class IdentityModule(NexusModule):
         reason = " ".join(args[2:]) if len(args) > 2 else "admin award"
         await ctx.award_xp(user_db_id, amount, reason)
 
-        await ctx.reply(
-            f"✅ Awarded {amount:,} XP to user\n"
-            f"Reason: {reason}"
-        )
+        await ctx.reply(f"✅ Awarded {amount:,} XP to user\n" f"Reason: {reason}")
 
     async def cmd_awardachievement(self, ctx: NexusContext):
         """Award achievement to user (admin only)."""
@@ -686,7 +801,9 @@ class IdentityModule(NexusModule):
 
         if len(args) < 2:
             await ctx.reply("❌ Usage: /awardachievement <@user> <achievement_id>")
-            await ctx.reply("Available achievements: " + ", ".join(self.achievements.keys()))
+            await ctx.reply(
+                "Available achievements: " + ", ".join(self.achievements.keys())
+            )
             return
 
         user_id = self._get_user_id(ctx, args)
@@ -697,7 +814,10 @@ class IdentityModule(NexusModule):
         achievement_id = args[1]
 
         if achievement_id not in self.achievements:
-            await ctx.reply(f"❌ Invalid achievement. Available: " + ", ".join(self.achievements.keys()))
+            await ctx.reply(
+                f"❌ Invalid achievement. Available: "
+                + ", ".join(self.achievements.keys())
+            )
             return
 
         # Get target user
@@ -716,6 +836,7 @@ class IdentityModule(NexusModule):
 
         # Create a fake user object
         from bot.core.context import MemberProfile
+
         target = MemberProfile(
             id=0,
             user_id=user_db_id,
