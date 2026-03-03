@@ -124,8 +124,13 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     """
     Validate the hash of Telegram WebApp initData.
 
+    Uses the official Telegram algorithm:
+    https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+
     Returns True if valid, False otherwise.
     """
+    import urllib.parse
+
     received_hash = raw_params.get("hash", "")
     if not received_hash:
         logger.warning("Missing hash in init data")
@@ -141,36 +146,47 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
             logger.warning(f"Init data expired: auth_date={auth_timestamp}, current={current_time}")
             return False
 
-    # Create data_check_string using RAW (URL-encoded) values
-    # Sort alphabetically by key, exclude hash
-    data_check_items = []
-    for key in sorted(raw_params.keys()):
-        if key != "hash":
-            data_check_items.append(f"{key}={raw_params[key]}")
-    data_check_string = "\n".join(data_check_items)
+    # Parse all key=value pairs and URL-decode the values
+    # The hash is computed using decoded values, not raw URL-encoded ones
+    parsed = {}
+    for key, value in raw_params.items():
+        parsed[key] = urllib.parse.unquote(value)
 
-    # Compute secret key
+    # Extract and remove the hash — it must NOT be part of the check string
+    parsed.pop("hash", None)
+
+    # Also remove 'signature' if present — it's not part of the legacy hash check
+    parsed.pop("signature", None)
+
+    # Build the data_check_string: sorted keys alphabetically, joined by \n
+    # Use the URL-decoded values as per Telegram's algorithm
+    data_check_string = "\n".join(
+        f"{k}={v}" for k, v in sorted(parsed.items())
+    )
+
+    # Step 1: Derive secret key using "WebAppData" as the HMAC key
+    # CRITICAL: key=b"WebAppData", msg=bot_token — NOT the other way around
     secret_key = hmac.new(
         key=b"WebAppData",
-        msg=bot_token.encode(),
+        msg=bot_token.encode("utf-8"),
         digestmod=hashlib.sha256,
     ).digest()
 
-    # Compute hash
+    # Step 2: Compute the final hash using the derived secret key
     computed_hash = hmac.new(
         key=secret_key,
-        msg=data_check_string.encode(),
+        msg=data_check_string.encode("utf-8"),
         digestmod=hashlib.sha256,
     ).hexdigest()
 
-    if computed_hash != received_hash:
+    # Use constant-time comparison to prevent timing attacks
+    if not hmac.compare_digest(computed_hash, received_hash):
         logger.warning(f"Hash mismatch: computed={computed_hash}, received={received_hash}")
         logger.info(f"Data check string (full): {data_check_string!r}")
-        logger.info("Raw params keys and values:")
-        for key in sorted(raw_params.keys()):
-            if key != "hash":
-                val = raw_params[key]
-                logger.info(f"  {key}={val!r}")
+        logger.info("Parsed params keys and values (URL-decoded):")
+        for key in sorted(parsed.keys()):
+            val = parsed[key]
+            logger.info(f"  {key}={val!r}")
         logger.info(f"Bot token: {bot_token!r}")
         logger.info(f"Secret key (hex): {secret_key.hex()}")
         return False
