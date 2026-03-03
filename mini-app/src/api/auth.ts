@@ -16,6 +16,9 @@ export interface User {
   last_name: string | null
   language_code: string
   is_premium: boolean
+  is_owner: boolean
+  is_support: boolean
+  is_staff: boolean
 }
 
 export const telegramAuth = async (initData: string, customBotToken?: string): Promise<AuthResponse & { user: User }> => {
