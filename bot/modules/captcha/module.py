@@ -12,6 +12,7 @@ from bot.core.module_base import CommandDef, ModuleCategory, NexusModule, EventT
 
 class CaptchaConfig(BaseModel):
     """Configuration for captcha module."""
+
     captcha_enabled: bool = True
     captcha_type: str = "button"
     timeout_seconds: int = 90
@@ -125,7 +126,9 @@ class CaptchaModule(NexusModule):
             challenge = self._generate_challenge(ctx, config)
 
             # Send CAPTCHA message
-            keyboard = self._build_captcha_keyboard(member.id, challenge["correct_answer"])
+            keyboard = self._build_captcha_keyboard(
+                member.id, challenge["correct_answer"]
+            )
 
             custom_text = config.get("custom_text", "")
             if custom_text:
@@ -166,6 +169,13 @@ class CaptchaModule(NexusModule):
             user_id = int(parts[1])
             answer = parts[2]
 
+            # Check if the user clicking is the one who needs verification
+            if ctx.callback_query.from_user.id != user_id:
+                await ctx.callback_query.answer(
+                    "❌ This verification is not for you!", show_alert=True
+                )
+                return True
+
             # Check if user has pending challenge
             if user_id not in self._challenges:
                 return False
@@ -175,13 +185,19 @@ class CaptchaModule(NexusModule):
 
             if answer == correct_answer:
                 # Correct! Unmute and delete CAPTCHA message
-                await self._handle_success(ctx, user_id, ctx.callback_query.message.message_id)
+                await self._handle_success(
+                    ctx, user_id, ctx.callback_query.message.message_id
+                )
                 del self._challenges[user_id]
 
-                await ctx.callback_query.answer("✅ Verification successful!", show_alert=True)
+                await ctx.callback_query.answer(
+                    "✅ Verification successful!", show_alert=True
+                )
             else:
                 # Wrong! Show alert
-                await ctx.callback_query.answer("❌ Wrong answer! Try again.", show_alert=True)
+                await ctx.callback_query.answer(
+                    "❌ Wrong answer! Try again.", show_alert=True
+                )
 
         except Exception:
             return False
@@ -246,19 +262,31 @@ class CaptchaModule(NexusModule):
             "question": question_text,
         }
 
-    def _build_captcha_keyboard(self, user_id: int, answer: str) -> InlineKeyboardMarkup:
+    def _build_captcha_keyboard(
+        self, user_id: int, answer: str
+    ) -> InlineKeyboardMarkup:
         """Build CAPTCHA verification keyboard."""
         if answer in ["verify", "Verify ✅"]:
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="Verify ✅", callback_data=f"captcha_{user_id}_verify")]
+                    [
+                        InlineKeyboardButton(
+                            text="Verify ✅", callback_data=f"captcha_{user_id}_verify"
+                        )
+                    ]
                 ]
             )
         elif answer in ["👍", "❤️", "😂", "👎", "😍", "😘", "🎉", "🔥", "💯"]:
             buttons = []
             row = []
-            for i, emoji in enumerate(["👍", "❤️", "😂", "👎", "😍", "😘", "🎉", "🔥", "💯"]):
-                row.append(InlineKeyboardButton(text=emoji, callback_data=f"captcha_{user_id}_{emoji}"))
+            for i, emoji in enumerate(
+                ["👍", "❤️", "😂", "👎", "😍", "😘", "🎉", "🔥", "💯"]
+            ):
+                row.append(
+                    InlineKeyboardButton(
+                        text=emoji, callback_data=f"captcha_{user_id}_{emoji}"
+                    )
+                )
                 if len(row) == 5:
                     buttons.append(row)
                     row = []
@@ -270,13 +298,22 @@ class CaptchaModule(NexusModule):
             buttons = []
             if len(answer) <= 4:
                 for digit in answer:
-                    buttons.append(InlineKeyboardButton(text=digit, callback_data=f"captcha_{user_id}_{digit}"))
+                    buttons.append(
+                        InlineKeyboardButton(
+                            text=digit, callback_data=f"captcha_{user_id}_{digit}"
+                        )
+                    )
                 keyboard = InlineKeyboardMarkup(inline_keyboard=[buttons])
             else:
                 # For larger numbers, just ask to type
                 keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [InlineKeyboardButton(text="I'm ready", callback_data=f"captcha_{user_id}_ready")]
+                        [
+                            InlineKeyboardButton(
+                                text="I'm ready",
+                                callback_data=f"captcha_{user_id}_ready",
+                            )
+                        ]
                     ]
                 )
 
@@ -329,7 +366,7 @@ class CaptchaModule(NexusModule):
                 await ctx.bot.ban_chat_member(
                     chat_id=ctx.group.telegram_id,
                     user_id=user_id,
-                revoke_messages=True,
+                    revoke_messages=True,
                 )
             except Exception:
                 pass
@@ -367,7 +404,9 @@ class CaptchaModule(NexusModule):
         captcha_type = args[0].lower()
 
         if captcha_type not in self.CAPTCHA_TYPES:
-            await ctx.reply(f"❌ Invalid type. Available: {', '.join(self.CAPTCHA_TYPES)}")
+            await ctx.reply(
+                f"❌ Invalid type. Available: {', '.join(self.CAPTCHA_TYPES)}"
+            )
             return
 
         # Update config
