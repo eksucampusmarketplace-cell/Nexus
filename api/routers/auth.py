@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 from cryptography.fernet import Fernet
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -24,20 +24,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 security = HTTPBearer()
 
-# In production, ENCRYPTION_KEY must be explicitly set
+# JWT Secret Configuration
+# In production, JWT_SECRET must be explicitly set for security
+_jwt_secret = os.getenv("JWT_SECRET")
 _env_encryption_key = os.getenv("ENCRYPTION_KEY")
 _environment = os.getenv("ENVIRONMENT", "development")
 
-if _env_encryption_key:
+if _jwt_secret:
+    # Prefer dedicated JWT_SECRET if available
+    SECRET_KEY = _jwt_secret
+elif _env_encryption_key:
+    # Fall back to ENCRYPTION_KEY for backward compatibility
     SECRET_KEY = _env_encryption_key
 elif _environment == "production":
     raise RuntimeError(
-        "ENCRYPTION_KEY environment variable is required in production. "
-        "Please set a secure encryption key (min 32 characters)."
+        "JWT_SECRET environment variable is required in production. "
+        "Please set a secure JWT secret (min 32 characters). "
+        "You can also use ENCRYPTION_KEY for backward compatibility."
     )
 else:
     # Development fallback - DO NOT use in production
-    SECRET_KEY = "your-secret-key-min-32-characters-long"
+    SECRET_KEY = "dev-jwt-secret-do-not-use-in-production"
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
@@ -159,7 +166,7 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     if computed_hash != received_hash:
         logger.warning(f"Hash mismatch: computed={computed_hash[:16]}..., received={received_hash[:16]}...")
         logger.info(f"Data check string (first 500 chars): {data_check_string[:500]!r}")
-        logger.info(f"Raw params keys and sample values:")
+        logger.info("Raw params keys and sample values:")
         for key in sorted(raw_params.keys()):
             if key != "hash":
                 val = raw_params[key]

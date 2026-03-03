@@ -42,6 +42,10 @@ services:
         value: https://nexus-4uxn.onrender.com/mini-app
       - key: ENCRYPTION_KEY
         generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: BOT_USERNAME
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       - key: ENVIRONMENT
@@ -52,6 +56,8 @@ services:
         value: "5"
       - key: DATABASE_MAX_OVERFLOW
         value: "5"
+      - key: BOT_USERNAME
+        sync: false
 
   - type: web
     name: nexus-bot
@@ -97,6 +103,8 @@ services:
       - key: ENCRYPTION_KEY
         sync: false
       - key: OPENAI_API_KEY
+        sync: false
+      - key: BOT_USERNAME
         sync: false
       - key: ENVIRONMENT
         value: production
@@ -148,7 +156,11 @@ services:
         sync: false
       - key: ENCRYPTION_KEY
         sync: false
+      - key: JWT_SECRET
+        sync: false
       - key: OPENAI_API_KEY
+        sync: false
+      - key: BOT_USERNAME
         sync: false
       - key: ENVIRONMENT
         value: production
@@ -196,7 +208,11 @@ services:
         sync: false
       - key: ENCRYPTION_KEY
         sync: false
+      - key: JWT_SECRET
+        sync: false
       - key: OPENAI_API_KEY
+        sync: false
+      - key: BOT_USERNAME
         sync: false
       - key: ENVIRONMENT
         value: production
