@@ -403,7 +403,33 @@ async def create_token(
     # Collect error messages for debugging
     validation_errors = []
 
-    # Try 1: Custom bot token from request (localStorage)
+    # Try 1: Get user from initData, then find bots based on user's group memberships
+    # This is the database-driven approach - no localStorage needed
+    telegram_user_data = parsed_data.get("user", {})
+    telegram_user_id = telegram_user_data.get("id")
+
+    if telegram_user_id:
+        # Get all bot tokens for groups where this user is a member
+        user_bot_tokens = await _get_bot_tokens_for_user(db, telegram_user_id)
+        for bot_info in user_bot_tokens:
+            logger.info(
+                f"Trying bot @{bot_info.get('username')} from user membership (group_id: {bot_info.get('group_id')})"
+            )
+            if validate_init_data_hash(raw_params, bot_info["token"]):
+                logger.info(
+                    f"Validation successful with user's bot @{bot_info.get('username')}"
+                )
+                telegram_user = verify_telegram_init_data(
+                    request.init_data, bot_info["token"]
+                )
+                return await _create_user_token(telegram_user, db)
+            else:
+                validation_errors.append(
+                    f"User's bot @{bot_info.get('username')}: hash mismatch"
+                )
+                logger.debug(f"Bot @{bot_info.get('username')} validation failed")
+
+    # Try 2: Custom bot token from request (fallback - deprecated, prefer database)
     # Strip whitespace from custom bot token as well
     custom_bot_token = request.bot_token.strip() if request.bot_token else None
     if custom_bot_token:
@@ -606,6 +632,96 @@ async def _get_all_bot_tokens(db: AsyncSession) -> list[dict]:
 
     except Exception as e:
         logger.error(f"Error getting all bot tokens: {e}")
+        return []
+
+
+async def _get_bot_tokens_for_user(
+    db: AsyncSession, telegram_user_id: int
+) -> list[dict]:
+    """
+    Get bot tokens for groups where the user is a member.
+
+    This is the database-driven approach - the bot knows which groups
+    the user belongs to and can find the right bot tokens automatically.
+    No localStorage needed!
+
+    Args:
+        db: Database session
+        telegram_user_id: The Telegram user ID from initData
+
+    Returns list of dicts with 'token', 'username', 'bot_id', and 'group_id'.
+    """
+    try:
+        # First, find the user by telegram_id
+        user_result = await db.execute(
+            select(User).where(User.telegram_id == telegram_user_id)
+        )
+        user = user_result.scalar_one_or_none()
+
+        if not user:
+            logger.debug(f"No user found with telegram_id={telegram_user_id}")
+            return []
+
+        # Get all groups where user is a member
+        member_result = await db.execute(
+            select(Member).where(Member.user_id == user.id)
+        )
+        members = member_result.scalars().all()
+
+        if not members:
+            logger.debug(f"User {telegram_user_id} is not a member of any groups")
+            return []
+
+        group_ids = [m.group_id for m in members]
+        logger.info(
+            f"User {telegram_user_id} is member of {len(group_ids)} groups: {group_ids}"
+        )
+
+        # Get all BotInstances for those groups
+        bot_result = await db.execute(
+            select(BotInstance).where(
+                BotInstance.group_id.in_(group_ids), BotInstance.is_active == True
+            )
+        )
+        bot_instances = bot_result.scalars().all()
+
+        if not bot_instances:
+            logger.debug(f"No active bot instances found for user's groups")
+            return []
+
+        # Decrypt each token
+        encryption_key = os.getenv("ENCRYPTION_KEY")
+        if not encryption_key:
+            logger.warning("ENCRYPTION_KEY not set, cannot decrypt bot tokens")
+            return []
+
+        fernet = Fernet(encryption_key.encode())
+
+        bots = []
+        for bot_instance in bot_instances:
+            try:
+                decrypted_token = fernet.decrypt(
+                    bot_instance.token_hash.encode()
+                ).decode()
+                bots.append(
+                    {
+                        "token": decrypted_token,
+                        "username": bot_instance.bot_username,
+                        "bot_id": bot_instance.bot_telegram_id,
+                        "group_id": bot_instance.group_id,
+                    }
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to decrypt bot token for {bot_instance.bot_username}: {e}"
+                )
+                continue
+
+        logger.info(f"Found {len(bots)} bot instances for user {telegram_user_id}")
+        return bots
+
+    except Exception as e:
+        logger.error(f"Error getting bot tokens for user {telegram_user_id}: {e}")
         return []
 
 

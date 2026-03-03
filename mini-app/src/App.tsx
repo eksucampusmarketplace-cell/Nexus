@@ -91,26 +91,18 @@ function App() {
       const groupIdStr = startParam ? String(startParam) : (chatId ? String(chatId) : null)
       const telegramChatId = groupIdStr ? Number(groupIdStr) : null
 
-      // Try to get custom bot token from localStorage (optional - backend handles lookup now)
-      let customBotToken: string | undefined
-      if (groupIdStr) {
-        try {
-          const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
-          customBotToken = storedTokens[groupIdStr]
-        } catch (e) {
-          console.warn('Failed to read custom bot tokens from localStorage:', e)
-        }
-      }
+      // No more localStorage! Backend handles bot token lookup based on user membership
+      // The bot knows which groups the user is in and finds the right token automatically
 
       try {
         // Authenticate with backend
-        // Backend now handles bot token lookup automatically
+        // Backend finds bots based on user's group memberships (database-driven)
         console.log('[App] Starting authentication...')
-        const authData = await telegramAuth(initDataRaw, customBotToken)
+        console.log('[App] Backend will find bots based on your group memberships')
+        const authData = await telegramAuth(initDataRaw)
         console.log('[App] Authentication successful, setting auth state')
-        // Token is stored in localStorage by setAuth before state update
         setAuth(authData.access_token, authData.user)
-        console.log('[App] Auth state set, token stored in localStorage')
+        console.log('[App] Auth state set')
 
         // If we have a Telegram Chat ID, resolve it to Database Group ID
         if (telegramChatId) {
