@@ -7,7 +7,6 @@ import logging
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
-from urllib.parse import parse_qsl
 
 from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -58,41 +57,60 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 def parse_init_data(init_data: str) -> Tuple[dict, dict, str]:
     """
-    Parse Telegram WebApp initData without validation.
+    Parse Telegram WebApp initData.
+
+    CRITICAL: We must preserve the ORIGINAL URL-encoded values for hash validation.
+    Telegram computes the hash using the raw initData string values, NOT URL-decoded ones.
+    
+    Example: If user="John%20Doe" in initData, Telegram uses "John%20Doe" for hash,
+    but parse_qsl would decode it to "John Doe", causing hash mismatch.
 
     Returns:
-        Tuple of (raw_params, parsed_data, received_hash)
+        Tuple of (raw_params_encoded, parsed_data, received_hash)
     """
-    raw_params = dict(parse_qsl(init_data, keep_blank_values=True))
+    # Split manually to preserve URL-encoded values for hash computation
+    # This is critical - Telegram uses the original URL-encoded values for hash
+    raw_params_encoded = {}
+    for pair in init_data.split('&'):
+        if '=' in pair:
+            key, value = pair.split('=', 1)
+            raw_params_encoded[key] = value
+        elif pair:
+            raw_params_encoded[pair] = ""
 
-    received_hash = raw_params.get("hash", "")
+    received_hash = raw_params_encoded.get("hash", "")
 
     parsed_data = {}
 
-    user_raw = raw_params.get("user", "")
+    # For user and chat, we need to URL-decode the JSON before parsing
+    user_raw = raw_params_encoded.get("user", "")
     if user_raw:
         try:
-            parsed_data["user"] = json.loads(user_raw)
-        except json.JSONDecodeError as e:
+            import urllib.parse
+            decoded_user = urllib.parse.unquote(user_raw)
+            parsed_data["user"] = json.loads(decoded_user)
+        except (json.JSONDecodeError, Exception) as e:
             logger.warning(f"Failed to parse user JSON: {e}, raw value: {user_raw[:100]!r}")
 
-    chat_raw = raw_params.get("chat", "")
+    chat_raw = raw_params_encoded.get("chat", "")
     if chat_raw:
         try:
-            parsed_data["chat"] = json.loads(chat_raw)
-        except json.JSONDecodeError as e:
+            import urllib.parse
+            decoded_chat = urllib.parse.unquote(chat_raw)
+            parsed_data["chat"] = json.loads(decoded_chat)
+        except (json.JSONDecodeError, Exception) as e:
             logger.warning(f"Failed to parse chat JSON: {e}, raw value: {chat_raw[:100]!r}")
 
-    if raw_params.get("chat_type"):
-        parsed_data["chat_type"] = raw_params.get("chat_type")
+    if raw_params_encoded.get("chat_type"):
+        parsed_data["chat_type"] = raw_params_encoded.get("chat_type")
 
-    if raw_params.get("start_param"):
-        parsed_data["start_param"] = raw_params.get("start_param")
+    if raw_params_encoded.get("start_param"):
+        parsed_data["start_param"] = raw_params_encoded.get("start_param")
 
-    if raw_params.get("auth_date"):
-        parsed_data["auth_date"] = raw_params.get("auth_date")
+    if raw_params_encoded.get("auth_date"):
+        parsed_data["auth_date"] = raw_params_encoded.get("auth_date")
 
-    return raw_params, parsed_data, received_hash
+    return raw_params_encoded, parsed_data, received_hash
 
 
 def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
@@ -140,8 +158,13 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
 
     if computed_hash != received_hash:
         logger.warning(f"Hash mismatch: computed={computed_hash[:16]}..., received={received_hash[:16]}...")
-        logger.debug(f"Data check string (first 200 chars): {data_check_string[:200]!r}")
-        logger.debug(f"Bot token (first 20 chars): {bot_token[:20]!r}...")
+        logger.info(f"Data check string (first 500 chars): {data_check_string[:500]!r}")
+        logger.info(f"Raw params keys and sample values:")
+        for key in sorted(raw_params.keys()):
+            if key != "hash":
+                val = raw_params[key]
+                logger.info(f"  {key}={val[:100]!r}{'...' if len(val) > 100 else ''}")
+        logger.info(f"Bot token (first 20 chars): {bot_token[:20]!r}...")
         return False
 
     return True
