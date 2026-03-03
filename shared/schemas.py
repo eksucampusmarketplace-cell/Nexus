@@ -48,7 +48,6 @@ class ModuleCategory(str, Enum):
 # Base schemas
 class BaseSchema(BaseModel):
     """Base schema with common configuration."""
-
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -74,32 +73,6 @@ class UserCreate(UserBase):
 
 class UserResponse(UserBase, TimestampMixin):
     id: int
-
-
-# Session schemas
-class UserSessionBase(BaseSchema):
-    device_info: Optional[str] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-
-
-class UserSessionCreate(UserSessionBase):
-    pass
-
-
-class UserSessionResponse(UserSessionBase):
-    id: int
-    user_id: int
-    session_token: str
-    is_active: bool
-    created_at: datetime
-    expires_at: datetime
-    last_activity_at: datetime
-
-
-class UserSessionListResponse(BaseSchema):
-    sessions: List[UserSessionResponse]
-    total: int
 
 
 # Group schemas
@@ -646,7 +619,6 @@ class AuthTokenResponse(BaseSchema):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
-    user: "UserResponse"
 
 
 class UserPermissionsResponse(BaseSchema):
@@ -729,7 +701,6 @@ class PaginatedActionsResponse(PaginatedResponse):
 
 
 # ============ NEW SCHEMAS FOR ADVANCED FEATURES ============
-
 
 # Bot Template schemas
 class BotTemplateBase(BaseSchema):
@@ -1258,12 +1229,12 @@ class DeletedMessageResponse(DeletedMessageBase):
     restored_at: Optional[datetime] = None
     restored_by: Optional[int] = None
     restored_message_id: Optional[int] = None
-
+    
     # User details (joined)
     user_username: Optional[str] = None
     user_first_name: Optional[str] = None
     user_last_name: Optional[str] = None
-
+    
     # Deleter details (joined)
     deleter_username: Optional[str] = None
     deleter_first_name: Optional[str] = None

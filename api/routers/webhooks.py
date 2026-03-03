@@ -16,8 +16,7 @@ from bot.core.token_manager import token_manager
 
 logger = logging.getLogger(__name__)
 
-# Strip whitespace from bot token to handle potential environment variable formatting issues
-BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 if not BOT_TOKEN:
@@ -45,17 +44,16 @@ _last_error: Optional[str] = None
 async def get_shared_bot():
     """Get or create the cached shared bot instance."""
     global _shared_bot, _shared_identity
-
+    
     if _shared_bot is None:
         if not BOT_TOKEN:
             raise ValueError("BOT_TOKEN not configured")
-
+        
         logger.info("Creating new Bot instance...")
         _shared_bot = Bot(token=BOT_TOKEN)
         bot_info = await _shared_bot.get_me()
-
+        
         from bot.core.context import BotIdentity
-
         _shared_identity = BotIdentity(
             bot_id=bot_info.id,
             username=bot_info.username,
@@ -63,28 +61,24 @@ async def get_shared_bot():
             token_hash="shared",
         )
         logger.info(f"Bot initialized: @{bot_info.username} (ID: {bot_info.id})")
-
+    
     return _shared_bot, _shared_identity
 
 
 async def process_update(bot: Bot, bot_identity: Any, update: Update):
     """Process a single update through the pipeline."""
     global _last_error
-
+    
     try:
         # Log update type
         update_type = None
         if update.message:
             update_type = "message"
             if update.message.text:
-                logger.info(
-                    f"Processing message: '{update.message.text[:50]}...' from chat {update.message.chat.id}"
-                )
+                logger.info(f"Processing message: '{update.message.text[:50]}...' from chat {update.message.chat.id}")
         elif update.callback_query:
             update_type = "callback_query"
-            logger.info(
-                f"Processing callback from chat {update.callback_query.message.chat.id if update.callback_query.message else 'unknown'}"
-            )
+            logger.info(f"Processing callback from chat {update.callback_query.message.chat.id if update.callback_query.message else 'unknown'}")
         elif update.inline_query:
             update_type = "inline_query"
         elif update.edited_message:
@@ -92,10 +86,10 @@ async def process_update(bot: Bot, bot_identity: Any, update: Update):
         else:
             update_type = type(update).__name__
             logger.info(f"Processing update type: {update_type}")
-
+        
         result = await pipeline.process_update(bot, bot_identity, update)
         logger.info(f"Pipeline result: {result}")
-
+        
     except Exception as e:
         logger.exception(f"Error processing update: {e}")
         _last_error = f"{datetime.utcnow().isoformat()}: {str(e)}"
@@ -108,14 +102,14 @@ async def shared_webhook(
 ):
     """Webhook endpoint for shared bot."""
     global _webhook_count, _last_update
-
+    
     try:
         data = await request.json()
         _last_update = data
-
+        
         # Log incoming update
         logger.info(f"Received webhook update #{_webhook_count + 1}")
-
+        
         update = Update(**data)
 
         if not BOT_TOKEN:
@@ -188,7 +182,7 @@ async def webhook_info():
 async def debug_info():
     """Debug endpoint to diagnose webhook and command issues."""
     global _webhook_count, _last_update, _last_error, _shared_bot, _shared_identity
-
+    
     # Get webhook info from Telegram
     webhook_info = None
     webhook_error = None
@@ -206,26 +200,26 @@ async def debug_info():
             await bot.session.close()
     except Exception as e:
         webhook_error = str(e)
-
+    
     # Get pipeline info
     pipeline_info = {
         "middleware_count": len(pipeline._middlewares),
         "module_count": len(pipeline._modules),
         "modules": [m.name for m in pipeline._modules] if pipeline._modules else [],
     }
-
+    
     # Get module registry info
     registry_info = {
         "registered_modules": list(module_registry._modules.keys()),
         "module_count": len(module_registry._modules),
     }
-
+    
     # Expected endpoint
     expected_webhook_url = None
     if WEBHOOK_URL:
         base_url = WEBHOOK_URL.split("/webhook")[0]
         expected_webhook_url = f"{base_url}/webhook/shared"
-
+    
     return {
         "status": "debug",
         "timestamp": datetime.utcnow().isoformat(),
@@ -237,14 +231,10 @@ async def debug_info():
         },
         "cached_bot": {
             "initialized": _shared_bot is not None,
-            "identity": (
-                {
-                    "bot_id": _shared_identity.bot_id if _shared_identity else None,
-                    "username": _shared_identity.username if _shared_identity else None,
-                }
-                if _shared_identity
-                else None
-            ),
+            "identity": {
+                "bot_id": _shared_identity.bot_id if _shared_identity else None,
+                "username": _shared_identity.username if _shared_identity else None,
+            } if _shared_identity else None,
         },
         "webhook_stats": {
             "total_received": _webhook_count,
@@ -264,19 +254,19 @@ async def test_webhook(request: Request):
     try:
         data = await request.json()
         logger.info(f"Test webhook received: {json.dumps(data, indent=2)}")
-
+        
         # Check if we can process it
         if not BOT_TOKEN:
             return {"error": "BOT_TOKEN not configured"}
-
+        
         bot, identity = await get_shared_bot()
-
+        
         # Parse as Update
         update = Update(**data)
-
+        
         # Process synchronously for testing
         result = await pipeline.process_update(bot, identity, update)
-
+        
         return {
             "ok": True,
             "result": result,

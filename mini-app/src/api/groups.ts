@@ -2,14 +2,22 @@ import api from './client'
 
 export interface Group {
   id: number
-  telegram_id: number
+  telegram_id?: number
+  telegramId?: number
   title: string
   username: string | null
-  member_count: number
-  language: string
-  is_premium: boolean
-  owner_id: number
-  created_at: string
+  member_count?: number
+  memberCount?: number
+  language?: string
+  is_premium?: boolean
+  isPremium?: boolean
+  owner_id?: number
+  created_at?: string
+  role?: 'owner' | 'admin' | 'mod'
+  enabledModulesCount?: number
+  lastActivity?: string
+  hasCustomBot?: boolean
+  customBotUsername?: string
 }
 
 export interface GroupStats {
@@ -39,11 +47,6 @@ export const getGroup = async (groupId: number): Promise<Group> => {
   return response.data
 }
 
-export const getGroupByTelegramId = async (telegramId: number): Promise<Group> => {
-  const response = await api.get(`/groups/by-telegram-id/${telegramId}`)
-  return response.data
-}
-
 export const updateGroup = async (groupId: number, data: Partial<Group>): Promise<Group> => {
   const response = await api.patch(`/groups/${groupId}`, data)
   return response.data
@@ -51,10 +54,5 @@ export const updateGroup = async (groupId: number, data: Partial<Group>): Promis
 
 export const getGroupStats = async (groupId: number): Promise<GroupStats> => {
   const response = await api.get(`/groups/${groupId}/stats`)
-  return response.data
-}
-
-export const getGroupStatsByTelegramId = async (telegramId: number): Promise<GroupStats> => {
-  const response = await api.get(`/groups/by-telegram-id/${telegramId}/stats`)
   return response.data
 }
