@@ -39,6 +39,11 @@ export const getGroup = async (groupId: number): Promise<Group> => {
   return response.data
 }
 
+export const getGroupByTelegramId = async (telegramId: number): Promise<Group> => {
+  const response = await api.get(`/groups/by-telegram-id/${telegramId}`)
+  return response.data
+}
+
 export const updateGroup = async (groupId: number, data: Partial<Group>): Promise<Group> => {
   const response = await api.patch(`/groups/${groupId}`, data)
   return response.data
@@ -46,5 +51,10 @@ export const updateGroup = async (groupId: number, data: Partial<Group>): Promis
 
 export const getGroupStats = async (groupId: number): Promise<GroupStats> => {
   const response = await api.get(`/groups/${groupId}/stats`)
+  return response.data
+}
+
+export const getGroupStatsByTelegramId = async (telegramId: number): Promise<GroupStats> => {
+  const response = await api.get(`/groups/by-telegram-id/${telegramId}/stats`)
   return response.data
 }
