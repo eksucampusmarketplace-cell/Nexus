@@ -84,6 +84,13 @@ async def lifespan(app: FastAPI):
     logger.info(f"Working Directory: {os.getcwd()}")
     logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
     
+    # Check BOT_TOKEN configuration
+    bot_token = os.getenv("BOT_TOKEN")
+    if bot_token:
+        logger.info(f"BOT_TOKEN configured: {bot_token[:8]}...{bot_token[-4:]}")
+    else:
+        logger.warning("BOT_TOKEN not configured! Mini App authentication will not work.")
+    
     # Startup
     logger.info("Initializing database...")
     await init_db()

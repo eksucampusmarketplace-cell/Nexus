@@ -164,14 +164,15 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     ).hexdigest()
 
     if computed_hash != received_hash:
-        logger.warning(f"Hash mismatch: computed={computed_hash[:16]}..., received={received_hash[:16]}...")
-        logger.info(f"Data check string (first 500 chars): {data_check_string[:500]!r}")
-        logger.info("Raw params keys and sample values:")
+        logger.warning(f"Hash mismatch: computed={computed_hash}, received={received_hash}")
+        logger.info(f"Data check string (full): {data_check_string!r}")
+        logger.info("Raw params keys and values:")
         for key in sorted(raw_params.keys()):
             if key != "hash":
                 val = raw_params[key]
-                logger.info(f"  {key}={val[:100]!r}{'...' if len(val) > 100 else ''}")
-        logger.info(f"Bot token (first 20 chars): {bot_token[:20]!r}...")
+                logger.info(f"  {key}={val!r}")
+        logger.info(f"Bot token: {bot_token!r}")
+        logger.info(f"Secret key (hex): {secret_key.hex()}")
         return False
 
     return True
@@ -328,6 +329,8 @@ async def create_token(
     logger.debug(f"init_data (first 200 chars): {request.init_data[:200]!r}..." if request.init_data else "empty")
     logger.debug(f"Custom bot token provided: {bool(request.bot_token)}")
     logger.debug(f"Main bot token configured: {bool(main_bot_token)}")
+    if main_bot_token:
+        logger.info(f"Main BOT_TOKEN loaded: {main_bot_token[:10]}...{main_bot_token[-5:]}")
 
     # Parse init data first to extract chat info
     raw_params, parsed_data, received_hash = parse_init_data(request.init_data)
