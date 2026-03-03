@@ -68,7 +68,7 @@ def parse_init_data(init_data: str) -> Tuple[dict, dict, str]:
 
     CRITICAL: We must preserve the ORIGINAL URL-encoded values for hash validation.
     Telegram computes the hash using the raw initData string values, NOT URL-decoded ones.
-    
+
     Example: If user="John%20Doe" in initData, Telegram uses "John%20Doe" for hash,
     but parse_qsl would decode it to "John Doe", causing hash mismatch.
 
@@ -78,9 +78,9 @@ def parse_init_data(init_data: str) -> Tuple[dict, dict, str]:
     # Split manually to preserve URL-encoded values for hash computation
     # This is critical - Telegram uses the original URL-encoded values for hash
     raw_params_encoded = {}
-    for pair in init_data.split('&'):
-        if '=' in pair:
-            key, value = pair.split('=', 1)
+    for pair in init_data.split("&"):
+        if "=" in pair:
+            key, value = pair.split("=", 1)
             raw_params_encoded[key] = value
         elif pair:
             raw_params_encoded[pair] = ""
@@ -94,19 +94,25 @@ def parse_init_data(init_data: str) -> Tuple[dict, dict, str]:
     if user_raw:
         try:
             import urllib.parse
+
             decoded_user = urllib.parse.unquote(user_raw)
             parsed_data["user"] = json.loads(decoded_user)
         except (json.JSONDecodeError, Exception) as e:
-            logger.warning(f"Failed to parse user JSON: {e}, raw value: {user_raw[:100]!r}")
+            logger.warning(
+                f"Failed to parse user JSON: {e}, raw value: {user_raw[:100]!r}"
+            )
 
     chat_raw = raw_params_encoded.get("chat", "")
     if chat_raw:
         try:
             import urllib.parse
+
             decoded_chat = urllib.parse.unquote(chat_raw)
             parsed_data["chat"] = json.loads(decoded_chat)
         except (json.JSONDecodeError, Exception) as e:
-            logger.warning(f"Failed to parse chat JSON: {e}, raw value: {chat_raw[:100]!r}")
+            logger.warning(
+                f"Failed to parse chat JSON: {e}, raw value: {chat_raw[:100]!r}"
+            )
 
     if raw_params_encoded.get("chat_type"):
         parsed_data["chat_type"] = raw_params_encoded.get("chat_type")
@@ -140,10 +146,13 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     auth_date = raw_params.get("auth_date")
     if auth_date:
         import time
+
         auth_timestamp = int(auth_date)
         current_time = int(time.time())
         if current_time - auth_timestamp > 86400:  # 24 hours
-            logger.warning(f"Init data expired: auth_date={auth_timestamp}, current={current_time}")
+            logger.warning(
+                f"Init data expired: auth_date={auth_timestamp}, current={current_time}"
+            )
             return False
 
     # Use raw values as-is (URL-encoded) for hash computation
@@ -158,9 +167,7 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
 
     # Build the data_check_string: sorted keys alphabetically, joined by \n
     # Use the raw URL-encoded values as per Telegram's algorithm
-    data_check_string = "\n".join(
-        f"{k}={v}" for k, v in sorted(parsed.items())
-    )
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
 
     # Step 1: Derive secret key using "WebAppData" as the HMAC key
     # CRITICAL: key=b"WebAppData", msg=bot_token — NOT the other way around
@@ -179,7 +186,9 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
 
     # Use constant-time comparison to prevent timing attacks
     if not hmac.compare_digest(computed_hash, received_hash):
-        logger.warning(f"Hash mismatch: computed={computed_hash}, received={received_hash}")
+        logger.warning(
+            f"Hash mismatch: computed={computed_hash}, received={received_hash}"
+        )
         logger.info(f"Data check string (full): {data_check_string!r}")
         logger.info("Parsed params keys and values (URL-encoded):")
         for key in sorted(parsed.keys()):
@@ -209,7 +218,7 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
         # Return combined user and chat data
         user_data = parsed_data.get("user", {})
         result = user_data.copy() if user_data else {}
-        
+
         if parsed_data.get("chat"):
             result["chat"] = parsed_data["chat"]
         if parsed_data.get("chat_type"):
@@ -226,8 +235,16 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
 
 
 # Owner and Support ID configuration
-OWNER_IDS = {int(id_str.strip()) for id_str in os.getenv("OWNER_IDS", "").split(",") if id_str.strip()}
-SUPPORT_IDS = {int(id_str.strip()) for id_str in os.getenv("SUPPORT_IDS", "").split(",") if id_str.strip()}
+OWNER_IDS = {
+    int(id_str.strip())
+    for id_str in os.getenv("OWNER_IDS", "").split(",")
+    if id_str.strip()
+}
+SUPPORT_IDS = {
+    int(id_str.strip())
+    for id_str in os.getenv("SUPPORT_IDS", "").split(",")
+    if id_str.strip()
+}
 
 
 def is_owner(telegram_id: int) -> bool:
@@ -273,12 +290,12 @@ async def get_current_user_with_permissions(
 ) -> User:
     """Get current user from JWT token with owner/support permissions attached."""
     user = await get_current_user(credentials, db)
-    
+
     # Attach permission flags to user object
     user.is_owner = is_owner(user.telegram_id)
     user.is_support = is_support(user.telegram_id)
     user.is_staff = is_staff(user.telegram_id)
-    
+
     return user
 
 
@@ -336,15 +353,26 @@ async def create_token(
     2. Bot token from BotInstance table (looked up by chat ID from init data)
     3. Main BOT_TOKEN environment variable
     """
-    main_bot_token = os.getenv("BOT_TOKEN")
+    # IMPORTANT: Strip whitespace from bot token to handle potential environment variable formatting issues
+    main_bot_token = os.getenv("BOT_TOKEN", "").strip()
 
     # Log the incoming request for debugging
-    logger.info(f"Auth token request received. init_data length: {len(request.init_data) if request.init_data else 0}")
-    logger.debug(f"init_data (first 200 chars): {request.init_data[:200]!r}..." if request.init_data else "empty")
+    logger.info(
+        f"Auth token request received. init_data length: {len(request.init_data) if request.init_data else 0}"
+    )
+    logger.debug(
+        f"init_data (first 200 chars): {request.init_data[:200]!r}..."
+        if request.init_data
+        else "empty"
+    )
     logger.debug(f"Custom bot token provided: {bool(request.bot_token)}")
     logger.debug(f"Main bot token configured: {bool(main_bot_token)}")
     if main_bot_token:
-        logger.info(f"Main BOT_TOKEN loaded: {main_bot_token[:10]}...{main_bot_token[-5:]}")
+        logger.info(
+            f"Main BOT_TOKEN loaded: {main_bot_token[:10]}...{main_bot_token[-5:]}, length: {len(main_bot_token)}"
+        )
+    else:
+        logger.error("BOT_TOKEN environment variable is EMPTY or not set!")
 
     # Parse init data first to extract chat info
     raw_params, parsed_data, received_hash = parse_init_data(request.init_data)
@@ -355,7 +383,9 @@ async def create_token(
     # Log parsed data for debugging
     logger.debug(f"Raw params keys: {list(raw_params.keys())}")
     logger.debug(f"Parsed data keys: {list(parsed_data.keys())}")
-    logger.debug(f"User ID: {parsed_data.get('user', {}).get('id') if parsed_data.get('user') else None}")
+    logger.debug(
+        f"User ID: {parsed_data.get('user', {}).get('id') if parsed_data.get('user') else None}"
+    )
     logger.debug(f"Chat from parsed_data: {parsed_data.get('chat')}")
     logger.debug(f"Start param: {parsed_data.get('start_param')}")
 
@@ -369,35 +399,90 @@ async def create_token(
             chat_id = int(parsed_data["start_param"])
         except (ValueError, TypeError):
             pass
-    
+
     # Collect error messages for debugging
     validation_errors = []
-    
-    # Try 1: Custom bot token from request (localStorage)
-    if request.bot_token:
-        logger.info(f"Trying custom bot token from request (length: {len(request.bot_token)})")
-        if validate_init_data_hash(raw_params, request.bot_token):
+
+    # Try 1: Get user from initData, then find bots based on user's group memberships
+    # This is the database-driven approach - no localStorage needed
+    telegram_user_data = parsed_data.get("user", {})
+    telegram_user_id = telegram_user_data.get("id")
+
+    if telegram_user_id:
+        # Get all bot tokens for groups where this user is a member
+        user_bot_tokens = await _get_bot_tokens_for_user(db, telegram_user_id)
+        for bot_info in user_bot_tokens:
+            logger.info(
+                f"Trying bot @{bot_info.get('username')} from user membership (group_id: {bot_info.get('group_id')})"
+            )
+            if validate_init_data_hash(raw_params, bot_info["token"]):
+                logger.info(
+                    f"Validation successful with user's bot @{bot_info.get('username')}"
+                )
+                telegram_user = verify_telegram_init_data(
+                    request.init_data, bot_info["token"]
+                )
+                return await _create_user_token(telegram_user, db)
+            else:
+                validation_errors.append(
+                    f"User's bot @{bot_info.get('username')}: hash mismatch"
+                )
+                logger.debug(f"Bot @{bot_info.get('username')} validation failed")
+
+    # Try 2: Custom bot token from request (fallback - deprecated, prefer database)
+    # Strip whitespace from custom bot token as well
+    custom_bot_token = request.bot_token.strip() if request.bot_token else None
+    if custom_bot_token:
+        logger.info(
+            f"Trying custom bot token from request (length: {len(custom_bot_token)})"
+        )
+        if validate_init_data_hash(raw_params, custom_bot_token):
             logger.info("Validation successful with custom bot token from request")
-            telegram_user = verify_telegram_init_data(request.init_data, request.bot_token)
+            telegram_user = verify_telegram_init_data(
+                request.init_data, custom_bot_token
+            )
             return await _create_user_token(telegram_user, db)
         else:
             validation_errors.append("Custom bot token: hash mismatch")
             logger.warning("Custom bot token validation failed")
-    
+
     # Try 2: Look up bot token from BotInstance table by chat ID
     if chat_id:
         logger.info(f"Looking up bot token for chat_id: {chat_id}")
         bot_instance = await _get_bot_token_for_chat(db, chat_id)
         if bot_instance:
-            logger.info(f"Found bot instance for chat {chat_id}: @{bot_instance.get('username', 'unknown')}")
-            if validate_init_data_hash(raw_params, bot_instance['token']):
+            logger.info(
+                f"Found bot instance for chat {chat_id}: @{bot_instance.get('username', 'unknown')}"
+            )
+            if validate_init_data_hash(raw_params, bot_instance["token"]):
                 logger.info(f"Validation successful with bot token for chat {chat_id}")
-                telegram_user = verify_telegram_init_data(request.init_data, bot_instance['token'])
+                telegram_user = verify_telegram_init_data(
+                    request.init_data, bot_instance["token"]
+                )
                 return await _create_user_token(telegram_user, db)
             else:
                 validation_errors.append(f"Bot token for chat {chat_id}: hash mismatch")
                 logger.warning(f"Bot token for chat {chat_id} validation failed")
-    
+
+    # Try 2b: Try ALL bot instances from database (for private chat opens where no chat_id available)
+    # This allows white-label/clone bots to authenticate from private chats
+    all_bot_tokens = await _get_all_bot_tokens(db)
+    for bot_info in all_bot_tokens:
+        logger.info(
+            f"Trying bot instance @{bot_info.get('username', 'unknown')} (group_id: {bot_info.get('group_id')})"
+        )
+        if validate_init_data_hash(raw_params, bot_info["token"]):
+            logger.info(
+                f"Validation successful with bot @{bot_info.get('username')} (group_id: {bot_info.get('group_id')})"
+            )
+            telegram_user = verify_telegram_init_data(
+                request.init_data, bot_info["token"]
+            )
+            return await _create_user_token(telegram_user, db)
+        else:
+            validation_errors.append(f"Bot @{bot_info.get('username')}: hash mismatch")
+            logger.debug(f"Bot @{bot_info.get('username')} validation failed")
+
     # Try 3: Main bot token from environment
     if main_bot_token:
         logger.info("Trying main BOT_TOKEN from environment")
@@ -408,7 +493,7 @@ async def create_token(
         else:
             validation_errors.append("Main BOT_TOKEN: hash mismatch")
             logger.warning("Main BOT_TOKEN validation failed")
-    
+
     # All validation attempts failed
     error_detail = "Invalid init data: Hash mismatch"
     if validation_errors:
@@ -416,28 +501,40 @@ async def create_token(
 
     # Provide more helpful error message for common issues
     if chat_id is None and not request.bot_token:
-        error_detail += ". Chat ID not found in initData and no custom bot token provided. "
+        error_detail += (
+            ". Chat ID not found in initData and no custom bot token provided. "
+        )
         error_detail += "Ensure BOT_TOKEN environment variable matches the bot that opened the Mini App."
 
     # Development bypass: Allow authentication without hash validation in development
     # This is useful for testing the Mini App in a browser without Telegram
-    dev_bypass = os.getenv("DISABLE_AUTH_VALIDATION", "").lower() in ("true", "1", "yes")
+    dev_bypass = os.getenv("DISABLE_AUTH_VALIDATION", "").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
     if dev_bypass and _environment == "development":
-        logger.warning(f"DEVELOPMENT MODE: Bypassing hash validation for user {parsed_data.get('user', {}).get('id')}")
+        logger.warning(
+            f"DEVELOPMENT MODE: Bypassing hash validation for user {parsed_data.get('user', {}).get('id')}"
+        )
         if parsed_data.get("user"):
             return await _create_user_token(parsed_data["user"], db)
 
-    logger.error(f"All validation attempts failed. Chat ID: {chat_id}, Raw params keys: {list(raw_params.keys())}, Errors: {validation_errors}")
+    logger.error(
+        f"All validation attempts failed. Chat ID: {chat_id}, Raw params keys: {list(raw_params.keys())}, Errors: {validation_errors}"
+    )
     raise HTTPException(status_code=401, detail=error_detail)
 
 
-async def _get_bot_token_for_chat(db: AsyncSession, telegram_chat_id: int) -> Optional[dict]:
+async def _get_bot_token_for_chat(
+    db: AsyncSession, telegram_chat_id: int
+) -> Optional[dict]:
     """
     Get the bot token for a specific Telegram chat from the BotInstance table.
-    
+
     Args:
         telegram_chat_id: The Telegram chat ID (from init data)
-    
+
     Returns dict with 'token' and 'username' if found, None otherwise.
     """
     try:
@@ -446,44 +543,191 @@ async def _get_bot_token_for_chat(db: AsyncSession, telegram_chat_id: int) -> Op
             select(Group).where(Group.telegram_id == telegram_chat_id)
         )
         group = group_result.scalar_one_or_none()
-        
+
         if not group:
             logger.debug(f"No group found with telegram_id={telegram_chat_id}")
             return None
-        
+
         # Then, find the bot instance for this group
         bot_result = await db.execute(
             select(BotInstance).where(
-                BotInstance.group_id == group.id,
-                BotInstance.is_active == True
+                BotInstance.group_id == group.id, BotInstance.is_active == True
             )
         )
         bot_instance = bot_result.scalar_one_or_none()
-        
+
         if not bot_instance:
             logger.debug(f"No active bot instance found for group_id={group.id}")
             return None
-        
+
         # Decrypt the stored token
         encryption_key = os.getenv("ENCRYPTION_KEY")
         if not encryption_key:
             logger.warning("ENCRYPTION_KEY not set, cannot decrypt bot token")
             return None
-        
+
         fernet = Fernet(encryption_key.encode())
         decrypted_token = fernet.decrypt(bot_instance.token_hash.encode()).decode()
-        
+
         return {
-            'token': decrypted_token,
-            'username': bot_instance.bot_username,
-            'bot_id': bot_instance.bot_telegram_id,
+            "token": decrypted_token,
+            "username": bot_instance.bot_username,
+            "bot_id": bot_instance.bot_telegram_id,
         }
     except Exception as e:
         logger.error(f"Error getting bot token for chat {telegram_chat_id}: {e}")
         return None
 
 
-async def _create_user_token(telegram_user: dict, db: AsyncSession) -> AuthTokenResponse:
+async def _get_all_bot_tokens(db: AsyncSession) -> list[dict]:
+    """
+    Get all active bot tokens from the BotInstance table.
+
+    This is used when the Mini App is opened from a private chat (no chat_id),
+    so we can try all registered bots to find the one that signed the initData.
+
+    Returns list of dicts with 'token', 'username', 'bot_id', and 'group_id'.
+    """
+    try:
+        # Get all active bot instances
+        bot_result = await db.execute(
+            select(BotInstance).where(BotInstance.is_active == True)
+        )
+        bot_instances = bot_result.scalars().all()
+
+        if not bot_instances:
+            logger.debug("No active bot instances found")
+            return []
+
+        # Decrypt each token
+        encryption_key = os.getenv("ENCRYPTION_KEY")
+        if not encryption_key:
+            logger.warning("ENCRYPTION_KEY not set, cannot decrypt bot tokens")
+            return []
+
+        fernet = Fernet(encryption_key.encode())
+
+        bots = []
+        for bot_instance in bot_instances:
+            try:
+                decrypted_token = fernet.decrypt(
+                    bot_instance.token_hash.encode()
+                ).decode()
+                bots.append(
+                    {
+                        "token": decrypted_token,
+                        "username": bot_instance.bot_username,
+                        "bot_id": bot_instance.bot_telegram_id,
+                        "group_id": bot_instance.group_id,
+                    }
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to decrypt bot token for {bot_instance.bot_username}: {e}"
+                )
+                continue
+
+        logger.info(f"Found {len(bots)} active bot instances to try")
+        return bots
+
+    except Exception as e:
+        logger.error(f"Error getting all bot tokens: {e}")
+        return []
+
+
+async def _get_bot_tokens_for_user(
+    db: AsyncSession, telegram_user_id: int
+) -> list[dict]:
+    """
+    Get bot tokens for groups where the user is a member.
+
+    This is the database-driven approach - the bot knows which groups
+    the user belongs to and can find the right bot tokens automatically.
+    No localStorage needed!
+
+    Args:
+        db: Database session
+        telegram_user_id: The Telegram user ID from initData
+
+    Returns list of dicts with 'token', 'username', 'bot_id', and 'group_id'.
+    """
+    try:
+        # First, find the user by telegram_id
+        user_result = await db.execute(
+            select(User).where(User.telegram_id == telegram_user_id)
+        )
+        user = user_result.scalar_one_or_none()
+
+        if not user:
+            logger.debug(f"No user found with telegram_id={telegram_user_id}")
+            return []
+
+        # Get all groups where user is a member
+        member_result = await db.execute(
+            select(Member).where(Member.user_id == user.id)
+        )
+        members = member_result.scalars().all()
+
+        if not members:
+            logger.debug(f"User {telegram_user_id} is not a member of any groups")
+            return []
+
+        group_ids = [m.group_id for m in members]
+        logger.info(
+            f"User {telegram_user_id} is member of {len(group_ids)} groups: {group_ids}"
+        )
+
+        # Get all BotInstances for those groups
+        bot_result = await db.execute(
+            select(BotInstance).where(
+                BotInstance.group_id.in_(group_ids), BotInstance.is_active == True
+            )
+        )
+        bot_instances = bot_result.scalars().all()
+
+        if not bot_instances:
+            logger.debug(f"No active bot instances found for user's groups")
+            return []
+
+        # Decrypt each token
+        encryption_key = os.getenv("ENCRYPTION_KEY")
+        if not encryption_key:
+            logger.warning("ENCRYPTION_KEY not set, cannot decrypt bot tokens")
+            return []
+
+        fernet = Fernet(encryption_key.encode())
+
+        bots = []
+        for bot_instance in bot_instances:
+            try:
+                decrypted_token = fernet.decrypt(
+                    bot_instance.token_hash.encode()
+                ).decode()
+                bots.append(
+                    {
+                        "token": decrypted_token,
+                        "username": bot_instance.bot_username,
+                        "bot_id": bot_instance.bot_telegram_id,
+                        "group_id": bot_instance.group_id,
+                    }
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to decrypt bot token for {bot_instance.bot_username}: {e}"
+                )
+                continue
+
+        logger.info(f"Found {len(bots)} bot instances for user {telegram_user_id}")
+        return bots
+
+    except Exception as e:
+        logger.error(f"Error getting bot tokens for user {telegram_user_id}: {e}")
+        return []
+
+
+async def _create_user_token(
+    telegram_user: dict, db: AsyncSession
+) -> AuthTokenResponse:
     """Create or get user and return access token."""
     telegram_id = telegram_user.get("id")
     result = await db.execute(select(User).where(User.telegram_id == telegram_id))
@@ -581,17 +825,18 @@ async def debug_auth(
     db: AsyncSession = Depends(get_db),
 ):
     """Debug endpoint to diagnose authentication issues.
-    
+
     This endpoint returns detailed information about the init data validation
     without actually creating a token. Useful for debugging hash mismatch issues.
     """
     import time
-    
-    main_bot_token = os.getenv("BOT_TOKEN")
-    
+
+    # Strip whitespace from bot token
+    main_bot_token = os.getenv("BOT_TOKEN", "").strip()
+
     # Parse init data
     raw_params, parsed_data, received_hash = parse_init_data(request.init_data)
-    
+
     # Extract chat info - prefer chat.id over start_param
     chat_id = None
     if parsed_data.get("chat"):
@@ -601,7 +846,7 @@ async def debug_auth(
             chat_id = int(parsed_data["start_param"])
         except (ValueError, TypeError):
             pass
-    
+
     # Check auth_date
     auth_date_valid = True
     auth_date_age = None
@@ -610,7 +855,7 @@ async def debug_auth(
         current_time = int(time.time())
         auth_date_age = current_time - auth_timestamp
         auth_date_valid = auth_date_age <= 86400
-    
+
     # Build debug info
     debug_info = {
         "init_data_length": len(request.init_data),
@@ -618,7 +863,9 @@ async def debug_auth(
         "hash_length": len(received_hash) if received_hash else 0,
         "raw_params_keys": list(raw_params.keys()),
         "parsed_data_keys": list(parsed_data.keys()),
-        "user_id": parsed_data.get("user", {}).get("id") if parsed_data.get("user") else None,
+        "user_id": (
+            parsed_data.get("user", {}).get("id") if parsed_data.get("user") else None
+        ),
         "chat_id": chat_id,
         "auth_date": parsed_data.get("auth_date"),
         "auth_date_age_seconds": auth_date_age,
@@ -628,27 +875,48 @@ async def debug_auth(
         "has_main_bot_token": bool(main_bot_token),
         "validation_results": {},
     }
-    
+
     # Try validation with each token
     if request.bot_token:
         debug_info["validation_results"]["custom_token"] = {
-            "valid": validate_init_data_hash(raw_params, request.bot_token),
+            "valid": validate_init_data_hash(raw_params, request.bot_token.strip()),
             "token_length": len(request.bot_token),
         }
-    
+
     if chat_id:
         bot_instance = await _get_bot_token_for_chat(db, chat_id)
         if bot_instance:
             debug_info["validation_results"]["db_token"] = {
-                "valid": validate_init_data_hash(raw_params, bot_instance['token']),
-                "bot_username": bot_instance.get('username'),
+                "valid": validate_init_data_hash(raw_params, bot_instance["token"]),
+                "bot_username": bot_instance.get("username"),
             }
         else:
             debug_info["validation_results"]["db_token"] = {"found": False}
-    
+
+    # Try all bot instances from database (for private chat scenarios)
+    all_bots = await _get_all_bot_tokens(db)
+    if all_bots:
+        debug_info["validation_results"]["all_bot_instances"] = {
+            "count": len(all_bots),
+            "results": [],
+        }
+        for bot in all_bots:
+            is_valid = validate_init_data_hash(raw_params, bot["token"])
+            debug_info["validation_results"]["all_bot_instances"]["results"].append(
+                {
+                    "username": bot.get("username"),
+                    "group_id": bot.get("group_id"),
+                    "valid": is_valid,
+                }
+            )
+            if is_valid:
+                debug_info["validation_results"]["all_bot_instances"]["matched"] = (
+                    bot.get("username")
+                )
+
     if main_bot_token:
         debug_info["validation_results"]["main_token"] = {
             "valid": validate_init_data_hash(raw_params, main_bot_token),
         }
-    
+
     return debug_info
