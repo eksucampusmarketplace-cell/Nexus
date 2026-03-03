@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import { useGroupStore } from './stores/groupStore'
 import { telegramAuth } from './api/auth'
+import { getGroupByTelegramId, getGroupStatsByTelegramId } from './api/groups'
 
 // Layouts
 import MainLayout from './components/Layout/MainLayout'
@@ -50,6 +51,7 @@ function App() {
   const [initData, setInitData] = useState<string>('')
   const [errorDetail, setErrorDetail] = useState<string>('')
   const [authAttempted, setAuthAttempted] = useState(false)
+  const [dbGroupId, setDbGroupId] = useState<number | null>(null) // Store the Database Group ID
 
   useEffect(() => {
     const init = async () => {
@@ -57,19 +59,19 @@ function App() {
 
       // Get Telegram init data
       const tg = (window as any).Telegram?.WebApp
-      
+
       // Configure Telegram WebApp theme to match our dark theme
       if (tg) {
         // Set header color to match our dark background
         tg.setHeaderColor('#020617')
-        // Set bottom bar color to match our dark background  
+        // Set bottom bar color to match our dark background
         tg.setBottomBarColor('#020617')
         // Set background color for the main content area
         tg.setBackgroundColor('#020617')
         // Expand the web app to full height
         tg.expand()
       }
-      
+
       const initDataRaw = tg?.initData || ''
       setInitData(initDataRaw)
 
@@ -81,14 +83,13 @@ function App() {
         return
       }
 
-      // Get group ID from start_param or chat
+      // Get Telegram Chat ID from start_param or chat
       // IMPORTANT: Keep as string to avoid JavaScript number precision loss
       // Telegram IDs can exceed Number.MAX_SAFE_INTEGER (2^53-1)
       const startParam = tg?.initDataUnsafe?.start_param
       const chatId = tg?.initDataUnsafe?.chat?.id
       const groupIdStr = startParam ? String(startParam) : (chatId ? String(chatId) : null)
-      // Also keep numeric version for navigation/routing that expects numbers
-      const groupIdNum = groupIdStr ? Number(groupIdStr) : null
+      const telegramChatId = groupIdStr ? Number(groupIdStr) : null
 
       // Try to get custom bot token from localStorage (optional - backend handles lookup now)
       let customBotToken: string | undefined
@@ -110,6 +111,20 @@ function App() {
         // Token is stored in localStorage by setAuth before state update
         setAuth(authData.access_token, authData.user)
         console.log('[App] Auth state set, token stored in localStorage')
+
+        // If we have a Telegram Chat ID, resolve it to Database Group ID
+        if (telegramChatId) {
+          try {
+            console.log('[App] Resolving Telegram Chat ID to Database Group ID:', telegramChatId)
+            const group = await getGroupByTelegramId(telegramChatId)
+            setDbGroupId(group.id)
+            setCurrentGroup(group)
+            console.log('[App] Resolved to Database Group ID:', group.id)
+          } catch (e: any) {
+            console.error('[App] Failed to resolve Telegram Chat ID:', e)
+            // Don't fail auth, just log it - user may need to add bot to group
+          }
+        }
       } catch (err: any) {
         console.error('Auth error:', err)
         const detail = err.response?.data?.detail || 'Authentication failed'
@@ -149,19 +164,15 @@ function App() {
       </div>
     )
   }
-  
+
   // Check if opened from a specific group
-  // Keep as string to avoid JavaScript number precision loss with large Telegram IDs
-  const tg = (window as any).Telegram?.WebApp
-  const startParam = tg?.initDataUnsafe?.start_param
-  const groupId = startParam ? String(startParam) : null
-  
+  // Use the resolved Database Group ID for navigation
   return (
     <MainLayout>
       <Routes>
         <Route path="/" element={
           isAuthenticated ? (
-            groupId ? <Navigate to={`/admin/${groupId}`} /> : <Dashboard />
+            dbGroupId ? <Navigate to={`/admin/${dbGroupId}`} /> : <Dashboard />
           ) : (
             <div className="flex items-center justify-center h-screen">
               <div className="text-center">
@@ -173,8 +184,8 @@ function App() {
         } />
         <Route path="/help" element={<Help />} />
         <Route path="/profile/:groupId" element={<MemberProfile />} />
-        
-        {/* Admin Dashboard Routes */}
+
+        {/* Admin Dashboard Routes - All use Database Group ID */}
         <Route path="/admin/:groupId" element={<AdminDashboard />} />
         <Route path="/admin/:groupId/modules" element={<Modules />} />
         <Route path="/admin/:groupId/members" element={<Members />} />
@@ -184,7 +195,7 @@ function App() {
         <Route path="/admin/:groupId/settings" element={<Settings />} />
         <Route path="/admin/:groupId/bot-builder" element={<BotBuilder />} />
         <Route path="/admin/:groupId/advanced" element={<AdvancedFeatures />} />
-        
+
         {/* New Feature Routes */}
         <Route path="/admin/:groupId/moderation" element={<ModerationQueue />} />
         <Route path="/admin/:groupId/notes-filters" element={<NotesAndFilters />} />
@@ -194,27 +205,27 @@ function App() {
         <Route path="/admin/:groupId/import-export" element={<ImportExport />} />
         <Route path="/admin/:groupId/custom-bot" element={<CustomBotToken />} />
         <Route path="/admin/:groupId/integrations" element={<Integrations />} />
-        
+
         {/* New Unified Routes */}
         <Route path="/admin/:groupId/security" element={<SecurityCenter />} />
         <Route path="/admin/:groupId/polls" element={<PollsCenter />} />
-        
+
         {/* New Hubs - High Priority */}
         <Route path="/admin/:groupId/gamification" element={<GamificationHub />} />
         <Route path="/admin/:groupId/community" element={<CommunityHub />} />
         <Route path="/admin/:groupId/games" element={<GamesHub />} />
-        
+
         {/* New Hubs - Medium Priority */}
         <Route path="/admin/:groupId/broadcast" element={<BroadcastCenter />} />
         <Route path="/admin/:groupId/automation" element={<AutomationCenter />} />
-        
+
         {/* New Hubs - Low Priority */}
         <Route path="/admin/:groupId/formatting" element={<FormattingTools />} />
         <Route path="/admin/:groupId/search" element={<AdvancedSearch />} />
-        
+
         {/* Message Graveyard */}
         <Route path="/admin/:groupId/graveyard" element={<Graveyard />} />
-        
+
         {/* Group Intelligence */}
         <Route path="/admin/:groupId/intelligence" element={<GroupIntelligence />} />
         <Route path="/admin/:groupId/automation-enhanced" element={<AutomationCenterEnhanced />} />

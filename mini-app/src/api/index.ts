@@ -16,6 +16,7 @@ export {
 
 // Re-export from groups (canonical Group type)
 export * from './groups'
+export { getGroupByTelegramId, getGroupStatsByTelegramId } from './groups'
 
 // Re-export other modules
 export * from './members'

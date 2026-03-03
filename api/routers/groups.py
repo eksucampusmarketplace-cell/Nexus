@@ -87,13 +87,41 @@ async def list_my_groups(
     return groups_data
 
 
+@router.get("/groups/by-telegram-id/{telegram_id}", response_model=GroupResponse)
+async def get_group_by_telegram_id(
+    telegram_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get group details by Telegram chat ID."""
+    result = await db.execute(
+        select(Group).where(Group.telegram_id == telegram_id)
+    )
+    group = result.scalar()
+
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    # Check membership
+    result = await db.execute(
+        select(Member).where(
+            Member.user_id == current_user.id,
+            Member.group_id == group.id,
+        )
+    )
+    if not result.scalar():
+        raise HTTPException(status_code=403, detail="Not a member of this group")
+
+    return group
+
+
 @router.get("/groups/{group_id}", response_model=GroupResponse)
 async def get_group(
     group_id: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get group details."""
+    """Get group details by database ID."""
     result = await db.execute(
         select(Group).where(Group.id == group_id)
     )
@@ -159,13 +187,104 @@ async def update_group(
     return group
 
 
+@router.get("/groups/by-telegram-id/{telegram_id}/stats", response_model=GroupStats)
+async def get_group_stats_by_telegram_id(
+    telegram_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get group statistics by Telegram chat ID."""
+    result = await db.execute(
+        select(Group).where(Group.telegram_id == telegram_id)
+    )
+    group = result.scalar()
+
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    # Check membership
+    result = await db.execute(
+        select(Member).where(
+            Member.user_id == current_user.id,
+            Member.group_id == group.id,
+        )
+    )
+    if not result.scalar():
+        raise HTTPException(status_code=403, detail="Not a member of this group")
+
+    # Calculate stats using group.id (Database ID)
+    total_members = await db.scalar(
+        select(func.count()).where(Member.group_id == group.id)
+    )
+
+    from datetime import datetime, timedelta
+
+    day_ago = datetime.utcnow() - timedelta(days=1)
+    week_ago = datetime.utcnow() - timedelta(days=7)
+
+    active_24h = await db.scalar(
+        select(func.count()).where(
+            Member.group_id == group.id,
+            Member.last_active >= day_ago,
+        )
+    )
+
+    active_7d = await db.scalar(
+        select(func.count()).where(
+            Member.group_id == group.id,
+            Member.last_active >= week_ago,
+        )
+    )
+
+    new_24h = await db.scalar(
+        select(func.count()).where(
+            Member.group_id == group.id,
+            Member.joined_at >= day_ago,
+        )
+    )
+
+    messages_24h = sum(m.message_count for m in await db.execute(
+        select(Member).where(Member.group_id == group.id)
+    ).scalars().all())
+
+    # Top members
+    top_members_result = await db.execute(
+        select(Member, User)
+        .join(User, Member.user_id == User.id)
+        .where(Member.group_id == group.id)
+        .order_by(Member.message_count.desc())
+        .limit(10)
+    )
+    top_members = [
+        {
+            "id": user.id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "message_count": member.message_count,
+            "xp": member.xp,
+            "level": member.level,
+        }
+        for member, user in top_members_result.all()
+    ]
+
+    return GroupStats(
+        total_members=total_members,
+        active_members_24h=active_24h,
+        active_members_7d=active_7d,
+        new_members_24h=new_24h,
+        messages_24h=messages_24h,
+        top_members=top_members,
+        mood_score=75.0,  # Placeholder for AI mood analysis
+    )
+
+
 @router.get("/groups/{group_id}/stats", response_model=GroupStats)
 async def get_group_stats(
     group_id: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get group statistics."""
+    """Get group statistics by database ID."""
     result = await db.execute(
         select(Group).where(Group.id == group_id)
     )
