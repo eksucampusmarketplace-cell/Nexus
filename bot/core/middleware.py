@@ -28,9 +28,22 @@ from shared.schemas import Role
 logger = logging.getLogger(__name__)
 
 
+def get_mini_app_url():
+    """Get Mini App URL from environment or fallback to production."""
+    mini_app_url = os.getenv("MINI_APP_URL", "")
+    if mini_app_url and mini_app_url != "http://localhost:3000":
+        return mini_app_url
+    # Fallback to webhook URL base domain or production URL
+    webhook_url = os.getenv("WEBHOOK_URL", "")
+    if webhook_url:
+        return webhook_url.split("/webhook")[0]
+    # Final fallback to production URL
+    return "https://nexus-4uxn.onrender.com"
+
+
 def get_mini_app_button():
     """Get Mini App button if URL is configured."""
-    mini_app_url = os.getenv("MINI_APP_URL", "")
+    mini_app_url = get_mini_app_url()
     if mini_app_url:
         return InlineKeyboardButton(
             text="🚀 Open Mini App",
@@ -41,7 +54,7 @@ def get_mini_app_button():
 
 def get_mini_app_keyboard():
     """Get inline keyboard with Mini App button."""
-    mini_app_url = os.getenv("MINI_APP_URL", "")
+    mini_app_url = get_mini_app_url()
     if mini_app_url:
         return InlineKeyboardMarkup(
             inline_keyboard=[
@@ -232,7 +245,7 @@ class MiddlewarePipeline:
             return True
 
         if command == "settings":
-            mini_app_url = os.getenv("MINI_APP_URL", "")
+            mini_app_url = get_mini_app_url()
             if mini_app_url:
                 text = f"⚙️ {hbold('Nexus Settings')}\n\n"
                 text += "Open the Mini App to configure your groups, manage modules, and customize settings!"
@@ -276,6 +289,82 @@ class MiddlewarePipeline:
             logger.error(f"Failed to send unknown command hint: {e}")
         return True
 
+    async def _handle_private_callback(self, bot: Bot, update: Update) -> bool:
+        """Handle callback queries from private chat button clicks."""
+        if not update.callback_query:
+            return False
+
+        callback_data = update.callback_query.data
+        callback_message = update.callback_query.message
+
+        # If there's no message (inline keyboard), try to get chat from the query itself
+        if not callback_message and update.callback_query.chat_instance:
+            # For inline keyboards, we need the message to know which chat to respond in
+            # Try to get chat from the inline message ID or chat instance
+            pass  # Can't respond without knowing the chat
+
+        if not callback_message:
+            logger.warning("Callback query has no associated message, cannot handle in private chat")
+            return False
+
+        logger.info(f"Processing callback query: {callback_data}")
+
+        try:
+            # Answer the callback query first
+            await update.callback_query.answer()
+
+            # Handle different callback data
+            if callback_data == "help":
+                text = f"{hbold('📚 Nexus Bot Help')}\n\n"
+                text += f"{hbold('Core Commands')}:\n"
+                text += f"  {hcode('/start')} - Start the bot\n"
+                text += f"  {hcode('/help')} - Show this help\n"
+                text += f"  {hcode('/ping')} - Check bot latency\n"
+                text += f"  {hcode('/about')} - About Nexus bot\n"
+                text += f"  {hcode('/settings')} - Open Mini App settings\n\n"
+                text += f"Add me to a group to enable moderation features!"
+
+                keyboard = get_mini_app_keyboard()
+                await bot.send_message(
+                    chat_id=callback_message.chat.id,
+                    text=text,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+                return True
+
+            elif callback_data == "commands":
+                text = f"{hbold('⚡ Available Commands')}\n\n"
+                text += f"{hbold('General')}:\n"
+                text += f"  {hcode('/start')} - Start the bot\n"
+                text += f"  {hcode('/help')} - Get help\n"
+                text += f"  {hcode('/ping')} - Check latency\n"
+                text += f"  {hcode('/about')} - Bot info\n"
+                text += f"  {hcode('/settings')} - Open settings\n\n"
+                text += f"{hbold('Moderation')}:\n"
+                text += f"  {hcode('/warn')} - Warn a user\n"
+                text += f"  {hcode('/mute')} - Mute a user\n"
+                text += f"  {hcode('/ban')} - Ban a user\n"
+                text += f"  {hcode('/kick')} - Kick a user\n\n"
+                text += f"Add me to a group to see all commands!"
+
+                keyboard = get_mini_app_keyboard()
+                await bot.send_message(
+                    chat_id=callback_message.chat.id,
+                    text=text,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+                return True
+
+            else:
+                logger.info(f"Unknown callback data: {callback_data}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error handling private callback: {e}")
+            return False
+
     async def process_update(
         self,
         bot: Bot,
@@ -294,6 +383,13 @@ class MiddlewarePipeline:
             logger.info(f"Routing to private command handler for chat {update.message.chat.id}")
             result = await self._handle_private_command(bot, update)
             logger.info(f"Private command handler result: {result}")
+            return result
+
+        # Handle private chat callback queries (button clicks)
+        if update.callback_query and update.callback_query.message and update.callback_query.message.chat.type == "private":
+            logger.info(f"Routing to private callback handler for chat {update.callback_query.message.chat.id}")
+            result = await self._handle_private_callback(bot, update)
+            logger.info(f"Private callback handler result: {result}")
             return result
 
         # Create database session for group updates
@@ -347,11 +443,12 @@ class MiddlewarePipeline:
             telegram_chat = update.message.chat
         elif update.callback_query:
             telegram_user = update.callback_query.from_user
-            telegram_chat = (
-                update.callback_query.message.chat
-                if update.callback_query.message
-                else None
-            )
+            # Try to get chat from the message first, then fall back to the chat property
+            if update.callback_query.message:
+                telegram_chat = update.callback_query.message.chat
+            elif hasattr(update.callback_query, 'chat') and update.callback_query.chat:
+                # For inline keyboards, the chat property gives us the chat where it was used
+                telegram_chat = update.callback_query.chat
         elif update.inline_query:
             telegram_user = update.inline_query.from_user
         elif update.edited_message:

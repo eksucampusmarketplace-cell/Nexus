@@ -9,11 +9,15 @@ export interface User {
   last_name: string | null
   language_code: string
   is_premium: boolean
+  is_owner: boolean
+  is_support: boolean
+  is_staff: boolean
 }
 
 interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
+  isRehydrated: boolean
   token: string | null
   user: User | null
   error: string | null
@@ -21,17 +25,27 @@ interface AuthState {
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   logout: () => void
+  // Helper to check if we have a stored token
+  hasStoredToken: () => boolean
+  // Check if auth is ready (rehydrated and not loading)
+  isAuthReady: () => boolean
+  // Check if current user is owner/support
+  isUserOwner: () => boolean
+  isUserSupport: () => boolean
+  isUserStaff: () => boolean
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       isAuthenticated: false,
       isLoading: true,
+      isRehydrated: false,
       token: null,
       user: null,
       error: null,
       setAuth: (token, user) => {
+        // Ensure token is written to localStorage BEFORE state update
         localStorage.setItem('nexus_token', token)
         set({ isAuthenticated: true, token, user, error: null })
       },
@@ -41,9 +55,34 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem('nexus_token')
         set({ isAuthenticated: false, token: null, user: null })
       },
+      hasStoredToken: () => {
+        return !!localStorage.getItem('nexus_token')
+      },
+      isAuthReady: () => {
+        const state = get()
+        return state.isRehydrated && !state.isLoading
+      },
+      isUserOwner: () => {
+        const state = get()
+        return state.user?.is_owner ?? false
+      },
+      isUserSupport: () => {
+        const state = get()
+        return state.user?.is_support ?? false
+      },
+      isUserStaff: () => {
+        const state = get()
+        return state.user?.is_staff ?? false
+      }
     }),
     {
       name: 'nexus-auth',
+      onRehydrateStorage: () => (state) => {
+        // Mark as rehydrated after persist middleware restores state
+        if (state) {
+          state.isRehydrated = true
+        }
+      }
     }
   )
 )

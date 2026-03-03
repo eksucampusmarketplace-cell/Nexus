@@ -34,16 +34,17 @@ export default function Analytics() {
   }
 
   return (
-    <div className="py-6 animate-fade-in">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Analytics</h1>
-        <p className="text-dark-400 mt-1">
+    <div className="animate-fade-in space-y-4 sm:space-y-6">
+      {/* Header - Responsive */}
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold text-white">Analytics</h1>
+        <p className="text-dark-400 mt-1 text-sm sm:text-base">
           Insights and statistics for your group
         </p>
       </div>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      {/* Overview Stats - Responsive grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           title="Total Members"
           value={stats?.total_members.toLocaleString() || '0'}
@@ -74,51 +75,52 @@ export default function Analytics() {
 
       {/* Top Members */}
       <Card title="Top Members" icon={Users}>
-        <div className="space-y-3 mt-4">
+        <div className="space-y-2 sm:space-y-3 mt-3 sm:mt-4">
           {stats?.top_members?.slice(0, 5).map((member: any, index: number) => (
-            <div key={member.id} className="flex items-center gap-3">
-              <span className="w-6 text-center text-dark-500 font-mono">#{index + 1}</span>
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold text-white">
+            <div key={member.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-0 -mx-2 px-2 sm:mx-0 sm:px-0 hover:bg-dark-800 sm:hover:bg-transparent rounded-lg sm:rounded-none transition-colors">
+              <span className="w-5 sm:w-6 text-center text-dark-500 font-mono text-xs sm:text-sm flex-shrink-0">#{index + 1}</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-primary-500 to-purple-600 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-white flex-shrink-0">
                 {member.first_name.charAt(0).toUpperCase()}
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-white">{member.first_name}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm sm:text-base font-medium text-white truncate">{member.first_name}</p>
                 {member.username && (
                   <p className="text-xs text-dark-400">@{member.username}</p>
                 )}
               </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-white">{member.message_count}</p>
+              <div className="text-right flex-shrink-0">
+                <p className="text-sm sm:text-base font-medium text-white">{member.message_count}</p>
                 <p className="text-xs text-dark-400">messages</p>
               </div>
             </div>
           ))}
 
           {!stats?.top_members?.length && (
-            <p className="text-center text-dark-400 py-4">No activity yet</p>
+            <p className="text-center text-dark-400 py-4 text-sm sm:text-base">No activity yet</p>
           )}
         </div>
       </Card>
 
       {/* Mod Actions */}
-      <div className="mt-6">
-        <Card title="Moderation Activity" icon={Shield}>
-          <div className="grid grid-cols-3 gap-4 mt-4">
-            <div className="text-center p-4 bg-dark-800 rounded-lg">
-              <p className="text-2xl font-bold text-white">0</p>
-              <p className="text-xs text-dark-400">Warnings (24h)</p>
-            </div>
-            <div className="text-center p-4 bg-dark-800 rounded-lg">
-              <p className="text-2xl font-bold text-white">0</p>
-              <p className="text-xs text-dark-400">Mutes (24h)</p>
-            </div>
-            <div className="text-center p-4 bg-dark-800 rounded-lg">
-              <p className="text-2xl font-bold text-white">0</p>
-              <p className="text-xs text-dark-400">Bans (24h)</p>
-            </div>
+      <Card title="Moderation Activity" icon={Shield}>
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-3 sm:mt-4">
+          <div className="text-center p-2 sm:p-4 bg-dark-800 rounded-lg">
+            <p className="text-lg sm:text-2xl font-bold text-white">0</p>
+            <p className="text-xs sm:text-xs text-dark-400">Warnings</p>
+            <p className="text-xxs text-dark-500 hidden sm:block">(24h)</p>
           </div>
-        </Card>
-      </div>
+          <div className="text-center p-2 sm:p-4 bg-dark-800 rounded-lg">
+            <p className="text-lg sm:text-2xl font-bold text-white">0</p>
+            <p className="text-xs sm:text-xs text-dark-400">Mutes</p>
+            <p className="text-xxs text-dark-500 hidden sm:block">(24h)</p>
+          </div>
+          <div className="text-center p-2 sm:p-4 bg-dark-800 rounded-lg">
+            <p className="text-lg sm:text-2xl font-bold text-white">0</p>
+            <p className="text-xs sm:text-xs text-dark-400">Bans</p>
+            <p className="text-xxs text-dark-500 hidden sm:block">(24h)</p>
+          </div>
+        </div>
+      </Card>
     </div>
   )
 }

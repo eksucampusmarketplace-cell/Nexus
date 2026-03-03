@@ -46,13 +46,16 @@ export default function CustomBotToken() {
     if (!groupId) return
     setLoading(true)
     try {
-      const data = await getBotToken(parseInt(groupId))
+      // API calls still use numeric groupId (backend handles this)
+      const numericGroupId = parseInt(groupId, 10)
+      const data = await getBotToken(numericGroupId)
       setBotToken(data)
 
-      // Also load token from localStorage (for authentication purposes)
+      // localStorage uses string keys to avoid precision loss with large Telegram IDs
       if (!data) {
         const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
-        if (storedTokens[groupId]) {
+        // Use string version of groupId as key (consistent with how it's stored)
+        if (storedTokens[String(groupId)]) {
           // Token exists in localStorage but not registered in backend
           // This can happen if user cleared browser data but localStorage persists
           console.log('Found token in localStorage but not registered in backend')
@@ -92,15 +95,19 @@ export default function CustomBotToken() {
     if (!groupId || !tokenInput) return
     setRegistering(true)
     try {
-      const result = await registerBotToken(parseInt(groupId), tokenInput)
+      // API calls still use numeric groupId (backend handles this)
+      const numericGroupId = parseInt(groupId, 10)
+      const result = await registerBotToken(numericGroupId, tokenInput)
       setBotToken(result)
       setTokenInput('')
       setValidatedBot(null)
       toast.success('Bot token registered successfully!')
 
       // Store the bot token in localStorage for authentication
+      // Use string version of groupId as key to avoid JavaScript number precision loss
+      // Telegram IDs can exceed Number.MAX_SAFE_INTEGER (2^53-1)
       const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
-      storedTokens[groupId] = tokenInput
+      storedTokens[String(groupId)] = tokenInput
       localStorage.setItem('nexus_custom_bot_tokens', JSON.stringify(storedTokens))
     } catch (error) {
       toast.error('Failed to register token')
@@ -112,14 +119,17 @@ export default function CustomBotToken() {
   const handleRevoke = async () => {
     if (!groupId) return
     try {
-      await revokeBotToken(parseInt(groupId))
+      // API calls still use numeric groupId (backend handles this)
+      const numericGroupId = parseInt(groupId, 10)
+      await revokeBotToken(numericGroupId)
       setBotToken(null)
       setShowConfirmRevoke(false)
       toast.success('Bot token revoked')
 
       // Remove the bot token from localStorage
+      // Use string version of groupId as key to ensure correct deletion
       const storedTokens = JSON.parse(localStorage.getItem('nexus_custom_bot_tokens') || '{}')
-      delete storedTokens[groupId]
+      delete storedTokens[String(groupId)]
       localStorage.setItem('nexus_custom_bot_tokens', JSON.stringify(storedTokens))
     } catch (error) {
       toast.error('Failed to revoke token')

@@ -43,58 +43,76 @@ async def list_my_groups(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List groups where user is a member with additional metadata."""
-    from shared.models import BotInstance
+    """List groups with member-specific details for the dashboard."""
+    from datetime import datetime
 
-    # Get all groups where user is a member with their role
+    # Get groups with member details
     result = await db.execute(
         select(Group, Member)
         .join(Member, Member.group_id == Group.id)
         .where(Member.user_id == current_user.id)
         .order_by(Group.title)
     )
+    rows = result.all()
 
     groups_data = []
-    for group, member in result.all():
+    for group, member in rows:
         # Count enabled modules
         modules_result = await db.execute(
             select(func.count()).where(
-                ModuleConfig.group_id == group.id, ModuleConfig.is_enabled == True
+                ModuleConfig.group_id == group.id,
+                ModuleConfig.is_enabled == True
             )
         )
-        enabled_modules = modules_result.scalar() or 0
+        enabled_modules_count = modules_result.scalar() or 0
 
-        # Check for custom bot
-        bot_result = await db.execute(
-            select(BotInstance).where(
-                BotInstance.group_id == group.id, BotInstance.is_active == True
-            )
-        )
-        bot_instance = bot_result.scalar_one_or_none()
+        # Format last activity
+        last_activity = member.last_active.isoformat() if member.last_active else group.updated_at.isoformat() if group.updated_at else group.created_at.isoformat()
 
-        groups_data.append(
-            {
-                "id": group.id,
-                "telegramId": group.telegram_id,
-                "title": group.title,
-                "username": group.username,
-                "memberCount": group.member_count or 0,
-                "isPremium": group.is_premium or False,
-                "role": member.role,
-                "enabledModulesCount": enabled_modules,
-                "lastActivity": (
-                    member.last_active.isoformat()
-                    if member.last_active
-                    else group.created_at.isoformat()
-                ),
-                "hasCustomBot": bot_instance is not None,
-                "customBotUsername": (
-                    bot_instance.bot_username if bot_instance else None
-                ),
-            }
-        )
+        groups_data.append({
+            "id": group.id,
+            "telegramId": group.telegram_id,
+            "title": group.title,
+            "username": group.username,
+            "memberCount": group.member_count,
+            "isPremium": group.is_premium,
+            "role": member.role.value if hasattr(member.role, 'value') else str(member.role),
+            "enabledModulesCount": enabled_modules_count,
+            "lastActivity": last_activity,
+            "hasCustomBot": False,  # TODO: Implement custom bot check
+            "customBotUsername": None,
+            "avatar": None,
+        })
 
     return groups_data
+
+
+@router.get("/groups/by-telegram-id/{telegram_id}", response_model=GroupResponse)
+async def get_group_by_telegram_id(
+    telegram_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get group details by Telegram chat ID."""
+    result = await db.execute(
+        select(Group).where(Group.telegram_id == telegram_id)
+    )
+    group = result.scalar()
+
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    # Check membership
+    result = await db.execute(
+        select(Member).where(
+            Member.user_id == current_user.id,
+            Member.group_id == group.id,
+        )
+    )
+    if not result.scalar():
+        raise HTTPException(status_code=403, detail="Not a member of this group")
+
+    return group
 
 
 @router.get("/groups/{group_id}", response_model=GroupResponse)
@@ -103,8 +121,10 @@ async def get_group(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get group details."""
-    result = await db.execute(select(Group).where(Group.id == group_id))
+    """Get group details by database ID."""
+    result = await db.execute(
+        select(Group).where(Group.id == group_id)
+    )
     group = result.scalar()
 
     if not group:
@@ -131,7 +151,9 @@ async def update_group(
     db: AsyncSession = Depends(get_db),
 ):
     """Update group settings."""
-    result = await db.execute(select(Group).where(Group.id == group_id))
+    result = await db.execute(
+        select(Group).where(Group.id == group_id)
+    )
     group = result.scalar()
 
     if not group:
@@ -165,14 +187,107 @@ async def update_group(
     return group
 
 
+@router.get("/groups/by-telegram-id/{telegram_id}/stats", response_model=GroupStats)
+async def get_group_stats_by_telegram_id(
+    telegram_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get group statistics by Telegram chat ID."""
+    result = await db.execute(
+        select(Group).where(Group.telegram_id == telegram_id)
+    )
+    group = result.scalar()
+
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    # Check membership
+    result = await db.execute(
+        select(Member).where(
+            Member.user_id == current_user.id,
+            Member.group_id == group.id,
+        )
+    )
+    if not result.scalar():
+        raise HTTPException(status_code=403, detail="Not a member of this group")
+
+    # Calculate stats using group.id (Database ID)
+    total_members = await db.scalar(
+        select(func.count()).where(Member.group_id == group.id)
+    )
+
+    from datetime import datetime, timedelta
+
+    day_ago = datetime.utcnow() - timedelta(days=1)
+    week_ago = datetime.utcnow() - timedelta(days=7)
+
+    active_24h = await db.scalar(
+        select(func.count()).where(
+            Member.group_id == group.id,
+            Member.last_active >= day_ago,
+        )
+    )
+
+    active_7d = await db.scalar(
+        select(func.count()).where(
+            Member.group_id == group.id,
+            Member.last_active >= week_ago,
+        )
+    )
+
+    new_24h = await db.scalar(
+        select(func.count()).where(
+            Member.group_id == group.id,
+            Member.joined_at >= day_ago,
+        )
+    )
+
+    messages_24h = sum(m.message_count for m in await db.execute(
+        select(Member).where(Member.group_id == group.id)
+    ).scalars().all())
+
+    # Top members
+    top_members_result = await db.execute(
+        select(Member, User)
+        .join(User, Member.user_id == User.id)
+        .where(Member.group_id == group.id)
+        .order_by(Member.message_count.desc())
+        .limit(10)
+    )
+    top_members = [
+        {
+            "id": user.id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "message_count": member.message_count,
+            "xp": member.xp,
+            "level": member.level,
+        }
+        for member, user in top_members_result.all()
+    ]
+
+    return GroupStats(
+        total_members=total_members,
+        active_members_24h=active_24h,
+        active_members_7d=active_7d,
+        new_members_24h=new_24h,
+        messages_24h=messages_24h,
+        top_members=top_members,
+        mood_score=75.0,  # Placeholder for AI mood analysis
+    )
+
+
 @router.get("/groups/{group_id}/stats", response_model=GroupStats)
 async def get_group_stats(
     group_id: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get group statistics."""
-    result = await db.execute(select(Group).where(Group.id == group_id))
+    """Get group statistics by database ID."""
+    result = await db.execute(
+        select(Group).where(Group.id == group_id)
+    )
     group = result.scalar()
 
     if not group:
@@ -219,12 +334,9 @@ async def get_group_stats(
         )
     )
 
-    messages_24h = sum(
-        m.message_count
-        for m in await db.execute(select(Member).where(Member.group_id == group_id))
-        .scalars()
-        .all()
-    )
+    messages_24h = sum(m.message_count for m in await db.execute(
+        select(Member).where(Member.group_id == group_id)
+    ).scalars().all())
 
     # Top members
     top_members_result = await db.execute(
@@ -444,3 +556,170 @@ async def update_module_config(
 
     await db.commit()
     return {"config": config.config, "is_enabled": config.is_enabled}
+
+
+# ============ Bot Token Management ============
+
+
+@router.get("/groups/{group_id}/token")
+async def get_bot_token(
+    group_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get bot token info for a group (without exposing the actual token)."""
+    from shared.models import BotInstance
+    
+    # Check membership
+    result = await db.execute(
+        select(Member).where(
+            Member.user_id == current_user.id,
+            Member.group_id == group_id,
+        )
+    )
+    member = result.scalar()
+
+    if not member or member.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Get bot instance
+    result = await db.execute(
+        select(BotInstance).where(
+            BotInstance.group_id == group_id,
+            BotInstance.is_active == True
+        )
+    )
+    bot_instance = result.scalar_one_or_none()
+
+    if not bot_instance:
+        return None
+
+    # Return bot info WITHOUT exposing the actual token
+    return {
+        "bot_telegram_id": bot_instance.bot_telegram_id,
+        "bot_username": bot_instance.bot_username,
+        "bot_name": bot_instance.bot_name,
+        "is_active": bot_instance.is_active,
+        "registered_at": bot_instance.registered_at.isoformat() if bot_instance.registered_at else None,
+    }
+
+
+@router.post("/groups/{group_id}/token")
+async def register_bot_token(
+    group_id: int,
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Register a bot token for a group."""
+    import os
+    from cryptography.fernet import Fernet
+    from shared.models import BotInstance
+    
+    token = data.get("token")
+    if not token:
+        raise HTTPException(status_code=400, detail="Token is required")
+
+    # Check admin permission
+    result = await db.execute(
+        select(Member).where(
+            Member.user_id == current_user.id,
+            Member.group_id == group_id,
+        )
+    )
+    member = result.scalar()
+
+    if not member or member.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Validate token with Telegram API
+    try:
+        from aiogram import Bot
+        bot = Bot(token=token)
+        me = await bot.get_me()
+        bot_telegram_id = me.id
+        bot_username = me.username
+        bot_name = me.full_name
+        await bot.session.close()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid bot token: {str(e)}")
+
+    # Encrypt token for storage
+    encryption_key = os.getenv("ENCRYPTION_KEY")
+    if not encryption_key:
+        raise HTTPException(status_code=500, detail="Encryption key not configured")
+    
+    fernet = Fernet(encryption_key.encode())
+    encrypted_token = fernet.encrypt(token.encode()).decode()
+
+    # Check if bot instance already exists
+    result = await db.execute(
+        select(BotInstance).where(BotInstance.group_id == group_id)
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        # Update existing
+        existing.token_hash = encrypted_token
+        existing.bot_telegram_id = bot_telegram_id
+        existing.bot_username = bot_username
+        existing.bot_name = bot_name
+        existing.is_active = True
+        existing.registered_by = current_user.id
+    else:
+        # Create new
+        bot_instance = BotInstance(
+            token_hash=encrypted_token,
+            bot_telegram_id=bot_telegram_id,
+            bot_username=bot_username,
+            bot_name=bot_name,
+            group_id=group_id,
+            registered_by=current_user.id,
+            is_active=True,
+        )
+        db.add(bot_instance)
+
+    await db.commit()
+
+    # Return info WITHOUT the actual token
+    return {
+        "bot_telegram_id": bot_telegram_id,
+        "bot_username": bot_username,
+        "bot_name": bot_name,
+        "is_active": True,
+        "registered_at": None,  # Will be set on next GET
+    }
+
+
+@router.delete("/groups/{group_id}/token")
+async def revoke_bot_token(
+    group_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke (delete) bot token for a group."""
+    from shared.models import BotInstance
+    
+    # Check admin permission
+    result = await db.execute(
+        select(Member).where(
+            Member.user_id == current_user.id,
+            Member.group_id == group_id,
+        )
+    )
+    member = result.scalar()
+
+    if not member or member.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Get and delete bot instance
+    result = await db.execute(
+        select(BotInstance).where(BotInstance.group_id == group_id)
+    )
+    bot_instance = result.scalar_one_or_none()
+
+    if bot_instance:
+        await db.delete(bot_instance)
+        await db.commit()
+
+    return {"message": "Bot token revoked successfully"}
