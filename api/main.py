@@ -21,32 +21,32 @@ logger = logging.getLogger(__name__)
 
 async def setup_telegram_webhook():
     """Set up Telegram webhook on startup."""
-    bot_token = os.getenv("BOT_TOKEN", "").strip()
+    bot_token = os.getenv("BOT_TOKEN")
     webhook_url = os.getenv("WEBHOOK_URL")
-
+    
     if not bot_token:
         logger.error("BOT_TOKEN not set - webhook cannot be configured!")
         return
-
+    
     if not webhook_url:
         logger.warning("WEBHOOK_URL not set - skipping webhook configuration")
         return
-
+    
     try:
         # Construct the webhook endpoint URL
         base_url = webhook_url.split("/webhook")[0]
         shared_webhook = f"{base_url}/webhook/shared"
-
+        
         if not shared_webhook.startswith("http"):
             shared_webhook = f"https://{shared_webhook}"
-
+        
         logger.info(f"Setting Telegram webhook to: {shared_webhook}")
-
+        
         bot = Bot(token=bot_token)
-
+        
         # Delete any existing webhook first
         await bot.delete_webhook(drop_pending_updates=True)
-
+        
         # Set the new webhook
         await bot.set_webhook(
             url=shared_webhook,
@@ -63,13 +63,13 @@ async def setup_telegram_webhook():
                 "message_reaction",
             ],
         )
-
+        
         # Verify webhook is set
         info = await bot.get_webhook_info()
         logger.info(f"Webhook configured successfully: {info.url}")
-
+        
         await bot.session.close()
-
+        
     except Exception as e:
         logger.error(f"Failed to set webhook: {e}")
 
@@ -83,22 +83,11 @@ async def lifespan(app: FastAPI):
     logger.info(f"Python Version: {os.sys.version}")
     logger.info(f"Working Directory: {os.getcwd()}")
     logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
-
-    # Check BOT_TOKEN configuration - strip whitespace to handle potential formatting issues
-    bot_token = os.getenv("BOT_TOKEN", "").strip()
-    if bot_token:
-        logger.info(
-            f"BOT_TOKEN configured: {bot_token[:8]}...{bot_token[-4:]}, length: {len(bot_token)}"
-        )
-    else:
-        logger.warning(
-            "BOT_TOKEN not configured! Mini App authentication will not work."
-        )
-
+    
     # Startup
     logger.info("Initializing database...")
     await init_db()
-
+    
     logger.info("Connecting to Redis...")
     await get_redis()
 
@@ -110,7 +99,7 @@ async def lifespan(app: FastAPI):
     logger.info("Loading bot modules...")
     try:
         await module_registry.load_all()
-
+        
         # Check dependencies and conflicts
         missing_deps = module_registry.check_dependencies()
         if missing_deps:
@@ -127,19 +116,16 @@ async def lifespan(app: FastAPI):
             pipeline.add_module(module)
 
         logger.info(f"Loaded {len(module_registry.get_all_modules())} modules")
-
+        
         # Run health checks on all modules
         from shared.health_check import run_startup_health_checks
-
         module_names = [m.name for m in module_registry.get_all_modules()]
         health_results = await run_startup_health_checks(module_names)
-
+        
         # Disable failing modules
         for module_name, report in health_results.items():
             if report.overall_status.value == "fail":
-                logger.error(
-                    f"Disabling module '{module_name}' due to failed health checks"
-                )
+                logger.error(f"Disabling module '{module_name}' due to failed health checks")
                 # The module registry would need a disable method
     except Exception as e:
         logger.warning(f"Module loading skipped (DB unavailable): {e}")
@@ -148,7 +134,6 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing WebSocket manager...")
     try:
         from shared.websocket_manager import get_ws_manager
-
         await get_ws_manager()
         logger.info("WebSocket manager initialized")
     except Exception as e:
@@ -158,7 +143,6 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Event Bus listener...")
     try:
         from shared.event_bus import get_event_bus
-
         event_bus = await get_event_bus()
         asyncio.create_task(event_bus.start_listener())
         logger.info("Event Bus listener started")
@@ -168,7 +152,7 @@ async def lifespan(app: FastAPI):
     # Set up Telegram webhook (critical for Render single-service deployment)
     logger.info("Setting up Telegram webhook...")
     await setup_telegram_webhook()
-
+    
     # Check Mini App files
     dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
     if os.path.exists(dist_path):
@@ -178,7 +162,7 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning(f"Mini App dist directory NOT found at: {dist_path}")
         logger.warning("Mini App will not be available via /mini-app endpoint")
-
+    
     logger.info("Startup complete!")
     logger.info("=" * 50)
 
@@ -186,15 +170,14 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down Nexus API...")
-
+    
     # Shutdown WebSocket manager
     try:
         from shared.websocket_manager import shutdown_ws_manager
-
         await shutdown_ws_manager()
     except Exception as e:
         logger.error(f"Error shutting down WebSocket manager: {e}")
-
+    
     await module_registry.unload_all()
     await close_redis()
     logger.info("Shutdown complete")
@@ -226,9 +209,7 @@ async def log_requests(request: Request, call_next):
         response = await call_next(request)
         return response
     except Exception as e:
-        logger.error(
-            f"Request failed: {request.method} {request.url.path} - Error: {e}"
-        )
+        logger.error(f"Request failed: {request.method} {request.url.path} - Error: {e}")
         raise
 
 
@@ -244,23 +225,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Mount Mini App static files
 dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
+assets_path = os.path.join(dist_path, "assets")
 
-# Check for dist folder
-if os.path.exists(dist_path):
-    # Mount assets folder
-    assets_path = os.path.join(dist_path, "assets")
-    if os.path.exists(assets_path):
-        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
-        logger.info(f"Mini App assets mounted from: {assets_path}")
-
-    # Mount root-level static files (manifest.json, favicon, etc.) at /static
-    # This ensures manifest.json is accessible at /static/manifest.json
-    static_path = dist_path
-    app.mount("/static", StaticFiles(directory=static_path), name="static")
-    logger.info(f"Mini App static files mounted from: {static_path}")
+if os.path.exists(assets_path):
+    app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+    logger.info(f"Mini App assets mounted from: {assets_path}")
 else:
-    logger.warning(f"Mini App dist directory NOT found at: {dist_path}")
-    logger.warning("Mini App will not be available via /mini-app endpoint")
+    logger.warning(f"Mini App assets directory NOT found at: {assets_path}")
 
 
 @app.get("/vite.svg", include_in_schema=False)
@@ -269,39 +240,12 @@ async def serve_vite_svg():
     vite_svg_path = os.path.join(os.getcwd(), "mini-app", "dist", "vite.svg")
     if os.path.exists(vite_svg_path):
         from fastapi.responses import FileResponse
-
         return FileResponse(vite_svg_path, media_type="image/svg+xml")
-
-    # Fallback to public folder
-    public_vite_svg = os.path.join(os.getcwd(), "mini-app", "public", "vite.svg")
-    if os.path.exists(public_vite_svg):
-        from fastapi.responses import FileResponse
-
-        return FileResponse(public_vite_svg, media_type="image/svg+xml")
-    return HTMLResponse(content="Not found", status_code=404)
-
-
-@app.get("/manifest.json", include_in_schema=False)
-async def serve_manifest():
-    """Serve manifest.json for PWA."""
-    manifest_path = os.path.join(os.getcwd(), "mini-app", "dist", "manifest.json")
-    if os.path.exists(manifest_path):
-        from fastapi.responses import FileResponse
-
-        return FileResponse(manifest_path, media_type="application/json")
-
-    # Fallback to public folder
-    public_manifest = os.path.join(os.getcwd(), "mini-app", "public", "manifest.json")
-    if os.path.exists(public_manifest):
-        from fastapi.responses import FileResponse
-
-        return FileResponse(public_manifest, media_type="application/json")
     return HTMLResponse(content="Not found", status_code=404)
 
 
 # Import and include routers
 from api.routers import (
-    admin,
     advanced,
     analytics,
     auth,
@@ -337,7 +281,6 @@ app.include_router(webhooks.router, prefix="/webhook", tags=["webhooks"])
 app.include_router(messages.router, prefix="/api/v1", tags=["Message Templates"])
 app.include_router(commands.router, prefix="/api/v1", tags=["Commands"])
 app.include_router(graveyard.router, prefix="/api/v1", tags=["Message Graveyard"])
-app.include_router(admin.router, prefix="/api/v1", tags=["Admin"])
 # WebSocket router (no prefix, handles /ws/{group_id} directly)
 app.include_router(websocket.router)
 
@@ -345,10 +288,9 @@ app.include_router(websocket.router)
 @app.get("/", include_in_schema=False)
 async def root_redirect(request: Request):
     """Force redirect to mini-app for all browser/Telegram UI requests."""
-    # This ensures that any browser-like request to the root (/)
+    # This ensures that any browser-like request to the root (/) 
     # goes straight to the React dashboard.
     return RedirectResponse(url="/mini-app")
-
 
 @app.get("/api/status")
 async def api_status():
@@ -372,9 +314,9 @@ async def serve_mini_app():
     """Serve Mini App at /mini-app."""
     index_path = os.path.join(os.getcwd(), "mini-app", "dist", "index.html")
     replit_index_path = os.path.join(os.getcwd(), "index.html")
-
+    
     target_path = index_path if os.path.exists(index_path) else replit_index_path
-
+    
     if not os.path.exists(target_path):
         return HTMLResponse(
             content="""
@@ -423,28 +365,26 @@ async def serve_mini_app():
             </body>
             </html>
         """,
-            status_code=200,
+            status_code=200
         )
-
+    
     with open(target_path, "r") as f:
         html_content = f.read()
-
+    
     return HTMLResponse(content=html_content)
 
 
-@app.get(
-    "/mini-app/{full_path:path}", response_class=HTMLResponse, include_in_schema=False
-)
+@app.get("/mini-app/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
 async def serve_mini_app_spa(full_path: str):
     """Catch-all for Mini App client-side routing."""
     index_path = os.path.join(os.getcwd(), "mini-app", "dist", "index.html")
     replit_index_path = os.path.join(os.getcwd(), "index.html")
-
+    
     target_path = index_path if os.path.exists(index_path) else replit_index_path
-
+    
     if not os.path.exists(target_path):
         return HTMLResponse(content="<h1>Mini App Not Found</h1>", status_code=404)
-
+    
     with open(target_path, "r") as f:
         return HTMLResponse(content=f.read())
 
@@ -472,31 +412,29 @@ async def debug_mini_app():
     """Debug endpoint to check Mini App availability."""
     import httpx
     import socket
-
+    
     mini_app_url = os.getenv("MINI_APP_URL")
     if not mini_app_url:
         return {
             "error": "MINI_APP_URL not set",
-            "suggestion": "Check render.yaml environment variables",
+            "suggestion": "Check render.yaml environment variables"
         }
-
+    
     results = {
         "mini_app_url": mini_app_url,
         "dns_resolution": None,
         "http_response": None,
         "error": None,
     }
-
+    
     # Check DNS resolution
     try:
-        hostname = (
-            mini_app_url.replace("https://", "").replace("http://", "").split("/")[0]
-        )
+        hostname = mini_app_url.replace("https://", "").replace("http://", "").split("/")[0]
         ip = socket.gethostbyname(hostname)
         results["dns_resolution"] = {"success": True, "hostname": hostname, "ip": ip}
     except Exception as e:
         results["dns_resolution"] = {"success": False, "error": str(e)}
-
+    
     # Check HTTP response
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -505,16 +443,12 @@ async def debug_mini_app():
                 "status_code": response.status_code,
                 "headers": dict(response.headers),
                 "content_length": len(response.content),
-                "content_preview": (
-                    response.text[:200]
-                    if len(response.text) < 200
-                    else response.text[:200] + "..."
-                ),
+                "content_preview": response.text[:200] if len(response.text) < 200 else response.text[:200] + "...",
             }
     except Exception as e:
         results["http_response"] = {"success": False, "error": str(e)}
         results["error"] = str(e)
-
+    
     return results
 
 
@@ -522,17 +456,15 @@ async def debug_mini_app():
 async def debug_static_files():
     """Debug endpoint to check if static files exist."""
     dist_path_local = os.path.join(os.getcwd(), "mini-app", "dist")
-
+    
     results = {
         "current_working_dir": os.getcwd(),
         "dist_path": dist_path_local,
         "dist_exists": os.path.exists(dist_path_local),
-        "dist_is_dir": (
-            os.path.isdir(dist_path_local) if os.path.exists(dist_path_local) else None
-        ),
+        "dist_is_dir": os.path.isdir(dist_path_local) if os.path.exists(dist_path_local) else None,
         "mini_app_exists": os.path.exists(os.path.join(os.getcwd(), "mini-app")),
     }
-
+    
     if os.path.exists(dist_path_local) and os.path.isdir(dist_path_local):
         try:
             files = []
@@ -540,17 +472,15 @@ async def debug_static_files():
                 for filename in filenames:
                     filepath = os.path.join(root, filename)
                     relpath = os.path.relpath(filepath, dist_path_local)
-                    files.append(
-                        {
-                            "path": relpath,
-                            "size": os.path.getsize(filepath),
-                        }
-                    )
+                    files.append({
+                        "path": relpath,
+                        "size": os.path.getsize(filepath),
+                    })
             results["files"] = sorted(files, key=lambda x: x["path"])
             results["total_files"] = len(files)
         except Exception as e:
             results["file_list_error"] = str(e)
-
+    
     return results
 
 
@@ -559,9 +489,9 @@ async def debug_summary():
     """Comprehensive debug summary endpoint."""
     import httpx
     import socket
-
+    
     dist_path_local = os.path.join(os.getcwd(), "mini-app", "dist")
-
+    
     summary = {
         "api_status": {
             "service": "Nexus API",
@@ -579,16 +509,12 @@ async def debug_summary():
         "mini_app_files": {
             "dist_path": dist_path_local,
             "exists": os.path.exists(dist_path_local),
-            "is_directory": (
-                os.path.isdir(dist_path_local)
-                if os.path.exists(dist_path_local)
-                else None
-            ),
+            "is_directory": os.path.isdir(dist_path_local) if os.path.exists(dist_path_local) else None,
         },
         "mini_app_service": {},
         "recommendations": [],
     }
-
+    
     # Check static files
     if os.path.exists(dist_path_local):
         try:
@@ -602,21 +528,17 @@ async def debug_summary():
             summary["mini_app_files"]["sample_files"] = sorted(files)[:5]
         except Exception as e:
             summary["mini_app_files"]["error"] = str(e)
-
+    
     # Check Mini App service
     mini_app_url = os.getenv("MINI_APP_URL")
     if mini_app_url:
         try:
-            hostname = (
-                mini_app_url.replace("https://", "")
-                .replace("http://", "")
-                .split("/")[0]
-            )
+            hostname = mini_app_url.replace("https://", "").replace("http://", "").split("/")[0]
             ip = socket.gethostbyname(hostname)
             summary["mini_app_service"]["dns"] = {"success": True, "ip": ip}
         except Exception as e:
             summary["mini_app_service"]["dns"] = {"success": False, "error": str(e)}
-
+        
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(mini_app_url)
@@ -629,27 +551,17 @@ async def debug_summary():
     else:
         summary["mini_app_service"]["error"] = "MINI_APP_URL not set"
         summary["recommendations"].append("Set MINI_APP_URL environment variable")
-
+    
     # Generate recommendations
     if not summary["mini_app_files"]["exists"]:
-        summary["recommendations"].append(
-            "Mini App dist directory not found - run 'cd mini-app && bun run build'"
-        )
-
+        summary["recommendations"].append("Mini App dist directory not found - run 'cd mini-app && bun run build'")
+    
     if summary.get("mini_app_service", {}).get("http", {}).get("status_code") == 404:
-        summary["recommendations"].append(
-            "Mini App service returns 404 - check Render static service deployment"
-        )
-        summary["recommendations"].append(
-            "Verify staticPublishPath in render.yaml points to ./mini-app/dist"
-        )
-        summary["recommendations"].append(
-            "Check Render build logs for nexus-mini-app service"
-        )
-
+        summary["recommendations"].append("Mini App service returns 404 - check Render static service deployment")
+        summary["recommendations"].append("Verify staticPublishPath in render.yaml points to ./mini-app/dist")
+        summary["recommendations"].append("Check Render build logs for nexus-mini-app service")
+    
     if summary.get("mini_app_service", {}).get("http", {}).get("success") == False:
-        summary["recommendations"].append(
-            "Mini App service unreachable - check service status on Render"
-        )
-
+        summary["recommendations"].append("Mini App service unreachable - check service status on Render")
+    
     return summary

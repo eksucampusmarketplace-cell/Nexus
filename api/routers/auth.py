@@ -7,49 +7,38 @@ import logging
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
+from urllib.parse import parse_qsl, unquote
 
 from cryptography.fernet import Fernet
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database import get_db
-from shared.models import APIKey, Group, Member, User, BotInstance, UserSession
-from shared.schemas import (
-    AuthTokenRequest,
-    AuthTokenResponse,
-    UserPermissionsResponse,
-    UserSessionResponse,
-)
+from shared.models import APIKey, Group, Member, User, BotInstance
+from shared.schemas import AuthTokenRequest, AuthTokenResponse, UserPermissionsResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
 
-# JWT Secret Configuration
-# In production, JWT_SECRET must be explicitly set for security
-_jwt_secret = os.getenv("JWT_SECRET")
+# In production, ENCRYPTION_KEY must be explicitly set
 _env_encryption_key = os.getenv("ENCRYPTION_KEY")
 _environment = os.getenv("ENVIRONMENT", "development")
 
-if _jwt_secret:
-    # Prefer dedicated JWT_SECRET if available
-    SECRET_KEY = _jwt_secret
-elif _env_encryption_key:
-    # Fall back to ENCRYPTION_KEY for backward compatibility
+if _env_encryption_key:
     SECRET_KEY = _env_encryption_key
 elif _environment == "production":
     raise RuntimeError(
-        "JWT_SECRET environment variable is required in production. "
-        "Please set a secure JWT secret (min 32 characters). "
-        "You can also use ENCRYPTION_KEY for backward compatibility."
+        "ENCRYPTION_KEY environment variable is required in production. "
+        "Please set a secure encryption key (min 32 characters)."
     )
 else:
     # Development fallback - DO NOT use in production
-    SECRET_KEY = "dev-jwt-secret-do-not-use-in-production"
+    SECRET_KEY = "your-secret-key-min-32-characters-long"
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
@@ -69,79 +58,61 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 def parse_init_data(init_data: str) -> Tuple[dict, dict, str]:
     """
-    Parse Telegram WebApp initData.
-
-    CRITICAL: We must preserve the ORIGINAL URL-encoded values for hash validation.
-    Telegram computes the hash using the raw initData string values, NOT URL-decoded ones.
-
-    Example: If user="John%20Doe" in initData, Telegram uses "John%20Doe" for hash,
-    but parse_qsl would decode it to "John Doe", causing hash mismatch.
+    Parse Telegram WebApp initData without validation.
 
     Returns:
-        Tuple of (raw_params_encoded, parsed_data, received_hash)
+        Tuple of (raw_params, parsed_data, received_hash)
     """
-    # Split manually to preserve URL-encoded values for hash computation
-    # This is critical - Telegram uses the original URL-encoded values for hash
-    raw_params_encoded = {}
-    for pair in init_data.split("&"):
-        if "=" in pair:
-            key, value = pair.split("=", 1)
-            raw_params_encoded[key] = value
-        elif pair:
-            raw_params_encoded[pair] = ""
+    raw_params = {}
+    for param in init_data.split("&"):
+        if "=" in param:
+            key, value = param.split("=", 1)
+            raw_params[key] = value
 
-    received_hash = raw_params_encoded.get("hash", "")
+    received_hash = raw_params.get("hash", "")
 
+    # Parse user data with proper URL decoding
     parsed_data = {}
 
-    # For user and chat, we need to URL-decode the JSON before parsing
-    user_raw = raw_params_encoded.get("user", "")
+    user_raw = raw_params.get("user", "")
     if user_raw:
         try:
-            import urllib.parse
-
-            decoded_user = urllib.parse.unquote(user_raw)
-            parsed_data["user"] = json.loads(decoded_user)
-        except (json.JSONDecodeError, Exception) as e:
+            user_json = unquote(user_raw)
+            parsed_data["user"] = json.loads(user_json)
+        except json.JSONDecodeError as e:
             logger.warning(
                 f"Failed to parse user JSON: {e}, raw value: {user_raw[:100]!r}"
             )
 
-    chat_raw = raw_params_encoded.get("chat", "")
+    # Parse chat info if present
+    chat_raw = raw_params.get("chat", "")
     if chat_raw:
         try:
-            import urllib.parse
-
-            decoded_chat = urllib.parse.unquote(chat_raw)
-            parsed_data["chat"] = json.loads(decoded_chat)
-        except (json.JSONDecodeError, Exception) as e:
+            chat_json = unquote(chat_raw)
+            parsed_data["chat"] = json.loads(chat_json)
+        except json.JSONDecodeError as e:
             logger.warning(
                 f"Failed to parse chat JSON: {e}, raw value: {chat_raw[:100]!r}"
             )
 
-    if raw_params_encoded.get("chat_type"):
-        parsed_data["chat_type"] = raw_params_encoded.get("chat_type")
+    if raw_params.get("chat_type"):
+        parsed_data["chat_type"] = raw_params.get("chat_type")
 
-    if raw_params_encoded.get("start_param"):
-        parsed_data["start_param"] = raw_params_encoded.get("start_param")
+    if raw_params.get("start_param"):
+        parsed_data["start_param"] = raw_params.get("start_param")
 
-    if raw_params_encoded.get("auth_date"):
-        parsed_data["auth_date"] = raw_params_encoded.get("auth_date")
+    if raw_params.get("auth_date"):
+        parsed_data["auth_date"] = raw_params.get("auth_date")
 
-    return raw_params_encoded, parsed_data, received_hash
+    return raw_params, parsed_data, received_hash
 
 
 def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     """
     Validate the hash of Telegram WebApp initData.
 
-    Uses the official Telegram algorithm:
-    https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
-
     Returns True if valid, False otherwise.
     """
-    import urllib.parse
-
     received_hash = raw_params.get("hash", "")
     if not received_hash:
         logger.warning("Missing hash in init data")
@@ -160,47 +131,36 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
             )
             return False
 
-    # Use raw values as-is (URL-encoded) for hash computation
-    # Telegram signs the URL-encoded init data, not decoded values
-    parsed = dict(raw_params)
+    # Create data_check_string using RAW (URL-encoded) values
+    # Sort alphabetically by key, exclude hash
+    data_check_items = []
+    for key in sorted(raw_params.keys()):
+        if key != "hash":
+            data_check_items.append(f"{key}={raw_params[key]}")
+    data_check_string = "\n".join(data_check_items)
 
-    # Extract and remove the hash — it must NOT be part of the check string
-    parsed.pop("hash", None)
-
-    # Also remove 'signature' if present — it's not part of the legacy hash check
-    parsed.pop("signature", None)
-
-    # Build the data_check_string: sorted keys alphabetically, joined by \n
-    # Use the raw URL-encoded values as per Telegram's algorithm
-    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
-
-    # Step 1: Derive secret key using "WebAppData" as the HMAC key
-    # CRITICAL: key=b"WebAppData", msg=bot_token — NOT the other way around
+    # Compute secret key
     secret_key = hmac.new(
         key=b"WebAppData",
-        msg=bot_token.encode("utf-8"),
+        msg=bot_token.encode(),
         digestmod=hashlib.sha256,
     ).digest()
 
-    # Step 2: Compute the final hash using the derived secret key
+    # Compute hash
     computed_hash = hmac.new(
         key=secret_key,
-        msg=data_check_string.encode("utf-8"),
+        msg=data_check_string.encode(),
         digestmod=hashlib.sha256,
     ).hexdigest()
 
-    # Use constant-time comparison to prevent timing attacks
-    if not hmac.compare_digest(computed_hash, received_hash):
+    if computed_hash != received_hash:
         logger.warning(
-            f"Hash mismatch: computed={computed_hash}, received={received_hash}"
+            f"Hash mismatch: computed={computed_hash[:16]}..., received={received_hash[:16]}..."
         )
-        logger.info(f"Data check string (full): {data_check_string!r}")
-        logger.info("Parsed params keys and values (URL-encoded):")
-        for key in sorted(parsed.keys()):
-            val = parsed[key]
-            logger.info(f"  {key}={val!r}")
-        logger.info(f"Bot token: {bot_token!r}")
-        logger.info(f"Secret key (hex): {secret_key.hex()}")
+        logger.debug(
+            f"Data check string (first 200 chars): {data_check_string[:200]!r}"
+        )
+        logger.debug(f"Bot token (first 20 chars): {bot_token[:20]!r}...")
         return False
 
     return True
@@ -239,34 +199,6 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
         raise HTTPException(status_code=401, detail=f"Invalid init data: {str(e)}")
 
 
-# Owner and Support ID configuration
-OWNER_IDS = {
-    int(id_str.strip())
-    for id_str in os.getenv("OWNER_IDS", "").split(",")
-    if id_str.strip()
-}
-SUPPORT_IDS = {
-    int(id_str.strip())
-    for id_str in os.getenv("SUPPORT_IDS", "").split(",")
-    if id_str.strip()
-}
-
-
-def is_owner(telegram_id: int) -> bool:
-    """Check if user is a bot owner."""
-    return telegram_id in OWNER_IDS
-
-
-def is_support(telegram_id: int) -> bool:
-    """Check if user is support staff."""
-    return telegram_id in SUPPORT_IDS
-
-
-def is_staff(telegram_id: int) -> bool:
-    """Check if user is owner or support staff."""
-    return telegram_id in OWNER_IDS or telegram_id in SUPPORT_IDS
-
-
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
@@ -285,21 +217,6 @@ async def get_current_user(
     user = result.scalar()
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
-
-    return user
-
-
-async def get_current_user_with_permissions(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    """Get current user from JWT token with owner/support permissions attached."""
-    user = await get_current_user(credentials, db)
-
-    # Attach permission flags to user object
-    user.is_owner = is_owner(user.telegram_id)
-    user.is_support = is_support(user.telegram_id)
-    user.is_staff = is_staff(user.telegram_id)
 
     return user
 
@@ -346,7 +263,6 @@ async def get_api_key_user(
 @router.post("/auth/token", response_model=AuthTokenResponse)
 async def create_token(
     request: AuthTokenRequest,
-    http_request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Create access token from Telegram initData.
@@ -359,15 +275,7 @@ async def create_token(
     2. Bot token from BotInstance table (looked up by chat ID from init data)
     3. Main BOT_TOKEN environment variable
     """
-    # Extract client info for session tracking
-    client_ip = http_request.client.host if http_request.client else None
-    user_agent = http_request.headers.get("user-agent")
-
-    # Try to get device info from custom header or user agent
-    device_info = http_request.headers.get("x-device-info") or "Telegram Mini App"
-
-    # IMPORTANT: Strip whitespace from bot token to handle potential environment variable formatting issues
-    main_bot_token = os.getenv("BOT_TOKEN", "").strip()
+    main_bot_token = os.getenv("BOT_TOKEN")
 
     # Log the incoming request for debugging
     logger.info(
@@ -380,12 +288,6 @@ async def create_token(
     )
     logger.debug(f"Custom bot token provided: {bool(request.bot_token)}")
     logger.debug(f"Main bot token configured: {bool(main_bot_token)}")
-    if main_bot_token:
-        logger.info(
-            f"Main BOT_TOKEN loaded: {main_bot_token[:10]}...{main_bot_token[-5:]}, length: {len(main_bot_token)}"
-        )
-    else:
-        logger.error("BOT_TOKEN environment variable is EMPTY or not set!")
 
     # Parse init data first to extract chat info
     raw_params, parsed_data, received_hash = parse_init_data(request.init_data)
@@ -416,57 +318,17 @@ async def create_token(
     # Collect error messages for debugging
     validation_errors = []
 
-    # Try 1: Get user from initData, then find bots based on user's group memberships
-    # This is the database-driven approach - no localStorage needed
-    telegram_user_data = parsed_data.get("user", {})
-    telegram_user_id = telegram_user_data.get("id")
-
-    if telegram_user_id:
-        # Get all bot tokens for groups where this user is a member
-        user_bot_tokens = await _get_bot_tokens_for_user(db, telegram_user_id)
-        for bot_info in user_bot_tokens:
-            logger.info(
-                f"Trying bot @{bot_info.get('username')} from user membership (group_id: {bot_info.get('group_id')})"
-            )
-            if validate_init_data_hash(raw_params, bot_info["token"]):
-                logger.info(
-                    f"Validation successful with user's bot @{bot_info.get('username')}"
-                )
-                telegram_user = verify_telegram_init_data(
-                    request.init_data, bot_info["token"]
-                )
-                return await _create_user_token(
-                    telegram_user,
-                    db,
-                    device_info=device_info,
-                    ip_address=client_ip,
-                    user_agent=user_agent,
-                )
-            else:
-                validation_errors.append(
-                    f"User's bot @{bot_info.get('username')}: hash mismatch"
-                )
-                logger.debug(f"Bot @{bot_info.get('username')} validation failed")
-
-    # Try 2: Custom bot token from request (fallback - deprecated, prefer database)
-    # Strip whitespace from custom bot token as well
-    custom_bot_token = request.bot_token.strip() if request.bot_token else None
-    if custom_bot_token:
+    # Try 1: Custom bot token from request (localStorage)
+    if request.bot_token:
         logger.info(
-            f"Trying custom bot token from request (length: {len(custom_bot_token)})"
+            f"Trying custom bot token from request (length: {len(request.bot_token)})"
         )
-        if validate_init_data_hash(raw_params, custom_bot_token):
+        if validate_init_data_hash(raw_params, request.bot_token):
             logger.info("Validation successful with custom bot token from request")
             telegram_user = verify_telegram_init_data(
-                request.init_data, custom_bot_token
+                request.init_data, request.bot_token
             )
-            return await _create_user_token(
-                telegram_user,
-                db,
-                device_info=device_info,
-                ip_address=client_ip,
-                user_agent=user_agent,
-            )
+            return await _create_user_token(telegram_user, db)
         else:
             validation_errors.append("Custom bot token: hash mismatch")
             logger.warning("Custom bot token validation failed")
@@ -484,41 +346,10 @@ async def create_token(
                 telegram_user = verify_telegram_init_data(
                     request.init_data, bot_instance["token"]
                 )
-                return await _create_user_token(
-                    telegram_user,
-                    db,
-                    device_info=device_info,
-                    ip_address=client_ip,
-                    user_agent=user_agent,
-                )
+                return await _create_user_token(telegram_user, db)
             else:
                 validation_errors.append(f"Bot token for chat {chat_id}: hash mismatch")
                 logger.warning(f"Bot token for chat {chat_id} validation failed")
-
-    # Try 2b: Try ALL bot instances from database (for private chat opens where no chat_id available)
-    # This allows white-label/clone bots to authenticate from private chats
-    all_bot_tokens = await _get_all_bot_tokens(db)
-    for bot_info in all_bot_tokens:
-        logger.info(
-            f"Trying bot instance @{bot_info.get('username', 'unknown')} (group_id: {bot_info.get('group_id')})"
-        )
-        if validate_init_data_hash(raw_params, bot_info["token"]):
-            logger.info(
-                f"Validation successful with bot @{bot_info.get('username')} (group_id: {bot_info.get('group_id')})"
-            )
-            telegram_user = verify_telegram_init_data(
-                request.init_data, bot_info["token"]
-            )
-            return await _create_user_token(
-                telegram_user,
-                db,
-                device_info=device_info,
-                ip_address=client_ip,
-                user_agent=user_agent,
-            )
-        else:
-            validation_errors.append(f"Bot @{bot_info.get('username')}: hash mismatch")
-            logger.debug(f"Bot @{bot_info.get('username')} validation failed")
 
     # Try 3: Main bot token from environment
     if main_bot_token:
@@ -526,13 +357,7 @@ async def create_token(
         if validate_init_data_hash(raw_params, main_bot_token):
             logger.info("Validation successful with main BOT_TOKEN")
             telegram_user = verify_telegram_init_data(request.init_data, main_bot_token)
-            return await _create_user_token(
-                telegram_user,
-                db,
-                device_info=device_info,
-                ip_address=client_ip,
-                user_agent=user_agent,
-            )
+            return await _create_user_token(telegram_user, db)
         else:
             validation_errors.append("Main BOT_TOKEN: hash mismatch")
             logger.warning("Main BOT_TOKEN validation failed")
@@ -541,13 +366,6 @@ async def create_token(
     error_detail = "Invalid init data: Hash mismatch"
     if validation_errors:
         error_detail += f" (tried: {', '.join(validation_errors)})"
-
-    # Provide more helpful error message for common issues
-    if chat_id is None and not request.bot_token:
-        error_detail += (
-            ". Chat ID not found in initData and no custom bot token provided. "
-        )
-        error_detail += "Ensure BOT_TOKEN environment variable matches the bot that opened the Mini App."
 
     # Development bypass: Allow authentication without hash validation in development
     # This is useful for testing the Mini App in a browser without Telegram
@@ -561,13 +379,7 @@ async def create_token(
             f"DEVELOPMENT MODE: Bypassing hash validation for user {parsed_data.get('user', {}).get('id')}"
         )
         if parsed_data.get("user"):
-            return await _create_user_token(
-                parsed_data["user"],
-                db,
-                device_info=device_info,
-                ip_address=client_ip,
-                user_agent=user_agent,
-            )
+            return await _create_user_token(parsed_data["user"], db)
 
     logger.error(
         f"All validation attempts failed. Chat ID: {chat_id}, Raw params keys: {list(raw_params.keys())}, Errors: {validation_errors}"
@@ -628,160 +440,10 @@ async def _get_bot_token_for_chat(
         return None
 
 
-async def _get_all_bot_tokens(db: AsyncSession) -> list[dict]:
-    """
-    Get all active bot tokens from the BotInstance table.
-
-    This is used when the Mini App is opened from a private chat (no chat_id),
-    so we can try all registered bots to find the one that signed the initData.
-
-    Returns list of dicts with 'token', 'username', 'bot_id', and 'group_id'.
-    """
-    try:
-        # Get all active bot instances
-        bot_result = await db.execute(
-            select(BotInstance).where(BotInstance.is_active == True)
-        )
-        bot_instances = bot_result.scalars().all()
-
-        if not bot_instances:
-            logger.debug("No active bot instances found")
-            return []
-
-        # Decrypt each token
-        encryption_key = os.getenv("ENCRYPTION_KEY")
-        if not encryption_key:
-            logger.warning("ENCRYPTION_KEY not set, cannot decrypt bot tokens")
-            return []
-
-        fernet = Fernet(encryption_key.encode())
-
-        bots = []
-        for bot_instance in bot_instances:
-            try:
-                decrypted_token = fernet.decrypt(
-                    bot_instance.token_hash.encode()
-                ).decode()
-                bots.append(
-                    {
-                        "token": decrypted_token,
-                        "username": bot_instance.bot_username,
-                        "bot_id": bot_instance.bot_telegram_id,
-                        "group_id": bot_instance.group_id,
-                    }
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Failed to decrypt bot token for {bot_instance.bot_username}: {e}"
-                )
-                continue
-
-        logger.info(f"Found {len(bots)} active bot instances to try")
-        return bots
-
-    except Exception as e:
-        logger.error(f"Error getting all bot tokens: {e}")
-        return []
-
-
-async def _get_bot_tokens_for_user(
-    db: AsyncSession, telegram_user_id: int
-) -> list[dict]:
-    """
-    Get bot tokens for groups where the user is a member.
-
-    This is the database-driven approach - the bot knows which groups
-    the user belongs to and can find the right bot tokens automatically.
-    No localStorage needed!
-
-    Args:
-        db: Database session
-        telegram_user_id: The Telegram user ID from initData
-
-    Returns list of dicts with 'token', 'username', 'bot_id', and 'group_id'.
-    """
-    try:
-        # First, find the user by telegram_id
-        user_result = await db.execute(
-            select(User).where(User.telegram_id == telegram_user_id)
-        )
-        user = user_result.scalar_one_or_none()
-
-        if not user:
-            logger.debug(f"No user found with telegram_id={telegram_user_id}")
-            return []
-
-        # Get all groups where user is a member
-        member_result = await db.execute(
-            select(Member).where(Member.user_id == user.id)
-        )
-        members = member_result.scalars().all()
-
-        if not members:
-            logger.debug(f"User {telegram_user_id} is not a member of any groups")
-            return []
-
-        group_ids = [m.group_id for m in members]
-        logger.info(
-            f"User {telegram_user_id} is member of {len(group_ids)} groups: {group_ids}"
-        )
-
-        # Get all BotInstances for those groups
-        bot_result = await db.execute(
-            select(BotInstance).where(
-                BotInstance.group_id.in_(group_ids), BotInstance.is_active == True
-            )
-        )
-        bot_instances = bot_result.scalars().all()
-
-        if not bot_instances:
-            logger.debug(f"No active bot instances found for user's groups")
-            return []
-
-        # Decrypt each token
-        encryption_key = os.getenv("ENCRYPTION_KEY")
-        if not encryption_key:
-            logger.warning("ENCRYPTION_KEY not set, cannot decrypt bot tokens")
-            return []
-
-        fernet = Fernet(encryption_key.encode())
-
-        bots = []
-        for bot_instance in bot_instances:
-            try:
-                decrypted_token = fernet.decrypt(
-                    bot_instance.token_hash.encode()
-                ).decode()
-                bots.append(
-                    {
-                        "token": decrypted_token,
-                        "username": bot_instance.bot_username,
-                        "bot_id": bot_instance.bot_telegram_id,
-                        "group_id": bot_instance.group_id,
-                    }
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Failed to decrypt bot token for {bot_instance.bot_username}: {e}"
-                )
-                continue
-
-        logger.info(f"Found {len(bots)} bot instances for user {telegram_user_id}")
-        return bots
-
-    except Exception as e:
-        logger.error(f"Error getting bot tokens for user {telegram_user_id}: {e}")
-        return []
-
-
 async def _create_user_token(
-    telegram_user: dict,
-    db: AsyncSession,
-    device_info: str = None,
-    ip_address: str = None,
-    user_agent: str = None,
+    telegram_user: dict, db: AsyncSession
 ) -> AuthTokenResponse:
-    """Create or get user and return access token with session tracking."""
+    """Create or get user and return access token."""
     telegram_id = telegram_user.get("id")
     result = await db.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar()
@@ -798,46 +460,17 @@ async def _create_user_token(
         db.add(user)
         await db.flush()
 
-    # Create session token for tracking
-    session_token = str(uuid.uuid4())
-    expires_at = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-
-    # Create user session in database
-    session = UserSession(
-        user_id=user.id,
-        session_token=session_token,
-        device_info=device_info,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        expires_at=expires_at,
-    )
-    db.add(session)
-    await db.flush()
-
-    # Create JWT access token
-    access_token = create_access_token(data={"sub": user.id, "session_id": session.id})
+    access_token = create_access_token(data={"sub": user.id})
 
     return AuthTokenResponse(
         access_token=access_token,
         expires_in=ACCESS_TOKEN_EXPIRE_DAYS * 86400,
-        user={
-            "id": user.id,
-            "telegram_id": user.telegram_id,
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "language_code": user.language_code,
-            "is_bot": user.is_bot,
-            "is_premium": user.is_premium,
-            "created_at": user.created_at,
-            "updated_at": user.last_seen,
-        },
     )
 
 
 @router.get("/auth/me")
 async def get_me(current_user: User = Depends(get_current_user)):
-    """Get current user info including owner/support permissions."""
+    """Get current user info."""
     return {
         "id": current_user.id,
         "telegram_id": current_user.telegram_id,
@@ -846,9 +479,6 @@ async def get_me(current_user: User = Depends(get_current_user)):
         "last_name": current_user.last_name,
         "language_code": current_user.language_code,
         "is_premium": current_user.is_premium,
-        "is_owner": is_owner(current_user.telegram_id),
-        "is_support": is_support(current_user.telegram_id),
-        "is_staff": is_staff(current_user.telegram_id),
     }
 
 
@@ -901,8 +531,7 @@ async def debug_auth(
     """
     import time
 
-    # Strip whitespace from bot token
-    main_bot_token = os.getenv("BOT_TOKEN", "").strip()
+    main_bot_token = os.getenv("BOT_TOKEN")
 
     # Parse init data
     raw_params, parsed_data, received_hash = parse_init_data(request.init_data)
@@ -949,7 +578,7 @@ async def debug_auth(
     # Try validation with each token
     if request.bot_token:
         debug_info["validation_results"]["custom_token"] = {
-            "valid": validate_init_data_hash(raw_params, request.bot_token.strip()),
+            "valid": validate_init_data_hash(raw_params, request.bot_token),
             "token_length": len(request.bot_token),
         }
 
@@ -963,168 +592,9 @@ async def debug_auth(
         else:
             debug_info["validation_results"]["db_token"] = {"found": False}
 
-    # Try all bot instances from database (for private chat scenarios)
-    all_bots = await _get_all_bot_tokens(db)
-    if all_bots:
-        debug_info["validation_results"]["all_bot_instances"] = {
-            "count": len(all_bots),
-            "results": [],
-        }
-        for bot in all_bots:
-            is_valid = validate_init_data_hash(raw_params, bot["token"])
-            debug_info["validation_results"]["all_bot_instances"]["results"].append(
-                {
-                    "username": bot.get("username"),
-                    "group_id": bot.get("group_id"),
-                    "valid": is_valid,
-                }
-            )
-            if is_valid:
-                debug_info["validation_results"]["all_bot_instances"]["matched"] = (
-                    bot.get("username")
-                )
-
     if main_bot_token:
         debug_info["validation_results"]["main_token"] = {
             "valid": validate_init_data_hash(raw_params, main_bot_token),
         }
 
     return debug_info
-
-
-# ============================================================
-# Session Management Endpoints
-# ============================================================
-
-
-@router.get("/auth/sessions", response_model=dict)
-async def get_user_sessions(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get all active sessions for the current user."""
-    from datetime import datetime
-
-    # Get all active sessions for user
-    result = await db.execute(
-        select(UserSession)
-        .where(
-            UserSession.user_id == current_user.id,
-            UserSession.is_active == True,
-            UserSession.expires_at > datetime.utcnow(),
-        )
-        .order_by(UserSession.created_at.desc())
-    )
-    sessions = result.scalars().all()
-
-    return {
-        "sessions": [
-            {
-                "id": s.id,
-                "device_info": s.device_info,
-                "ip_address": s.ip_address,
-                "created_at": s.created_at.isoformat(),
-                "expires_at": s.expires_at.isoformat(),
-                "last_activity_at": s.last_activity_at.isoformat(),
-            }
-            for s in sessions
-        ],
-        "total": len(sessions),
-    }
-
-
-@router.post("/auth/sessions/{session_id}/revoke")
-async def revoke_session(
-    session_id: int,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Revoke a specific session."""
-    from datetime import datetime
-
-    result = await db.execute(
-        select(UserSession).where(
-            UserSession.id == session_id, UserSession.user_id == current_user.id
-        )
-    )
-    session = result.scalar_one_or_none()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    session.is_active = False
-    await db.commit()
-
-    return {"message": "Session revoked successfully"}
-
-
-@router.post("/auth/sessions/revoke-all")
-async def revoke_all_sessions(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Revoke all sessions for the current user (except the current one)."""
-    from datetime import datetime
-
-    # Get current session from JWT
-    # For now, we'll just revoke all sessions
-
-    result = await db.execute(
-        select(UserSession).where(
-            UserSession.user_id == current_user.id,
-            UserSession.is_active == True,
-            UserSession.expires_at > datetime.utcnow(),
-        )
-    )
-    sessions = result.scalars().all()
-
-    count = 0
-    for session in sessions:
-        session.is_active = False
-        count += 1
-
-    await db.commit()
-
-    return {"message": f"Revoked {count} sessions"}
-
-
-@router.get("/auth/sessions/current")
-async def get_current_session_info(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get information about the current session."""
-    from datetime import datetime
-
-    token = credentials.credentials
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        session_id: int = payload.get("session_id")
-        user_id: int = payload.get("sub")
-
-        if not session_id:
-            return {"session_id": None, "tracked": False}
-
-        result = await db.execute(
-            select(UserSession).where(UserSession.id == session_id)
-        )
-        session = result.scalar_one_or_none()
-
-        if not session or not session.is_active:
-            return {"session_id": session_id, "active": False}
-
-        # Update last activity
-        session.last_activity_at = datetime.utcnow()
-        await db.commit()
-
-        return {
-            "session_id": session.id,
-            "active": session.is_active,
-            "device_info": session.device_info,
-            "ip_address": session.ip_address,
-            "expires_at": session.expires_at.isoformat(),
-            "tracked": True,
-        }
-
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")

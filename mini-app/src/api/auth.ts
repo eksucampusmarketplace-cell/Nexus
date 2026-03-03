@@ -16,15 +16,14 @@ export interface User {
   last_name: string | null
   language_code: string
   is_premium: boolean
-  is_owner: boolean
-  is_support: boolean
-  is_staff: boolean
 }
 
-// Backend handles bot token lookup based on user's group memberships (database-driven)
-// No localStorage needed!
-export const telegramAuth = async (initData: string): Promise<AuthResponse & { user: User }> => {
-  const response = await api.post('/auth/token', { init_data: initData })
+export const telegramAuth = async (initData: string, customBotToken?: string): Promise<AuthResponse & { user: User }> => {
+  const payload: { init_data: string; bot_token?: string } = { init_data: initData }
+  if (customBotToken) {
+    payload.bot_token = customBotToken
+  }
+  const response = await api.post('/auth/token', payload)
   return response.data
 }
 

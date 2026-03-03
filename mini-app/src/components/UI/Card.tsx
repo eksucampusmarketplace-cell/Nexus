@@ -21,7 +21,7 @@ export default function Card({
   return (
     <div
       className={`
-        bg-dark-900 rounded-xl border border-dark-800 p-3 sm:p-4 lg:p-5
+        bg-dark-900 rounded-xl border border-dark-800 p-4
         ${onClick ? 'cursor-pointer hover:border-dark-700 hover:bg-dark-800' : ''}
         transition-all duration-200
         ${className}
@@ -29,18 +29,18 @@ export default function Card({
       onClick={onClick}
     >
       {(title || Icon) && (
-        <div className="flex items-start gap-2 sm:gap-3 mb-2 sm:mb-3">
+        <div className="flex items-start gap-3 mb-3">
           {Icon && (
-            <div className="p-1.5 sm:p-2 bg-primary-500/10 rounded-lg flex-shrink-0">
-              <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500" />
+            <div className="p-2 bg-primary-500/10 rounded-lg">
+              <Icon className="w-5 h-5 text-primary-500" />
             </div>
           )}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1">
             {title && (
-              <h3 className="font-semibold text-white text-sm sm:text-base">{title}</h3>
+              <h3 className="font-semibold text-white">{title}</h3>
             )}
             {description && (
-              <p className="text-xs sm:text-sm text-dark-400 mt-0.5 sm:mt-1">{description}</p>
+              <p className="text-sm text-dark-400 mt-1">{description}</p>
             )}
           </div>
         </div>

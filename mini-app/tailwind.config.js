@@ -34,35 +34,7 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-      },
-      screens: {
-        'xs': '360px',
-        'sm': '640px',
-        'md': '768px',
-        'lg': '1024px',
-        'xl': '1280px',
-        '2xl': '1536px',
-        'tablet': '640px',
-        'laptop': '1024px',
-        'desktop': '1280px',
-      },
-      spacing: {
-        '18': '4.5rem',
-        '22': '5.5rem',
-        '26': '6.5rem',
-        '30': '7.5rem',
-      },
-      fontSize: {
-        'xxs': ['0.625rem', { lineHeight: '0.875rem' }],
-      },
-      minWidth: {
-        'touch': '44px',
-        'touch-lg': '48px',
-      },
-      minHeight: {
-        'touch': '44px',
-        'touch-lg': '48px',
+        sans: ['Inter', 'system-ui', 'sans-serif'],
       },
     },
   },

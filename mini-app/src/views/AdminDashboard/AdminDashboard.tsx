@@ -96,25 +96,25 @@ export default function AdminDashboard() {
   }
   
   return (
-    <div className="animate-fade-in space-y-4 sm:space-y-6">
-      {/* Header - Responsive layout */}
-      <div className="flex items-center gap-3 sm:gap-4">
-        <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-primary-500 to-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold text-white flex-shrink-0">
+    <div className="py-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="w-14 h-14 bg-gradient-to-br from-primary-500 to-purple-600 rounded-2xl flex items-center justify-center text-2xl font-bold text-white">
           {currentGroup.title.charAt(0).toUpperCase()}
         </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-lg sm:text-xl font-bold text-white truncate">{currentGroup.title}</h1>
-          <p className="text-dark-400 text-xs sm:text-sm">
-            {currentGroup.member_count.toLocaleString()} members • {currentGroup.language.toUpperCase()}
+        <div className="flex-1">
+          <h1 className="text-xl font-bold text-white">{currentGroup.title}</h1>
+          <p className="text-dark-400 text-sm">
+            {(currentGroup.member_count ?? currentGroup.memberCount ?? 0).toLocaleString()} members • {(currentGroup.language ?? 'en').toUpperCase()}
           </p>
         </div>
       </div>
   
-      {/* Stats Grid - Responsive: 2 cols mobile, 4 cols desktop */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <StatCard
           title="Total Members"
-          value={currentGroup.member_count.toLocaleString()}
+          value={(currentGroup.member_count ?? currentGroup.memberCount ?? 0).toLocaleString()}
           icon={Users}
           trend="12%"
           trendUp={true}
@@ -141,19 +141,19 @@ export default function AdminDashboard() {
         />
       </div>
   
-      {/* Quick Actions - Responsive grid with scroll on mobile */}
-      <div>
-        <h2 className="text-base sm:text-lg font-semibold text-white mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+      {/* Quick Actions */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-white mb-3">Quick Actions</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {menuItems.map((item) => (
             <Link
               key={item.path}
               to={`/admin/${groupId}/${item.path}`}
-              className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-dark-900 rounded-xl border border-dark-800 hover:border-dark-700 hover:bg-dark-800 transition-all touch-target"
+              className="flex items-center gap-3 p-4 bg-dark-900 rounded-xl border border-dark-800 hover:border-dark-700 hover:bg-dark-800 transition-all"
             >
-              <item.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${item.color} flex-shrink-0`} />
-              <span className="font-medium text-white text-xs sm:text-sm truncate">{item.label}</span>
-              <ChevronRight className="w-4 h-4 text-dark-500 ml-auto flex-shrink-0" />
+              <item.icon className={`w-5 h-5 ${item.color}`} />
+              <span className="font-medium text-white text-sm">{item.label}</span>
+              <ChevronRight className="w-4 h-4 text-dark-500 ml-auto" />
             </Link>
           ))}
         </div>
