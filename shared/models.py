@@ -88,6 +88,31 @@ class User(Base):
     federations_owned: Mapped[List["Federation"]] = relationship(
         "Federation", back_populates="owner"
     )
+    sessions: Mapped[List["UserSession"]] = relationship(
+        "UserSession", back_populates="user"
+    )
+
+
+class UserSession(Base):
+    """User session model for tracking active login sessions."""
+
+    __tablename__ = "user_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    session_token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    device_info: Mapped[Optional[str]] = mapped_column(String(255))
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45))
+    user_agent: Mapped[Optional[str]] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_activity_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="sessions")
 
 
 class Group(Base):
