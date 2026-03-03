@@ -42,18 +42,22 @@ services:
         value: https://nexus-4uxn.onrender.com/mini-app
       - key: ENCRYPTION_KEY
         generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: BOT_USERNAME
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       - key: ENVIRONMENT
         value: production
-      - key: DISABLE_AUTH_VALIDATION
-        value: "false"
       - key: PYTHONPATH
         value: /opt/render/project
       - key: DATABASE_POOL_SIZE
         value: "5"
       - key: DATABASE_MAX_OVERFLOW
         value: "5"
+      - key: BOT_USERNAME
+        sync: false
 
   - type: web
     name: nexus-bot
@@ -100,10 +104,10 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: BOT_USERNAME
+        sync: false
       - key: ENVIRONMENT
         value: production
-      - key: DISABLE_AUTH_VALIDATION
-        value: "false"
       - key: PYTHONPATH
         value: /opt/render/project
       - key: DATABASE_POOL_SIZE
@@ -152,12 +156,14 @@ services:
         sync: false
       - key: ENCRYPTION_KEY
         sync: false
+      - key: JWT_SECRET
+        sync: false
       - key: OPENAI_API_KEY
+        sync: false
+      - key: BOT_USERNAME
         sync: false
       - key: ENVIRONMENT
         value: production
-      - key: DISABLE_AUTH_VALIDATION
-        value: "false"
       - key: PYTHONPATH
         value: /opt/render/project
 
@@ -202,12 +208,14 @@ services:
         sync: false
       - key: ENCRYPTION_KEY
         sync: false
+      - key: JWT_SECRET
+        sync: false
       - key: OPENAI_API_KEY
+        sync: false
+      - key: BOT_USERNAME
         sync: false
       - key: ENVIRONMENT
         value: production
-      - key: DISABLE_AUTH_VALIDATION
-        value: "false"
       - key: PYTHONPATH
         value: /opt/render/project
 
@@ -219,6 +227,10 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://nexus-4uxn.onrender.com
+
+# Note: MINI_APP_URL should be set to the URL of the static site above
+# Render will assign a URL like: https://nexus-mini-app.onrender.com
+# Or if using the API service to serve the mini-app, use: https://nexus-4uxn.onrender.com
 
 databases:
   - name: nexus-db

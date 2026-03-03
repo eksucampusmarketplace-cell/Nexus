@@ -32,9 +32,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def get_mini_app_url():
+    """Get Mini App URL from environment or fallback to production."""
+    mini_app_url = os.getenv("MINI_APP_URL", "")
+    if mini_app_url and mini_app_url != "http://localhost:3000":
+        return mini_app_url
+    # Fallback to webhook URL base domain or production URL
+    webhook_url = os.getenv("WEBHOOK_URL", "")
+    if webhook_url:
+        return webhook_url.split("/webhook")[0]
+    # Final fallback to production URL
+    return "https://nexus-4uxn.onrender.com"
+
+
 def get_mini_app_keyboard():
     """Get inline keyboard with Mini App button."""
-    mini_app_url = os.getenv("MINI_APP_URL", "")
+    mini_app_url = get_mini_app_url()
     if mini_app_url:
         return InlineKeyboardMarkup(
             inline_keyboard=[
@@ -55,7 +68,7 @@ def get_mini_app_keyboard():
 
 async def set_private_chat_menu_button(bot: Bot, chat_id: int) -> None:
     """Ensure the Mini App is available from the private chat menu button."""
-    mini_app_url = os.getenv("MINI_APP_URL", "")
+    mini_app_url = get_mini_app_url()
     if not mini_app_url:
         return
 
@@ -109,7 +122,7 @@ async def ping_command(message: Message, bot: Bot):
 
 async def settings_command(message: Message, bot: Bot):
     """Handle /settings command - opens Mini App."""
-    mini_app_url = os.getenv("MINI_APP_URL", "")
+    mini_app_url = get_mini_app_url()
     if mini_app_url:
         text = f"⚙️ {hbold('Nexus Settings')}\n\n"
         text += "Open the Mini App to configure your groups, manage modules, and customize settings!"

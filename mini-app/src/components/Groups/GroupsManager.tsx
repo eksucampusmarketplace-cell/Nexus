@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Settings, Shield, Bell, BarChart3, ChevronRight,
   Plus, Search, MoreVertical, Check, X, Crown, Star, Zap,
-  MessageSquare, Clock, Activity
+  MessageSquare, Clock, Activity, RefreshCw
 } from 'lucide-react'
 import api from '../../api/client'
+import { getAddToGroupUrl } from '../../api/config'
 import toast from 'react-hot-toast'
+import { useAuthStore } from '../../stores/authStore'
 
 interface ManagedGroup {
   id: number
@@ -34,23 +36,51 @@ export default function GroupsManager({ onSelectGroup, selectedGroupId }: Groups
   const [searchQuery, setSearchQuery] = useState('')
   const [filterRole, setFilterRole] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'name' | 'members' | 'activity'>('activity')
+  const [error, setError] = useState<string | null>(null)
+  const { isAuthenticated, isAuthReady, hasStoredToken } = useAuthStore()
+  const hasLoadedGroups = useRef(false)
 
-  useEffect(() => {
-    loadGroups()
-  }, [])
-
-  const loadGroups = async () => {
+  const loadGroups = async (isRetry = false) => {
+    // Wait for auth to be fully ready (rehydrated + not loading)
+    if (!isAuthReady()) {
+      console.log('GroupsManager: Auth not ready, skipping load')
+      return
+    }
+    
+    // Check both isAuthenticated and hasStoredToken
+    const wasAuthenticated = hasStoredToken()
+    if (!isAuthenticated && !wasAuthenticated) {
+      console.log('GroupsManager: Not authenticated, skipping load')
+      return
+    }
+    
+    // Prevent double-loading unless it's a retry
+    if (hasLoadedGroups.current && !isRetry) {
+      console.log('GroupsManager: Already loaded, skipping')
+      return
+    }
+    
+    console.log('GroupsManager: Loading groups...', { isAuthenticated, wasAuthenticated })
+    hasLoadedGroups.current = true
+    setError(null)
+    
     try {
       setLoading(true)
       const response = await api.get('/groups/my-groups')
       setGroups(response.data)
-    } catch (error) {
-      console.error('Failed to load groups:', error)
-      toast.error('Failed to load groups')
+    } catch (err: any) {
+      console.error('Failed to load groups:', err)
+      const errorMessage = err.response?.data?.detail || 'Failed to load groups'
+      setError(errorMessage)
+      hasLoadedGroups.current = false // Allow retry on error
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadGroups()
+  }, [isAuthenticated, isAuthReady])
 
   // Filter and sort groups
   const filteredGroups = groups
@@ -170,12 +200,40 @@ export default function GroupsManager({ onSelectGroup, selectedGroupId }: Groups
         ))}
       </div>
 
-      {filteredGroups.length === 0 && (
+      {error && (
+        <div className="text-center py-12">
+          <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-6 h-6 text-red-500" />
+          </div>
+          <p className="text-red-400 mb-2">{error}</p>
+          <button
+            onClick={() => loadGroups(true)}
+            className="mt-4 px-4 py-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-sm transition-colors flex items-center gap-2 mx-auto"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!error && filteredGroups.length === 0 && !loading && (
         <div className="text-center py-12">
           <Users className="w-12 h-12 text-dark-600 mx-auto mb-4" />
           <p className="text-dark-400">
             {searchQuery || filterRole ? 'No groups match your filters' : 'No groups found'}
           </p>
+          {!searchQuery && !filterRole && (
+            <button
+              onClick={async () => {
+                const url = await getAddToGroupUrl()
+                window.open(url, '_blank')
+              }}
+              className="mt-4 px-4 py-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-sm transition-colors inline-flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add Nexus to Group
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -326,7 +384,7 @@ function GroupCard({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              // Navigate to modules
+              window.location.href = `/admin/${group.id}/modules`
             }}
             className="flex-1 px-3 py-2 bg-dark-700 text-dark-300 rounded-lg text-sm hover:bg-dark-600 transition-colors flex items-center justify-center gap-2"
           >
@@ -336,7 +394,7 @@ function GroupCard({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              // Navigate to dashboard
+              window.location.href = `/admin/${group.id}`
             }}
             className="flex-1 px-3 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 transition-colors flex items-center justify-center gap-2"
           >

@@ -10,11 +10,15 @@ const tg = (window as any).Telegram?.WebApp
 if (tg) {
   tg.ready()
   tg.expand()
+  // Set theme colors to match our dark theme
+  tg.setHeaderColor('#020617')
+  tg.setBottomBarColor('#020617')
+  tg.setBackgroundColor('#020617')
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/mini-app">
       <App />
       <Toaster
         position="top-center"
