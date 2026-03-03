@@ -9,6 +9,9 @@ export interface User {
   last_name: string | null
   language_code: string
   is_premium: boolean
+  is_owner: boolean
+  is_support: boolean
+  is_staff: boolean
 }
 
 interface AuthState {
@@ -26,6 +29,10 @@ interface AuthState {
   hasStoredToken: () => boolean
   // Check if auth is ready (rehydrated and not loading)
   isAuthReady: () => boolean
+  // Check if current user is owner/support
+  isUserOwner: () => boolean
+  isUserSupport: () => boolean
+  isUserStaff: () => boolean
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -54,6 +61,18 @@ export const useAuthStore = create<AuthState>()(
       isAuthReady: () => {
         const state = get()
         return state.isRehydrated && !state.isLoading
+      },
+      isUserOwner: () => {
+        const state = get()
+        return state.user?.is_owner ?? false
+      },
+      isUserSupport: () => {
+        const state = get()
+        return state.user?.is_support ?? false
+      },
+      isUserStaff: () => {
+        const state = get()
+        return state.user?.is_staff ?? false
       }
     }),
     {

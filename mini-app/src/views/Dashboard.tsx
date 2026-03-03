@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   Shield, Users, Settings, BarChart3, Plus, Zap,
   MessageSquare, Gamepad2, Sparkles, ChevronRight,
-  Bell, Lock, Activity, Star, Crown
+  Bell, Lock, Activity, Star, Crown, RefreshCw
 } from 'lucide-react'
 import { useGroupStore } from '../stores/groupStore'
 import { useAuthStore } from '../stores/authStore'
@@ -24,45 +24,48 @@ export default function Dashboard() {
   const { user, isAuthenticated, isAuthReady, hasStoredToken } = useAuthStore()
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('groups')
+  const [loadError, setLoadError] = useState<string | null>(null)
   const hasLoadedGroups = useRef(false)
 
-  useEffect(() => {
-    const loadGroups = async () => {
-      // Wait for auth to be fully ready (rehydrated + not loading)
-      if (!isAuthReady()) {
-        console.log('Skipping group load - auth not ready')
-        return
-      }
-      
-      // Check if we have a stored token that indicates user was previously authenticated
-      const wasAuthenticated = hasStoredToken()
-      
-      if (!isAuthenticated && !wasAuthenticated) {
-        console.log('Skipping group load - not authenticated and no stored token')
-        return
-      }
-      
-      // Prevent double-loading
-      if (hasLoadedGroups.current) {
-        console.log('Skipping group load - already loaded')
-        return
-      }
-      
-      console.log('Loading groups...', { isAuthenticated, wasAuthenticated })
-      hasLoadedGroups.current = true
-      setLoading(true)
-      try {
-        const data = await listGroups()
-        setGroups(data)
-      } catch (error) {
-        console.error('Failed to load groups:', error)
-        toast.error('Failed to load groups')
-        hasLoadedGroups.current = false // Allow retry on error
-      } finally {
-        setLoading(false)
-      }
+  const loadGroups = async (isRetry = false) => {
+    // Wait for auth to be fully ready (rehydrated + not loading)
+    if (!isAuthReady()) {
+      console.log('Skipping group load - auth not ready')
+      return
     }
+    
+    // Check if we have a stored token that indicates user was previously authenticated
+    const wasAuthenticated = hasStoredToken()
+    
+    if (!isAuthenticated && !wasAuthenticated) {
+      console.log('Skipping group load - not authenticated and no stored token')
+      return
+    }
+    
+    // Prevent double-loading unless it's a retry
+    if (hasLoadedGroups.current && !isRetry) {
+      console.log('Skipping group load - already loaded')
+      return
+    }
+    
+    console.log('Loading groups...', { isAuthenticated, wasAuthenticated })
+    hasLoadedGroups.current = true
+    setLoadError(null)
+    setLoading(true)
+    try {
+      const data = await listGroups()
+      setGroups(data)
+    } catch (error: any) {
+      console.error('Failed to load groups:', error)
+      const errorMessage = error?.response?.data?.detail || 'Failed to load groups'
+      setLoadError(errorMessage)
+      hasLoadedGroups.current = false // Allow retry on error
+    } finally {
+      setLoading(false)
+    }
+  }
 
+  useEffect(() => {
     loadGroups()
   }, [isAuthenticated, isAuthReady])
 
@@ -244,8 +247,28 @@ export default function Dashboard() {
         </motion.div>
       )}
 
+      {/* Error State */}
+      {loadError && viewMode === 'groups' && (
+        <div className="text-center py-8 sm:py-12 px-4">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-red-500/20 rounded-full flex items-center justify-center">
+            <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-red-500" />
+          </div>
+          <h3 className="text-base sm:text-lg font-medium text-white mb-2">Failed to load groups</h3>
+          <p className="text-red-400 max-w-sm mx-auto mb-4 sm:mb-6 text-sm sm:text-base">
+            {loadError}
+          </p>
+          <button
+            onClick={() => loadGroups(true)}
+            className="btn-primary inline-flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Empty State */}
-      {groups.length === 0 && viewMode === 'groups' && (
+      {!loadError && groups.length === 0 && viewMode === 'groups' && (
         <div className="text-center py-8 sm:py-12 px-4">
           <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-dark-800 rounded-full flex items-center justify-center">
             <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-dark-500" />

@@ -278,6 +278,7 @@ async def serve_manifest():
 
 # Import and include routers
 from api.routers import (
+    admin,
     advanced,
     analytics,
     auth,
@@ -313,6 +314,7 @@ app.include_router(webhooks.router, prefix="/webhook", tags=["webhooks"])
 app.include_router(messages.router, prefix="/api/v1", tags=["Message Templates"])
 app.include_router(commands.router, prefix="/api/v1", tags=["Commands"])
 app.include_router(graveyard.router, prefix="/api/v1", tags=["Message Graveyard"])
+app.include_router(admin.router, prefix="/api/v1", tags=["Admin"])
 # WebSocket router (no prefix, handles /ws/{group_id} directly)
 app.include_router(websocket.router)
 
