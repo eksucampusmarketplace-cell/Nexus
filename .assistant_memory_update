@@ -27,3 +27,15 @@
 - api/routers/admin.py: Public config endpoint
 - mini-app/src/api/config.ts: Frontend config fetching
 - mini-app/src/api/client.ts: Axios interceptor adds Bearer token
+
+## Missing Models (Fixed)
+- MemberSpotlight and SpotlightConfig models were missing from shared/models.py
+- These models are required by spotlight_service.py which is imported by bot/services/__init__.py
+- The challenges module failed to load because it imports ChallengeService from bot.services
+- Added both models to shared/models.py to resolve the import error
+
+## Authentication Flow Issues
+- 401 errors on /api/v1/groups/my-groups indicate JWT token is not being sent or is invalid
+- Token is stored in localStorage with key 'nexus_token' by both authStore.ts and api/client.ts
+- The auth flow: Telegram initData -> /auth/token -> JWT token -> localStorage -> API requests with Bearer token
+- If JWT_SECRET changes between token creation and validation, tokens will be invalid
