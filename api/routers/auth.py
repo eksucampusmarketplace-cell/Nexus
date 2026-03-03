@@ -180,6 +180,26 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
         raise HTTPException(status_code=401, detail=f"Invalid init data: {str(e)}")
 
 
+# Owner and Support ID configuration
+OWNER_IDS = {int(id_str.strip()) for id_str in os.getenv("OWNER_IDS", "").split(",") if id_str.strip()}
+SUPPORT_IDS = {int(id_str.strip()) for id_str in os.getenv("SUPPORT_IDS", "").split(",") if id_str.strip()}
+
+
+def is_owner(telegram_id: int) -> bool:
+    """Check if user is a bot owner."""
+    return telegram_id in OWNER_IDS
+
+
+def is_support(telegram_id: int) -> bool:
+    """Check if user is support staff."""
+    return telegram_id in SUPPORT_IDS
+
+
+def is_staff(telegram_id: int) -> bool:
+    """Check if user is owner or support staff."""
+    return telegram_id in OWNER_IDS or telegram_id in SUPPORT_IDS
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
@@ -199,6 +219,21 @@ async def get_current_user(
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
 
+    return user
+
+
+async def get_current_user_with_permissions(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Get current user from JWT token with owner/support permissions attached."""
+    user = await get_current_user(credentials, db)
+    
+    # Attach permission flags to user object
+    user.is_owner = is_owner(user.telegram_id)
+    user.is_support = is_support(user.telegram_id)
+    user.is_staff = is_staff(user.telegram_id)
+    
     return user
 
 
@@ -441,7 +476,7 @@ async def _create_user_token(telegram_user: dict, db: AsyncSession) -> AuthToken
 
 @router.get("/auth/me")
 async def get_me(current_user: User = Depends(get_current_user)):
-    """Get current user info."""
+    """Get current user info including owner/support permissions."""
     return {
         "id": current_user.id,
         "telegram_id": current_user.telegram_id,
@@ -450,6 +485,9 @@ async def get_me(current_user: User = Depends(get_current_user)):
         "last_name": current_user.last_name,
         "language_code": current_user.language_code,
         "is_premium": current_user.is_premium,
+        "is_owner": is_owner(current_user.telegram_id),
+        "is_support": is_support(current_user.telegram_id),
+        "is_staff": is_staff(current_user.telegram_id),
     }
 
 
