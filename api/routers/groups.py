@@ -556,3 +556,170 @@ async def update_module_config(
 
     await db.commit()
     return {"config": config.config, "is_enabled": config.is_enabled}
+
+
+# ============ Bot Token Management ============
+
+
+@router.get("/groups/{group_id}/token")
+async def get_bot_token(
+    group_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get bot token info for a group (without exposing the actual token)."""
+    from shared.models import BotInstance
+    
+    # Check membership
+    result = await db.execute(
+        select(Member).where(
+            Member.user_id == current_user.id,
+            Member.group_id == group_id,
+        )
+    )
+    member = result.scalar()
+
+    if not member or member.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Get bot instance
+    result = await db.execute(
+        select(BotInstance).where(
+            BotInstance.group_id == group_id,
+            BotInstance.is_active == True
+        )
+    )
+    bot_instance = result.scalar_one_or_none()
+
+    if not bot_instance:
+        return None
+
+    # Return bot info WITHOUT exposing the actual token
+    return {
+        "bot_telegram_id": bot_instance.bot_telegram_id,
+        "bot_username": bot_instance.bot_username,
+        "bot_name": bot_instance.bot_name,
+        "is_active": bot_instance.is_active,
+        "registered_at": bot_instance.registered_at.isoformat() if bot_instance.registered_at else None,
+    }
+
+
+@router.post("/groups/{group_id}/token")
+async def register_bot_token(
+    group_id: int,
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Register a bot token for a group."""
+    import os
+    from cryptography.fernet import Fernet
+    from shared.models import BotInstance
+    
+    token = data.get("token")
+    if not token:
+        raise HTTPException(status_code=400, detail="Token is required")
+
+    # Check admin permission
+    result = await db.execute(
+        select(Member).where(
+            Member.user_id == current_user.id,
+            Member.group_id == group_id,
+        )
+    )
+    member = result.scalar()
+
+    if not member or member.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Validate token with Telegram API
+    try:
+        from aiogram import Bot
+        bot = Bot(token=token)
+        me = await bot.get_me()
+        bot_telegram_id = me.id
+        bot_username = me.username
+        bot_name = me.full_name
+        await bot.session.close()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid bot token: {str(e)}")
+
+    # Encrypt token for storage
+    encryption_key = os.getenv("ENCRYPTION_KEY")
+    if not encryption_key:
+        raise HTTPException(status_code=500, detail="Encryption key not configured")
+    
+    fernet = Fernet(encryption_key.encode())
+    encrypted_token = fernet.encrypt(token.encode()).decode()
+
+    # Check if bot instance already exists
+    result = await db.execute(
+        select(BotInstance).where(BotInstance.group_id == group_id)
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        # Update existing
+        existing.token_hash = encrypted_token
+        existing.bot_telegram_id = bot_telegram_id
+        existing.bot_username = bot_username
+        existing.bot_name = bot_name
+        existing.is_active = True
+        existing.registered_by = current_user.id
+    else:
+        # Create new
+        bot_instance = BotInstance(
+            token_hash=encrypted_token,
+            bot_telegram_id=bot_telegram_id,
+            bot_username=bot_username,
+            bot_name=bot_name,
+            group_id=group_id,
+            registered_by=current_user.id,
+            is_active=True,
+        )
+        db.add(bot_instance)
+
+    await db.commit()
+
+    # Return info WITHOUT the actual token
+    return {
+        "bot_telegram_id": bot_telegram_id,
+        "bot_username": bot_username,
+        "bot_name": bot_name,
+        "is_active": True,
+        "registered_at": None,  # Will be set on next GET
+    }
+
+
+@router.delete("/groups/{group_id}/token")
+async def revoke_bot_token(
+    group_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke (delete) bot token for a group."""
+    from shared.models import BotInstance
+    
+    # Check admin permission
+    result = await db.execute(
+        select(Member).where(
+            Member.user_id == current_user.id,
+            Member.group_id == group_id,
+        )
+    )
+    member = result.scalar()
+
+    if not member or member.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Get and delete bot instance
+    result = await db.execute(
+        select(BotInstance).where(BotInstance.group_id == group_id)
+    )
+    bot_instance = result.scalar_one_or_none()
+
+    if bot_instance:
+        await db.delete(bot_instance)
+        await db.commit()
+
+    return {"message": "Bot token revoked successfully"}
