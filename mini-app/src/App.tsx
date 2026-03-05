@@ -4,6 +4,14 @@ import { useAuthStore } from './stores/authStore'
 import { useGroupStore } from './stores/groupStore'
 import { telegramAuth } from './api/auth'
 import { getGroupByTelegramId, getGroupStatsByTelegramId } from './api/groups'
+import { 
+  debugLog, 
+  LogCategory, 
+  LogLevel,
+  logInitData, 
+  logAuthState,
+  logTelegramEvent 
+} from './utils/debug'
 
 // Layouts
 import MainLayout from './components/Layout/MainLayout'
@@ -55,15 +63,25 @@ function App() {
 
   useEffect(() => {
     const init = async () => {
+      debugLog(LogCategory.INIT, '=== APP INITIALIZATION START ===', null);
       setLoading(true)
+      logAuthState('initializing');
 
       // Get Telegram init data
       const tg = (window as any).Telegram?.WebApp
+      
+      // Log Telegram WebApp object
+      debugLog(LogCategory.TELEGRAM, 'Telegram WebApp object:', tg ? 'Found' : 'NOT FOUND', tg ? LogLevel.INFO : LogLevel.ERROR);
+      
+      // Full init data dump
+      logInitData(tg);
 
       // Configure Telegram WebApp theme to match our dark theme
       if (tg) {
         // Version check: color functions require WebApp 6.1+
         const version = parseFloat(tg.version || '6.0')
+        debugLog(LogCategory.TELEGRAM, `WebApp version: ${version}`, null);
+        
         if (version >= 6.1) {
           try {
             // Set header color to match our dark background
@@ -72,19 +90,30 @@ function App() {
             tg.setBottomBarColor('#020617')
             // Set background color for the main content area
             tg.setBackgroundColor('#020617')
+            debugLog(LogCategory.TELEGRAM, 'Theme colors set successfully', null);
           } catch (e) {
-            console.log('[App] Color settings not supported')
+            debugLog(LogCategory.TELEGRAM, 'Color settings not supported', e, LogLevel.WARN);
           }
         } else {
           // For older versions, try color_key syntax
           try {
             tg.setHeaderColor({ color_key: 'bg_color' })
+            debugLog(LogCategory.TELEGRAM, 'Header color set via color_key', null);
           } catch (e) {
-            console.log('[App] Header color not supported in version', tg.version)
+            debugLog(LogCategory.TELEGRAM, 'Header color not supported in version', tg.version, LogLevel.WARN);
           }
         }
         // Expand the web app to full height
+        debugLog(LogCategory.TELEGRAM, 'Calling tg.expand()', null);
         tg.expand()
+        
+        // Set up event listeners for Telegram events
+        tg.onEvent('viewportChanged', (data: any) => {
+          logTelegramEvent('viewportChanged', data);
+        });
+        tg.onEvent('themeChanged', () => {
+          logTelegramEvent('themeChanged', { colorScheme: tg.colorScheme });
+        });
       }
 
       // Wait for initData to be available (it can take a moment in private chats)
@@ -92,31 +121,39 @@ function App() {
       let attempts = 0
       const maxAttempts = 20 // Wait up to 2 seconds
 
+      debugLog(LogCategory.INIT, `Starting initData wait loop. Initial value: ${initDataRaw ? 'Present' : 'Empty'}`, null);
+
       while (!initDataRaw && tg && attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 100))
         initDataRaw = tg?.initData || ''
         attempts++
         if (initDataRaw) {
-          console.log(`[App] initData became available after ${attempts} attempts`)
+          debugLog(LogCategory.INIT, `initData became available after ${attempts} attempts`, null);
+          logInitData(tg);
         }
       }
 
+      debugLog(LogCategory.INIT, `Wait loop complete. attempts=${attempts}, hasInitData=${!!initDataRaw}`, null);
       setInitData(initDataRaw)
 
       if (!initDataRaw) {
         // Not running in Telegram context or initData not available
-        console.log('[App] No initData available after waiting')
+        debugLog(LogCategory.INIT, 'No initData available after waiting', null, LogLevel.WARN);
 
         // Check if we have a stored token from previous session
         const storedToken = localStorage.getItem('nexus_token')
+        debugLog(LogCategory.TOKEN, 'Checking for stored token:', storedToken ? 'Found' : 'Not found');
+        
         if (storedToken) {
-          console.log('[App] Found stored token, allowing access with existing session')
+          debugLog(LogCategory.AUTH, 'Found stored token, allowing access with existing session', null);
+          logAuthState('restored_from_storage');
           setAuthAttempted(true)
           setLoading(false)
           return
         }
 
-        console.log('[App] Not in Telegram context and no stored token')
+        debugLog(LogCategory.AUTH, 'Not in Telegram context and no stored token', null, LogLevel.ERROR);
+        logAuthState('no_auth_available');
         setAuthAttempted(true)
         setLoading(false)
         return
@@ -130,34 +167,48 @@ function App() {
       const groupIdStr = startParam ? String(startParam) : (chatId ? String(chatId) : null)
       const telegramChatId = groupIdStr ? Number(groupIdStr) : null
 
+      debugLog(LogCategory.GROUPS, `Extracted IDs - startParam: ${startParam}, chatId: ${chatId}, telegramChatId: ${telegramChatId}`, null);
+
       // No more localStorage! Backend handles bot token lookup based on user membership
       // The bot knows which groups the user is in and finds the right token automatically
 
       try {
         // Authenticate with backend
         // Backend finds bots based on user's group memberships (database-driven)
-        console.log('[App] Starting authentication...')
-        console.log('[App] Backend will find bots based on your group memberships')
+        debugLog(LogCategory.AUTH, 'Starting authentication with backend...', null);
+        logAuthState('authenticating');
+        
+        debugLog(LogCategory.AUTH, 'Init data being sent (first 200 chars):', initDataRaw.substring(0, 200));
+        debugLog(LogCategory.HASH, 'initData hash from initDataUnsafe:', tg?.initDataUnsafe?.hash);
+        
         const authData = await telegramAuth(initDataRaw)
-        console.log('[App] Authentication successful, setting auth state')
+        debugLog(LogCategory.AUTH, 'Authentication successful!', { userId: authData.user?.id, username: authData.user?.username });
+        logAuthState('authenticated');
+        
+        debugLog(LogCategory.TOKEN, 'Received access token (first 30 chars):', authData.access_token?.substring(0, 30));
         setAuth(authData.access_token, authData.user)
-        console.log('[App] Auth state set')
+        debugLog(LogCategory.AUTH, 'Auth state set in store', null);
 
         // If we have a Telegram Chat ID, resolve it to Database Group ID
         if (telegramChatId) {
           try {
-            console.log('[App] Resolving Telegram Chat ID to Database Group ID:', telegramChatId)
+            debugLog(LogCategory.GROUPS, `Resolving Telegram Chat ID ${telegramChatId} to Database Group ID...`, null);
             const group = await getGroupByTelegramId(telegramChatId)
             setDbGroupId(group.id)
             setCurrentGroup(group)
-            console.log('[App] Resolved to Database Group ID:', group.id)
+            debugLog(LogCategory.GROUPS, `Resolved to Database Group ID: ${group.id}`, { groupTitle: group.title });
           } catch (e: any) {
-            console.error('[App] Failed to resolve Telegram Chat ID:', e)
+            debugLog(LogCategory.GROUPS, 'Failed to resolve Telegram Chat ID:', e?.response?.data || e.message, LogLevel.ERROR);
             // Don't fail auth, just log it - user may need to add bot to group
           }
+        } else {
+          debugLog(LogCategory.GROUPS, 'No telegramChatId available, skipping group resolution', null);
         }
       } catch (err: any) {
-        console.error('Auth error:', err)
+        debugLog(LogCategory.AUTH, 'Authentication error:', err, LogLevel.ERROR);
+        debugLog(LogCategory.AUTH, 'Error response data:', err.response?.data, LogLevel.ERROR);
+        logAuthState('failed', { detail: err.response?.data?.detail });
+        
         const detail = err.response?.data?.detail || 'Authentication failed'
         setError('Authentication Failed')
         setErrorDetail(detail)
@@ -165,6 +216,7 @@ function App() {
 
       setAuthAttempted(true)
       setLoading(false)
+      debugLog(LogCategory.INIT, '=== APP INITIALIZATION COMPLETE ===', { authAttempted: true, isLoading: false });
     }
 
     init()
