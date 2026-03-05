@@ -134,6 +134,8 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
 
     Returns True if valid, False otherwise.
     """
+    import urllib.parse
+
     received_hash = raw_params.get("hash", "")
     if not received_hash:
         logger.warning("Missing hash in init data")
@@ -152,8 +154,9 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
             )
             return False
 
-    # Use raw values as-is (URL-encoded) for hash computation
-    # Telegram signs the URL-encoded init data, not decoded values
+    # Create a copy of params for hash computation
+    # IMPORTANT: We must use the raw URL-encoded values as-is from the init data
+    # Telegram uses the exact same string for hash computation
     parsed = dict(raw_params)
 
     # Extract and remove the hash — it must NOT be part of the check string
@@ -164,6 +167,7 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
 
     # Build the data_check_string: sorted keys alphabetically, joined by \n
     # Use the raw URL-encoded values as per Telegram's algorithm
+    # This is critical - Telegram uses the URL-encoded values directly
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
 
     # Step 1: Derive secret key using "WebAppData" as the HMAC key
@@ -175,27 +179,46 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     ).digest()
 
     # Step 2: Compute the final hash using the derived secret key
+    # Use the raw data_check_string bytes directly
     computed_hash = hmac.new(
         key=secret_key,
         msg=data_check_string.encode("utf-8"),
         digestmod=hashlib.sha256,
     ).hexdigest()
 
-    # Use constant-time comparison to prevent timing attacks
-    if not hmac.compare_digest(computed_hash, received_hash):
-        logger.warning(
-            f"Hash mismatch: computed={computed_hash}, received={received_hash}"
-        )
-        logger.info(f"Data check string (full): {data_check_string!r}")
-        logger.info("Parsed params keys and values (URL-encoded):")
-        for key in sorted(parsed.keys()):
-            val = parsed[key]
-            logger.info(f"  {key}={val!r}")
-        logger.info(f"Bot token: {bot_token!r}")
-        logger.info(f"Secret key (hex): {secret_key.hex()}")
-        return False
+    # Also try with the URL-decoded values as a fallback
+    # Some implementations may use URL-decoded values
+    data_check_string_decoded = "\n".join(
+        f"{k}={urllib.parse.unquote(v)}" for k, v in sorted(parsed.items())
+    )
+    computed_hash_decoded = hmac.new(
+        key=secret_key,
+        msg=data_check_string_decoded.encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
 
-    return True
+    # Use constant-time comparison to prevent timing attacks
+    if hmac.compare_digest(computed_hash, received_hash):
+        return True
+
+    # Try decoded version as fallback
+    if hmac.compare_digest(computed_hash_decoded, received_hash):
+        logger.info("Hash validated using URL-decoded values (fallback)")
+        return True
+
+    # Log detailed debug info for diagnosis
+    logger.warning(
+        f"Hash mismatch: computed={computed_hash}, received={received_hash}"
+    )
+    logger.info(f"Data check string (URL-encoded, full): {data_check_string!r}")
+    logger.info(f"Data check string (URL-decoded, full): {data_check_string_decoded!r}")
+    logger.info("Parsed params keys and values (URL-encoded):")
+    for key in sorted(parsed.keys()):
+        val = parsed[key]
+        logger.info(f"  {key}={val!r}")
+    logger.info(f"Bot token (first 10 chars): {bot_token[:10]!r}...")
+    logger.info(f"Secret key (hex): {secret_key.hex()}")
+    return False
 
 
 def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
@@ -577,7 +600,7 @@ async def _get_bot_token_for_chat(
             return None
 
         fernet = Fernet(encryption_key.encode())
-        decrypted_token = fernet.decrypt(bot_instance.token_hash.encode()).decode()
+        decrypted_token = fernet.decrypt(bot_instance.token_hash.encode()).decode().strip()
 
         return {
             "token": decrypted_token,
@@ -622,7 +645,7 @@ async def _get_all_bot_tokens(db: AsyncSession) -> list[dict]:
             try:
                 decrypted_token = fernet.decrypt(
                     bot_instance.token_hash.encode()
-                ).decode()
+                ).decode().strip()
                 bots.append(
                     {
                         "token": decrypted_token,
@@ -712,7 +735,7 @@ async def _get_bot_tokens_for_user(
             try:
                 decrypted_token = fernet.decrypt(
                     bot_instance.token_hash.encode()
-                ).decode()
+                ).decode().strip()
                 bots.append(
                     {
                         "token": decrypted_token,
