@@ -23,6 +23,7 @@ load_dotenv(env_path)
 from bot.core.middleware import pipeline, setup_pipeline
 from bot.core.module_registry import module_registry
 from bot.core.token_manager import token_manager
+from bot.core.debug_logger import debug, ErrorAnalyzer, InitDataValidator, LogLevel
 
 # Configure logging
 logging.basicConfig(
@@ -159,29 +160,48 @@ async def run_long_polling(dp: Dispatcher, bot: Bot):
 async def startup():
     """Initialize and start the bot."""
     logger.info("Starting Nexus Bot...")
+    debug.info("=" * 60, "startup")
+    debug.info("NEXUS BOT STARTUP", "startup")
+    debug.info("=" * 60, "startup")
 
     # Get bot token
     bot_token = os.getenv("BOT_TOKEN")
     if not bot_token:
-        logger.error("BOT_TOKEN environment variable not set!")
+        error_msg = "BOT_TOKEN environment variable not set!"
+        logger.error(error_msg)
+        debug.critical(error_msg, component="startup")
+        analysis = ErrorAnalyzer.analyze(Exception(error_msg))
+        debug.fix_suggestion(analysis["fix"], "startup")
         sys.exit(1)
 
+    # Log configuration
+    debug.info("Configuration", "startup", {
+        "webhook_url": os.getenv("WEBHOOK_URL") or "Not set (will use long-polling)",
+        "mini_app_url": get_mini_app_url(),
+        "debug_mode": os.getenv("NEXUS_DEBUG", "false"),
+    })
+
     # Initialize token manager (try/catch for when database is unavailable)
-    logger.info("Initializing token manager...")
+    debug.info("Initializing token manager...", "startup")
     try:
         await token_manager.initialize()
+        debug.success("Token manager initialized", "startup")
     except Exception as e:
+        debug.warn("Token manager initialization skipped (DB unavailable)", "startup", {"error": str(e)})
         logger.warning(f"Token manager initialization skipped (DB unavailable): {e}")
 
     # Setup middleware pipeline
-    logger.info("Setting up middleware pipeline...")
+    debug.info("Setting up middleware pipeline...", "startup")
     setup_pipeline()
+    debug.success("Middleware pipeline configured", "startup")
 
     # Load modules (try/catch for when database is unavailable)
-    logger.info("Loading modules...")
+    debug.info("Loading modules...", "startup")
     try:
         await module_registry.load_all()
+        debug.success("Modules loaded", "startup", {"count": len(module_registry.get_all_modules())})
     except Exception as e:
+        debug.warn("Module loading skipped (DB unavailable)", "startup", {"error": str(e)})
         logger.warning(f"Module loading skipped (DB unavailable): {e}")
 
     # Check dependencies and conflicts
@@ -189,19 +209,23 @@ async def startup():
         missing_deps = module_registry.check_dependencies()
         if missing_deps:
             for name, deps in missing_deps.items():
+                debug.warn(f"Module {name} missing dependencies", "startup", {"dependencies": deps})
                 logger.warning(f"Module {name} missing dependencies: {deps}")
 
         conflicts = module_registry.check_conflicts()
         if conflicts:
             for name, confs in conflicts.items():
+                debug.warn(f"Module {name} conflicts with", "startup", {"conflicts": confs})
                 logger.warning(f"Module {name} conflicts with: {confs}")
 
         # Register modules with pipeline
         for module in module_registry.get_all_modules():
             pipeline.add_module(module)
 
+        debug.success(f"Loaded {len(module_registry.get_all_modules())} modules", "startup")
         logger.info(f"Loaded {len(module_registry.get_all_modules())} modules")
     except Exception as e:
+        debug.warn("Module registration skipped", "startup", {"error": str(e)})
         logger.warning(f"Module registration skipped: {e}")
 
     # Check mode: long-polling (development) or webhooks (production)
