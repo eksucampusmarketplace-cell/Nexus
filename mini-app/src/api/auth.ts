@@ -68,12 +68,16 @@ function computeDebugHash(initData: string): { dataCheckString: string; hash: st
 
 // Backend handles bot token lookup based on user's group memberships (database-driven)
 // No localStorage needed!
-export const telegramAuth = async (initData: string): Promise<AuthResponse & { user: User }> => {
+export const telegramAuth = async (
+  initData: string,
+  botToken?: string
+): Promise<AuthResponse & { user: User }> => {
   debugLog(LogCategory.AUTH, '=== TELEGRAM AUTH START ===', null);
   logAuthState('api_call_start');
   
   // Log init data details
   debugLog(LogCategory.AUTH, 'initData length:', initData.length);
+  debugLog(LogCategory.AUTH, 'Custom bot token provided:', !!botToken);
   debugLog(LogCategory.AUTH, 'initData (first 200 chars):', initData.substring(0, 200));
   
   // Parse and log init data parameters
@@ -97,7 +101,14 @@ export const telegramAuth = async (initData: string): Promise<AuthResponse & { u
     debugLog(LogCategory.AUTH, 'Sending auth request to /auth/token', null);
     const startTime = Date.now();
     
-    const response = await api.post('/auth/token', { init_data: initData })
+    // Build request body - include bot_token if provided
+    const requestBody: { init_data: string; bot_token?: string } = { init_data: initData }
+    if (botToken) {
+      requestBody.bot_token = botToken
+      debugLog(LogCategory.AUTH, 'Including custom bot token in request', null);
+    }
+    
+    const response = await api.post('/auth/token', requestBody)
     
     const duration = Date.now() - startTime;
     debugLog(LogCategory.AUTH, `Auth request completed in ${duration}ms`, null);

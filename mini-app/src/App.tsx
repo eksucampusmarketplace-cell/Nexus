@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import { useGroupStore } from './stores/groupStore'
@@ -28,6 +28,7 @@ import {
 import MainLayout from './components/Layout/MainLayout'
 
 // Views
+import EntrySelection from './views/EntrySelection'
 import Dashboard from './views/Dashboard'
 import Help from './views/Help'
 import AdminDashboard from './views/AdminDashboard/AdminDashboard'
@@ -64,237 +65,259 @@ import Graveyard from './views/AdminDashboard/Graveyard'
 import GroupIntelligence from './views/AdminDashboard/GroupIntelligence'
 import AutomationCenterEnhanced from './views/AdminDashboard/AutomationCenterEnhanced'
 
+// App initialization stages
+type AppStage = 
+  | 'initializing'      // Initial load, checking Telegram context
+  | 'entry-selection'   // Show entry selection (private chat or new user)
+  | 'authenticating'    // Auth in progress
+  | 'authenticated'     // Auth successful
+  | 'error'             // Auth error
+
+type EntryMethod = 'existing-groups' | 'custom-token' | 'first-time' | null
+
 function App() {
   const { isAuthenticated, isLoading, isRehydrated, error, setAuth, setLoading, setError } = useAuthStore()
   const { currentGroup, setCurrentGroup } = useGroupStore()
+  
+  // App state
+  const [stage, setStage] = useState<AppStage>('initializing')
   const [initData, setInitData] = useState<string>('')
   const [errorDetail, setErrorDetail] = useState<string>('')
-  const [authAttempted, setAuthAttempted] = useState(false)
-  const [dbGroupId, setDbGroupId] = useState<number | null>(null) // Store the Database Group ID
+  const [dbGroupId, setDbGroupId] = useState<number | null>(null)
+  const [entryMethod, setEntryMethod] = useState<EntryMethod>(null)
+  const [customBotToken, setCustomBotToken] = useState<string | null>(null)
 
+  // Authentication function - can be called with or without custom token
+  const authenticate = useCallback(async (botToken?: string) => {
+    if (!initData) {
+      setError('No Telegram Data')
+      setErrorDetail('Authentication requires Telegram initData. Please open from Telegram.')
+      setStage('error')
+      return
+    }
+
+    setStage('authenticating')
+    setLoading(true)
+    setError(null)
+
+    try {
+      enhancedDebug.info('Starting authentication', LogCategory.AUTH, {
+        hasCustomToken: !!botToken,
+        initDataLength: initData.length,
+      })
+
+      // Authenticate with backend, optionally passing custom bot token
+      const authData = await telegramAuth(initData, botToken)
+
+      enhancedDebug.success('Authentication successful!', LogCategory.AUTH, {
+        userId: authData.user?.id,
+        username: authData.user?.username,
+      })
+
+      setAuth(authData.access_token, authData.user)
+
+      // Try to resolve group from initData
+      const tg = (window as any).Telegram?.WebApp
+      const startParam = tg?.initDataUnsafe?.start_param
+      const chatId = tg?.initDataUnsafe?.chat?.id
+      const telegramChatId = startParam ? Number(startParam) : (chatId ? Number(chatId) : null)
+
+      if (telegramChatId) {
+        try {
+          const group = await getGroupByTelegramId(telegramChatId)
+          setDbGroupId(group.id)
+          setCurrentGroup(group)
+          enhancedDebug.success(`Resolved to Database Group ID: ${group.id}`, LogCategory.GROUPS)
+        } catch (e: any) {
+          enhancedDebug.warn('Failed to resolve Telegram Chat ID', LogCategory.GROUPS, { telegramChatId })
+          // Don't fail auth, just continue without group resolution
+        }
+      }
+
+      setStage('authenticated')
+    } catch (err: any) {
+      const errorAnalysis = ErrorAnalyzer.analyze(err, { initDataLength: initData.length })
+      enhancedDebug.error('Authentication failed', err, LogCategory.AUTH, {
+        responseData: err.response?.data,
+        status: err.response?.status,
+      })
+
+      const detail = err.response?.data?.detail || 'Authentication failed'
+      
+      // Check if error indicates we need entry selection
+      const needsEntrySelection = 
+        detail.includes('not currently a member of any groups') ||
+        detail.includes('Hash mismatch') ||
+        detail.includes('Chat ID not found')
+
+      if (needsEntrySelection && !botToken) {
+        // Show entry selection instead of error
+        setStage('entry-selection')
+        setErrorDetail(detail)
+        setLoading(false)
+        return
+      }
+
+      setError('Authentication Failed')
+      setErrorDetail(`${detail}\n\n${errorAnalysis.fix}`)
+      setStage('error')
+    } finally {
+      setLoading(false)
+    }
+  }, [initData, setAuth, setLoading, setError, setCurrentGroup])
+
+  // Initialize app - detect Telegram context
   useEffect(() => {
     const init = async () => {
-      // Use enhanced debug system with full diagnostics
       await enhancedDebug.withContext('App Initialization', LogCategory.INIT, async (ctx) => {
-        ctx.log('Starting app initialization');
-        setLoading(true);
-        telegramDebug.logAuthEvent('initializing');
+        ctx.log('Starting app initialization')
+        setLoading(true)
 
-        // Get Telegram WebApp object
-        const tg = (window as any).Telegram?.WebApp;
+        const tg = (window as any).Telegram?.WebApp
+        telegramDebug.logInitData((window as any).Telegram)
 
-        // Enhanced Telegram diagnostics
-        telegramDebug.logInitData((window as any).Telegram);
-
-        // Validate initData with detailed diagnostics
-        const botToken = import.meta.env.VITE_BOT_TOKEN || ''; // Only for client-side diagnostics
-        const validationResult = InitDataValidator.validate(tg?.initData, botToken);
-
-        if (!validationResult.valid) {
-          enhancedDebug.warn('initData validation issues detected', LogCategory.INIT, validationResult);
-
-          // Check for specific private chat issue
-          if (!validationResult.initDataPresent) {
-            const diagnosis = InitDataValidator.diagnoseMissingInitData((window as any).Telegram);
-            enhancedDebug.warn('Missing initData diagnosis', LogCategory.TELEGRAM, diagnosis);
-
-            // Provide actionable guidance to user
-            if (diagnosis.inTelegram && diagnosis.chatType === 'private') {
-              setError('Open from Group');
-              setErrorDetail('The Mini App works best when opened from a group. Please:\n1. Add the bot to a group\n2. Open the Mini App from that group\n\nReason: Telegram does not provide group context in private chats.');
-              setAuthAttempted(true);
-              setLoading(false);
-              return;
-            }
-          }
-        }
-
-        // Configure Telegram WebApp theme to match our dark theme
+        // Configure Telegram WebApp theme
         if (tg) {
-          const version = parseFloat(tg.version || '6.0');
-          enhancedDebug.debug(`WebApp version: ${version}`, LogCategory.TELEGRAM);
-
+          const version = parseFloat(tg.version || '6.0')
           if (version >= 6.1) {
             try {
-              tg.setHeaderColor('#020617');
-              tg.setBottomBarColor('#020617');
-              tg.setBackgroundColor('#020617');
-              enhancedDebug.success('Theme colors set successfully', LogCategory.TELEGRAM);
+              tg.setHeaderColor('#020617')
+              tg.setBottomBarColor('#020617')
+              tg.setBackgroundColor('#020617')
             } catch (e) {
-              enhancedDebug.warn('Color settings not supported', LogCategory.TELEGRAM, e);
+              enhancedDebug.warn('Color settings not supported', LogCategory.TELEGRAM, e)
             }
           }
-
-          tg.expand();
+          tg.expand()
 
           // Set up event listeners
           tg.onEvent('viewportChanged', (data: any) => {
-            telegramDebug.logWebSocketEvent('viewportChanged', data);
-          });
+            telegramDebug.logWebSocketEvent('viewportChanged', data)
+          })
           tg.onEvent('themeChanged', () => {
-            telegramDebug.logWebSocketEvent('themeChanged', { colorScheme: tg.colorScheme });
-          });
+            telegramDebug.logWebSocketEvent('themeChanged', { colorScheme: tg.colorScheme })
+          })
         }
 
-        // Wait for initData with enhanced logging
-        let initDataRaw = tg?.initData || '';
-        let attempts = 0;
-        const maxAttempts = 20;
-
-        enhancedDebug.debug(`Starting initData wait loop. Initial: ${initDataRaw ? 'Present' : 'Empty'}`, LogCategory.INIT);
+        // Wait for initData
+        let initDataRaw = tg?.initData || ''
+        let attempts = 0
+        const maxAttempts = 20
 
         while (!initDataRaw && tg && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          initDataRaw = tg?.initData || '';
-          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 100))
+          initDataRaw = tg?.initData || ''
+          attempts++
+        }
+
+        setInitData(initDataRaw)
+
+        // Check for stored token - if exists, try to use it
+        const storedToken = localStorage.getItem('nexus_token')
+        
+        if (storedToken) {
+          enhancedDebug.info('Found stored token, checking validity')
+          
+          // If we have initData, try to re-authenticate to get fresh permissions
           if (initDataRaw) {
-            ctx.log(`initData became available after ${attempts} attempts`);
-            telegramDebug.logInitData((window as any).Telegram);
+            await authenticate()
+            return
           }
+          
+          // No initData but have stored token - allow access (user can refresh data)
+          enhancedDebug.info('No initData but have stored token, allowing access')
+          setStage('authenticated')
+          setLoading(false)
+          return
         }
 
-        enhancedDebug.debug(`Wait loop complete. attempts=${attempts}, hasInitData=${!!initDataRaw}`, LogCategory.INIT);
-        setInitData(initDataRaw);
-
+        // No stored token - determine what to show
         if (!initDataRaw) {
-          enhancedDebug.warn('No initData available after waiting', LogCategory.INIT);
-
-          const storedToken = localStorage.getItem('nexus_token');
-          enhancedDebug.debug('Checking for stored token', LogCategory.TOKEN, { found: !!storedToken });
-
-          if (storedToken) {
-            enhancedDebug.success('Found stored token, allowing access', LogCategory.AUTH);
-            telegramDebug.logAuthEvent('restored_from_storage');
-            setAuthAttempted(true);
-            setLoading(false);
-            return;
-          }
-
-          // Enhanced error message with fix suggestion
-          const diagnosis = InitDataValidator.diagnoseMissingInitData((window as any).Telegram);
-          enhancedDebug.error(
-            'Authentication Failed - No initData',
-            new Error(ErrorCode.MISSING_INIT_DATA),
-            LogCategory.AUTH,
-            diagnosis
-          );
-
-          setError('Authentication Failed');
-          setErrorDetail(`No Telegram authentication data available.\n\n${diagnosis.explanation}\n\nTo fix:\n${diagnosis.workarounds.join('\n')}`);
-          setAuthAttempted(true);
-          setLoading(false);
-          return;
+          // Not in Telegram context
+          enhancedDebug.error('No initData available', new Error(ErrorCode.MISSING_INIT_DATA), LogCategory.AUTH)
+          setStage('entry-selection')
+          setErrorDetail('Open this Mini App from Telegram to authenticate')
+          setLoading(false)
+          return
         }
 
-        // Get Telegram Chat ID from start_param or chat
-        // IMPORTANT: Keep as string to avoid JavaScript number precision loss
-        // Telegram IDs can exceed Number.MAX_SAFE_INTEGER (2^53-1)
-        const startParam = tg?.initDataUnsafe?.start_param;
-        const chatId = tg?.initDataUnsafe?.chat?.id;
-        const groupIdStr = startParam ? String(startParam) : (chatId ? String(chatId) : null);
-        const telegramChatId = groupIdStr ? Number(groupIdStr) : null;
+        // We have initData - check if this is a private chat
+        const chatType = tg?.initDataUnsafe?.chat?.type
+        const chatId = tg?.initDataUnsafe?.chat?.id
 
-        enhancedDebug.debug(`Extracted IDs`, LogCategory.GROUPS, {
-          startParam,
-          chatId,
-          telegramChatId,
-          chatType: tg?.initDataUnsafe?.chat?.type,
-        });
-
-        try {
-          // Authenticate with backend
-          enhancedDebug.info('Starting authentication with backend', LogCategory.AUTH);
-          telegramDebug.logAuthEvent('authenticating');
-
-          enhancedDebug.debug('Init data being sent', LogCategory.AUTH, {
-            length: initDataRaw.length,
-            preview: initDataRaw.substring(0, 200),
-          });
-
-          const authData = await telegramAuth(initDataRaw);
-
-          enhancedDebug.success('Authentication successful!', LogCategory.AUTH, {
-            userId: authData.user?.id,
-            username: authData.user?.username,
-          });
-          telegramDebug.logAuthEvent('authenticated');
-
-          enhancedDebug.debug('Received access token', LogCategory.TOKEN, {
-            preview: authData.access_token?.substring(0, 30),
-          });
-
-          setAuth(authData.access_token, authData.user);
-          enhancedDebug.debug('Auth state set in store', LogCategory.AUTH);
-
-          // If we have a Telegram Chat ID, resolve it to Database Group ID
-          if (telegramChatId) {
-            try {
-              enhancedDebug.info(`Resolving Telegram Chat ID ${telegramChatId}`, LogCategory.GROUPS);
-              const group = await getGroupByTelegramId(telegramChatId);
-              setDbGroupId(group.id);
-              setCurrentGroup(group);
-              enhancedDebug.success(`Resolved to Database Group ID: ${group.id}`, LogCategory.GROUPS, {
-                groupTitle: group.title,
-              });
-            } catch (e: any) {
-              const errorAnalysis = ErrorAnalyzer.analyze(e, { telegramChatId });
-              enhancedDebug.error(
-                'Failed to resolve Telegram Chat ID',
-                e,
-                LogCategory.GROUPS,
-                { analysis: errorAnalysis, telegramChatId }
-              );
-              // Don't fail auth, just log it
-            }
-          } else {
-            enhancedDebug.warn('No telegramChatId available, skipping group resolution', LogCategory.GROUPS);
-          }
-        } catch (err: any) {
-          const errorAnalysis = ErrorAnalyzer.analyze(err, { initDataLength: initDataRaw.length });
-          enhancedDebug.error('Authentication error', err, LogCategory.AUTH, {
-            analysis: errorAnalysis,
-            responseData: err.response?.data,
-            status: err.response?.status,
-          });
-          telegramDebug.logAuthError(err, { initDataLength: initDataRaw.length });
-
-          const detail = err.response?.data?.detail || 'Authentication failed';
-          setError('Authentication Failed');
-          setErrorDetail(`${detail}\n\n${errorAnalysis.fix}`);
+        if (chatType === 'private' || !chatId) {
+          // Private chat - show entry selection
+          enhancedDebug.info('Detected private chat, showing entry selection')
+          setStage('entry-selection')
+          setLoading(false)
+          return
         }
 
-        setAuthAttempted(true);
-        setLoading(false);
-        enhancedDebug.info('=== APP INITIALIZATION COMPLETE ===', LogCategory.INIT, {
-          authAttempted: true,
-          isLoading: false,
-          isAuthenticated: useAuthStore.getState().isAuthenticated,
-        });
-      });
-    };
+        // Group chat - try automatic authentication
+        enhancedDebug.info('Detected group chat, attempting automatic authentication')
+        await authenticate()
+      })
+    }
 
-    init();
-  }, [setAuth, setLoading, setError]);
+    init()
+  }, [authenticate, setLoading])
 
-  if (isLoading) {
-    return <Loading />;
+  // Handle entry selection
+  const handleSelectExistingGroups = useCallback(async () => {
+    setEntryMethod('existing-groups')
+    // Try auth without custom token - backend will try user's group memberships
+    await authenticate()
+  }, [authenticate])
+
+  const handleSelectCustomToken = useCallback(async (token: string) => {
+    setEntryMethod('custom-token')
+    setCustomBotToken(token)
+    // Store token for future use
+    localStorage.setItem('nexus_custom_bot_token', token)
+    // Try auth with custom token
+    await authenticate(token)
+  }, [authenticate])
+
+  const handleSelectFirstTime = useCallback(() => {
+    setEntryMethod('first-time')
+    // First-time users need guidance, stay on entry selection
+  }, [])
+
+  // Loading state
+  if (isLoading && stage === 'initializing') {
+    return <Loading />
   }
 
-  // Show error if authentication failed
-  if (error) {
-    // Check if the error is about not being in any groups
-    const isGroupMembershipError = errorDetail?.includes('not currently a member of any groups');
+  // Entry Selection - show for private chats or when auth needs guidance
+  if (stage === 'entry-selection') {
+    return (
+      <EntrySelection
+        onSelectExistingGroups={handleSelectExistingGroups}
+        onSelectCustomToken={handleSelectCustomToken}
+        onSelectFirstTime={handleSelectFirstTime}
+        isLoading={isLoading}
+        error={error}
+      />
+    )
+  }
+
+  // Error state
+  if (stage === 'error' || error) {
+    const isGroupMembershipError = errorDetail?.includes('not currently a member of any groups')
     const isInitDataError = errorDetail?.includes('Chat ID not found in initData') ||
-                            errorDetail?.includes('No Telegram authentication');
+                            errorDetail?.includes('No Telegram authentication')
 
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center max-w-md p-6">
+      <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-primary-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/20">
+            <span className="text-3xl">🤖</span>
+          </div>
           <h1 className="text-3xl font-bold mb-4 gradient-text">Nexus</h1>
-          <p className="text-red-400 mb-2">{error}</p>
+          <p className="text-red-400 mb-4">{error}</p>
 
           {isGroupMembershipError ? (
-            <div className="bg-dark-800 rounded-lg p-4 mb-4 text-left">
+            <div className="bg-dark-800 rounded-xl p-4 mb-4 text-left">
               <p className="text-dark-300 text-sm mb-2">
                 You need to add the bot to a group before using the Mini App:
               </p>
@@ -303,23 +326,32 @@ function App() {
                 <li>Send any message in the group</li>
                 <li>Open the Mini App from the group</li>
               </ol>
+              <button
+                onClick={() => setStage('entry-selection')}
+                className="mt-4 w-full py-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-white text-sm transition-colors"
+              >
+                Back to Options
+              </button>
             </div>
           ) : isInitDataError ? (
-            <div className="bg-dark-800 rounded-lg p-4 mb-4 text-left">
+            <div className="bg-dark-800 rounded-xl p-4 mb-4 text-left">
               <p className="text-dark-300 text-sm mb-2">
                 The Mini App works best when opened from a group:
               </p>
               <ol className="text-dark-400 text-sm list-decimal list-inside space-y-1">
                 <li>Go to a group with the bot</li>
                 <li>Click the menu button (⋮ or ⋯)</li>
-                <li>Select "Mini App" or "🚀 Mini App"</li>
+                <li>Select &quot;Mini App&quot; or &quot;🚀 Mini App&quot;</li>
               </ol>
-              <p className="text-dark-500 text-xs mt-2">
-                Note: Telegram doesn&apos;t provide full authentication data in private chats.
-              </p>
+              <button
+                onClick={() => setStage('entry-selection')}
+                className="mt-4 w-full py-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-white text-sm transition-colors"
+              >
+                Back to Options
+              </button>
             </div>
           ) : errorDetail ? (
-            <div className="bg-dark-800 rounded-lg p-4 mb-4 text-left">
+            <div className="bg-dark-800 rounded-xl p-4 mb-4 text-left">
               <p className="text-dark-300 text-sm mb-2">Error details:</p>
               <pre className="text-dark-400 text-xs font-mono whitespace-pre-wrap">{errorDetail}</pre>
             </div>
@@ -332,13 +364,12 @@ function App() {
             Retry
           </button>
 
-          {/* Debug Export Button - Only in development */}
           {import.meta.env.DEV && (
             <button
               onClick={() => {
-                const report = enhancedDebug.generateReport();
-                console.log(report);
-                alert('Debug report printed to console');
+                const report = enhancedDebug.generateReport()
+                console.log(report)
+                alert('Debug report printed to console')
               }}
               className="mt-4 ml-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg text-sm transition-colors"
             >
@@ -347,11 +378,10 @@ function App() {
           )}
         </div>
       </div>
-    );
+    )
   }
 
-  // Check if opened from a specific group
-  // Use the resolved Database Group ID for navigation
+  // Authenticated - show main app
   return (
     <MainLayout>
       <Routes>
@@ -359,21 +389,7 @@ function App() {
           isAuthenticated ? (
             dbGroupId ? <Navigate to={`/admin/${dbGroupId}`} /> : <Dashboard />
           ) : (
-            <div className="flex items-center justify-center h-screen">
-              <div className="text-center max-w-md p-6">
-                <h1 className="text-3xl font-bold mb-4 gradient-text">Nexus</h1>
-                <p className="text-dark-400 mb-4">Open this Mini App from Telegram</p>
-                <div className="bg-dark-800 rounded-lg p-4 mb-4 text-left">
-                  <p className="text-dark-300 text-sm mb-2">To use the Mini App:</p>
-                  <ol className="text-dark-400 text-sm list-decimal list-inside space-y-1">
-                    <li>Add the bot to a Telegram group</li>
-                    <li>Send any message in the group</li>
-                    <li>Open the Mini App from the group menu</li>
-                  </ol>
-                </div>
-                <p className="text-dark-500 text-xs">Or check that your session hasn&apos;t expired</p>
-              </div>
-            </div>
+            <Navigate to="/" replace />
           )
         } />
         <Route path="/help" element={<Help />} />
@@ -390,7 +406,7 @@ function App() {
         <Route path="/admin/:groupId/bot-builder" element={<BotBuilder />} />
         <Route path="/admin/:groupId/advanced" element={<AdvancedFeatures />} />
 
-        {/* New Feature Routes */}
+        {/* Feature Routes */}
         <Route path="/admin/:groupId/moderation" element={<ModerationQueue />} />
         <Route path="/admin/:groupId/notes-filters" element={<NotesAndFilters />} />
         <Route path="/admin/:groupId/locks" element={<Locks />} />
@@ -400,20 +416,20 @@ function App() {
         <Route path="/admin/:groupId/custom-bot" element={<CustomBotToken />} />
         <Route path="/admin/:groupId/integrations" element={<Integrations />} />
 
-        {/* New Unified Routes */}
+        {/* Unified Routes */}
         <Route path="/admin/:groupId/security" element={<SecurityCenter />} />
         <Route path="/admin/:groupId/polls" element={<PollsCenter />} />
 
-        {/* New Hubs - High Priority */}
+        {/* Hubs - High Priority */}
         <Route path="/admin/:groupId/gamification" element={<GamificationHub />} />
         <Route path="/admin/:groupId/community" element={<CommunityHub />} />
         <Route path="/admin/:groupId/games" element={<GamesHub />} />
 
-        {/* New Hubs - Medium Priority */}
+        {/* Hubs - Medium Priority */}
         <Route path="/admin/:groupId/broadcast" element={<BroadcastCenter />} />
         <Route path="/admin/:groupId/automation" element={<AutomationCenter />} />
 
-        {/* New Hubs - Low Priority */}
+        {/* Hubs - Low Priority */}
         <Route path="/admin/:groupId/formatting" element={<FormattingTools />} />
         <Route path="/admin/:groupId/search" element={<AdvancedSearch />} />
 
@@ -425,7 +441,7 @@ function App() {
         <Route path="/admin/:groupId/automation-enhanced" element={<AutomationCenterEnhanced />} />
       </Routes>
     </MainLayout>
-  );
+  )
 }
 
 export default App
