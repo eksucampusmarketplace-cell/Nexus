@@ -17,9 +17,6 @@ import {
   LogLevel,
 } from '../utils/enhancedDebug';
 
-// Backward compatibility
-import { debugLog, logWebSocket } from '../utils/debug';
-
 // Event types matching the backend EventType enum
 export const EventTypes = {
   // Message events
@@ -197,7 +194,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
     });
 
     // Backward compatibility
-    debugLog(LogCategory.WEBSOCKET, 'WebSocket URL built:', {
+    enhancedDebug.debug('WebSocket URL built', LogCategory.WEBSOCKET, {
       url: url.replace(token || '', token ? '***token***' : ''),
       protocol,
       host,
@@ -370,8 +367,8 @@ export function useWebSocket(options: UseWebSocketOptions) {
   
   // Disconnect from WebSocket
   const disconnect = useCallback(() => {
-    debugLog(LogCategory.WEBSOCKET, '=== WebSocket disconnect() called ===', null);
-    logWebSocket('disconnecting');
+    enhancedDebug.debug('=== WebSocket disconnect() called ===', LogCategory.WEBSOCKET);
+    telegramDebug.logWebSocketEvent('disconnecting');
     
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -384,54 +381,54 @@ export function useWebSocket(options: UseWebSocketOptions) {
     }
     
     if (wsRef.current) {
-      debugLog(LogCategory.WEBSOCKET, 'Closing WebSocket connection (code: 1000)');
+      enhancedDebug.debug('Closing WebSocket connection (code: 1000)', LogCategory.WEBSOCKET);
       wsRef.current.close(1000); // Normal close
       wsRef.current = null;
     }
     
     setState(prev => ({ ...prev, connected: false }));
-    debugLog(LogCategory.WEBSOCKET, 'WebSocket disconnected');
+    enhancedDebug.debug('WebSocket disconnected', LogCategory.WEBSOCKET);
   }, []);
   
   // Send command through WebSocket
   const sendCommand = useCallback((action: string, params?: Record<string, any>) => {
-    debugLog(LogCategory.WEBSOCKET, `Sending command: ${action}`, params);
+    enhancedDebug.debug(`Sending command: ${action}`, LogCategory.WEBSOCKET, params);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'command',
         data: { action, params }
       }));
-      debugLog(LogCategory.WEBSOCKET, `Command sent: ${action}`);
+      enhancedDebug.debug(`Command sent: ${action}`, LogCategory.WEBSOCKET);
       return true;
     }
-    debugLog(LogCategory.WEBSOCKET, `Command failed - WebSocket not open: ${action}`, null, LogLevel.ERROR);
+    enhancedDebug.error(`Command failed - WebSocket not open: ${action}`, null, LogCategory.WEBSOCKET, { action, params });
     return false;
   }, []);
   
   // Subscribe to specific events
   const subscribe = useCallback((events: EventType[]) => {
-    debugLog(LogCategory.WEBSOCKET, 'Subscribing to events:', events);
+    enhancedDebug.debug('Subscribing to events:', LogCategory.WEBSOCKET, { events });
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'subscribe',
         data: { events }
       }));
-      debugLog(LogCategory.WEBSOCKET, 'Subscribe message sent');
+      enhancedDebug.debug('Subscribe message sent', LogCategory.WEBSOCKET);
       return true;
     }
-    debugLog(LogCategory.WEBSOCKET, 'Subscribe failed - WebSocket not open', null, LogLevel.ERROR);
+    enhancedDebug.error('Subscribe failed - WebSocket not open', null, LogCategory.WEBSOCKET);
     return false;
   }, []);
   
   // Auto-connect on mount
   useEffect(() => {
-    debugLog(LogCategory.WEBSOCKET, '=== useWebSocket useEffect ===', { autoConnect, groupId });
+    enhancedDebug.debug('=== useWebSocket useEffect ===', LogCategory.WEBSOCKET, { autoConnect, groupId });
     if (autoConnect) {
       connect();
     }
     
     return () => {
-      debugLog(LogCategory.WEBSOCKET, '=== useWebSocket cleanup ===', null);
+      enhancedDebug.debug('=== useWebSocket cleanup ===', LogCategory.WEBSOCKET);
       disconnect();
     };
   }, [autoConnect, connect, disconnect, groupId]);

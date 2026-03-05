@@ -32,6 +32,7 @@ export enum LogLevel {
 
 export enum LogCategory {
   // Core categories
+  GENERAL = 'GENERAL',
   TELEGRAM = 'TELEGRAM',
   AUTH = 'AUTH',
   API = 'API',
@@ -186,6 +187,7 @@ const COLORS: Record<LogLevel, string> = {
 };
 
 const CATEGORY_COLORS: Record<LogCategory, string> = {
+  [LogCategory.GENERAL]: '#9e9e9e',
   [LogCategory.TELEGRAM]: '#0088cc',
   [LogCategory.AUTH]: '#4caf50',
   [LogCategory.API]: '#2196f3',
@@ -597,7 +599,7 @@ const storage = new DebugStorage();
 // ERROR ANALYZER
 // ============================================================================
 
-class ErrorAnalyzer {
+export class ErrorAnalyzer {
   static analyze(error: Error | any, context?: Record<string, any>): ErrorAnalysis {
     const errorMessage = error?.message || String(error);
     const errorType = error?.constructor?.name || 'Unknown';
@@ -1256,11 +1258,17 @@ export class TelegramDebugger {
   }
 
   logApiResponse(method: string, url: string, status: number, data?: any): void {
-    const level = status >= 400 ? LogLevel.ERROR : LogLevel.DEBUG;
-    this.debug.log(level, LogCategory.API, `API Response: ${method} ${url} - ${status}`, {
-      status,
-      data: data ? this.sanitizeForLog(data) : undefined,
-    });
+    if (status >= 400) {
+      this.debug.error(`API Response: ${method} ${url} - ${status}`, null, LogCategory.API, {
+        status,
+        data: data ? this.sanitizeForLog(data) : undefined,
+      });
+    } else {
+      this.debug.debug(`API Response: ${method} ${url} - ${status}`, LogCategory.API, {
+        status,
+        data: data ? this.sanitizeForLog(data) : undefined,
+      });
+    }
   }
 
   logWebSocketEvent(event: string, data?: any): void {
@@ -1384,7 +1392,34 @@ export const debugLog = (
   data?: any,
   level: LogLevel = LogLevel.DEBUG
 ): void => {
-  enhancedDebug.log(level, category, message, data);
+  switch (level) {
+    case LogLevel.TRACE:
+      enhancedDebug.trace(message, category, data);
+      break;
+    case LogLevel.DEBUG:
+      enhancedDebug.debug(message, category, data);
+      break;
+    case LogLevel.INFO:
+      enhancedDebug.info(message, category, data);
+      break;
+    case LogLevel.SUCCESS:
+      enhancedDebug.success(message, category, data);
+      break;
+    case LogLevel.WARN:
+      enhancedDebug.warn(message, category, data);
+      break;
+    case LogLevel.ERROR:
+      enhancedDebug.error(message, null, category, data);
+      break;
+    case LogLevel.CRITICAL:
+      enhancedDebug.critical(message, null, category, data);
+      break;
+    case LogLevel.FIX:
+      enhancedDebug.fix(message, category);
+      break;
+    default:
+      enhancedDebug.debug(message, category, data);
+  }
 };
 
 export const logTelegramEvent = (event: string, data?: any): void => {
