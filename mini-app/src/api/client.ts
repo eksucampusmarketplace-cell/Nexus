@@ -57,7 +57,9 @@ api.interceptors.request.use((config) => {
     if (!tg) {
       console.log('[API Client] Not running in Telegram WebApp context')
     } else if (!tg.initData) {
-      console.log('[API Client] Telegram WebApp exists but no initData')
+      console.log('[API Client] Telegram WebApp exists but no initData (may be in private chat or loading)')
+    } else {
+      console.log('[API Client] initData exists but no token - auth may be in progress')
     }
   }
   return config

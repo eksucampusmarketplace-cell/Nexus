@@ -34,21 +34,28 @@ export default function Dashboard() {
       console.log('Skipping group load - auth not ready')
       return
     }
-    
+
     // Check if we have a stored token that indicates user was previously authenticated
     const wasAuthenticated = hasStoredToken()
-    
+
     if (!isAuthenticated && !wasAuthenticated) {
       console.log('Skipping group load - not authenticated and no stored token')
       return
     }
-    
+
     // Prevent double-loading unless it's a retry
     if (hasLoadedGroups.current && !isRetry) {
       console.log('Skipping group load - already loaded')
       return
     }
-    
+
+    // Check if Telegram WebApp is available but initData is not (private chat mode)
+    const tg = (window as any).Telegram?.WebApp
+    if (tg && !tg.initData && !wasAuthenticated) {
+      console.log('Skipping group load - in Telegram but no initData yet (private chat)')
+      return
+    }
+
     console.log('Loading groups...', { isAuthenticated, wasAuthenticated })
     hasLoadedGroups.current = true
     setLoadError(null)

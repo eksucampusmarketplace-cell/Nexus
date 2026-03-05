@@ -62,22 +62,61 @@ function App() {
 
       // Configure Telegram WebApp theme to match our dark theme
       if (tg) {
-        // Set header color to match our dark background
-        tg.setHeaderColor('#020617')
-        // Set bottom bar color to match our dark background
-        tg.setBottomBarColor('#020617')
-        // Set background color for the main content area
-        tg.setBackgroundColor('#020617')
+        // Version check: color functions require WebApp 6.1+
+        const version = parseFloat(tg.version || '6.0')
+        if (version >= 6.1) {
+          try {
+            // Set header color to match our dark background
+            tg.setHeaderColor('#020617')
+            // Set bottom bar color to match our dark background
+            tg.setBottomBarColor('#020617')
+            // Set background color for the main content area
+            tg.setBackgroundColor('#020617')
+          } catch (e) {
+            console.log('[App] Color settings not supported')
+          }
+        } else {
+          // For older versions, try color_key syntax
+          try {
+            tg.setHeaderColor({ color_key: 'bg_color' })
+          } catch (e) {
+            console.log('[App] Header color not supported in version', tg.version)
+          }
+        }
         // Expand the web app to full height
         tg.expand()
       }
 
-      const initDataRaw = tg?.initData || ''
+      // Wait for initData to be available (it can take a moment in private chats)
+      let initDataRaw = tg?.initData || ''
+      let attempts = 0
+      const maxAttempts = 20 // Wait up to 2 seconds
+
+      while (!initDataRaw && tg && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        initDataRaw = tg?.initData || ''
+        attempts++
+        if (initDataRaw) {
+          console.log(`[App] initData became available after ${attempts} attempts`)
+        }
+      }
+
       setInitData(initDataRaw)
 
       if (!initDataRaw) {
-        // Not running in Telegram context
-        console.log('Not running in Telegram WebApp context')
+        // Not running in Telegram context or initData not available
+        console.log('[App] No initData available after waiting')
+
+        // Check if we have a stored token from previous session
+        const storedToken = localStorage.getItem('nexus_token')
+        if (storedToken) {
+          console.log('[App] Found stored token, allowing access with existing session')
+          setAuthAttempted(true)
+          setLoading(false)
+          return
+        }
+
+        console.log('[App] Not in Telegram context and no stored token')
         setAuthAttempted(true)
         setLoading(false)
         return
@@ -137,16 +176,43 @@ function App() {
 
   // Show error if authentication failed
   if (error) {
+    // Check if the error is about not being in any groups
+    const isGroupMembershipError = errorDetail?.includes('not currently a member of any groups')
+    const isInitDataError = errorDetail?.includes('Chat ID not found in initData')
+
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center max-w-md p-6">
           <h1 className="text-3xl font-bold mb-4 gradient-text">Nexus</h1>
           <p className="text-red-400 mb-2">{error}</p>
-          {errorDetail && (
+
+          {isGroupMembershipError ? (
+            <div className="bg-dark-800 rounded-lg p-4 mb-4 text-left">
+              <p className="text-dark-300 text-sm mb-2">
+                You need to add the bot to a group before using the Mini App:
+              </p>
+              <ol className="text-dark-400 text-sm list-decimal list-inside space-y-1">
+                <li>Add the bot to one of your groups</li>
+                <li>Send any message in the group</li>
+                <li>Open the Mini App from the group</li>
+              </ol>
+            </div>
+          ) : isInitDataError ? (
+            <div className="bg-dark-800 rounded-lg p-4 mb-4 text-left">
+              <p className="text-dark-300 text-sm mb-2">
+                The Mini App works best when opened from a group:
+              </p>
+              <ol className="text-dark-400 text-sm list-decimal list-inside space-y-1">
+                <li>Go to a group with the bot</li>
+                <li>Click the menu button (⋮ or ⋯)</li>
+                <li>Select "Mini App" or "🚀 Mini App"</li>
+              </ol>
+            </div>
+          ) : errorDetail ? (
             <p className="text-dark-500 text-sm mb-4 font-mono text-xs break-all">{errorDetail}</p>
-          )}
-          <p className="text-dark-400 text-sm">Please try opening the Mini App again from Telegram.</p>
-          <button 
+          ) : null}
+
+          <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition-colors"
           >
@@ -167,9 +233,18 @@ function App() {
             dbGroupId ? <Navigate to={`/admin/${dbGroupId}`} /> : <Dashboard />
           ) : (
             <div className="flex items-center justify-center h-screen">
-              <div className="text-center">
+              <div className="text-center max-w-md p-6">
                 <h1 className="text-3xl font-bold mb-4 gradient-text">Nexus</h1>
-                <p className="text-dark-400 mb-6">Open this Mini App from Telegram</p>
+                <p className="text-dark-400 mb-4">Open this Mini App from Telegram</p>
+                <div className="bg-dark-800 rounded-lg p-4 mb-4 text-left">
+                  <p className="text-dark-300 text-sm mb-2">To use the Mini App:</p>
+                  <ol className="text-dark-400 text-sm list-decimal list-inside space-y-1">
+                    <li>Add the bot to a Telegram group</li>
+                    <li>Send any message in the group</li>
+                    <li>Open the Mini App from the group menu</li>
+                  </ol>
+                </div>
+                <p className="text-dark-500 text-xs">Or check that your session hasn't expired</p>
               </div>
             </div>
           )

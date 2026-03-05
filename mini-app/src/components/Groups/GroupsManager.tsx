@@ -46,24 +46,31 @@ export default function GroupsManager({ onSelectGroup, selectedGroupId }: Groups
       console.log('GroupsManager: Auth not ready, skipping load')
       return
     }
-    
+
     // Check both isAuthenticated and hasStoredToken
     const wasAuthenticated = hasStoredToken()
     if (!isAuthenticated && !wasAuthenticated) {
       console.log('GroupsManager: Not authenticated, skipping load')
       return
     }
-    
+
+    // Check if Telegram WebApp is available but initData is not (private chat mode)
+    const tg = (window as any).Telegram?.WebApp
+    if (tg && !tg.initData && !wasAuthenticated) {
+      console.log('GroupsManager: In Telegram but no initData yet, skipping load')
+      return
+    }
+
     // Prevent double-loading unless it's a retry
     if (hasLoadedGroups.current && !isRetry) {
       console.log('GroupsManager: Already loaded, skipping')
       return
     }
-    
+
     console.log('GroupsManager: Loading groups...', { isAuthenticated, wasAuthenticated })
     hasLoadedGroups.current = true
     setError(null)
-    
+
     try {
       setLoading(true)
       const response = await api.get('/groups/my-groups')
