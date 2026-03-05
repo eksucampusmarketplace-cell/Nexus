@@ -386,7 +386,9 @@ class MiddlewarePipeline:
         Returns True if the update was handled, False otherwise.
         """
         # Capture full Telegram context for debugging
-        tg_context = DebugTelegramContext.from_update(update, bot)
+        tg_context = DebugTelegramContext.from_update(
+            update, bot, bot_username=bot_identity.username if bot_identity else None
+        )
 
         with DebugContext("process_update", "middleware") as dbg_ctx:
             dbg_ctx.add_data("update_id", update.update_id)

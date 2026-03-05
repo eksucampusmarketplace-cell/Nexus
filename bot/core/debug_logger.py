@@ -148,13 +148,17 @@ class TelegramContext:
     hash_validation_error: Optional[str] = None
 
     @classmethod
-    def from_update(cls, update: Update, bot: Optional[Bot] = None) -> "TelegramContext":
+    def from_update(cls, update: Update, bot: Optional[Bot] = None, bot_username: Optional[str] = None) -> "TelegramContext":
         """Extract context from a Telegram update."""
         ctx = cls()
         ctx.update_id = update.update_id
 
-        if bot:
-            ctx.bot_username = bot.username
+        if bot_username:
+            ctx.bot_username = bot_username
+        elif bot:
+            # Bot object doesn't have username attribute directly
+            # Username should be passed via bot_username parameter from BotIdentity
+            ctx.bot_username = getattr(bot, 'username', None)
 
         if update.message:
             msg = update.message
