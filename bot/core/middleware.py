@@ -18,6 +18,13 @@ from bot.core.context import (
     MemberProfile,
     NexusContext,
 )
+from bot.core.debug_logger import (
+    debug,
+    DebugContext,
+    TelegramContext as DebugTelegramContext,
+    CommandDebugger,
+    KeyboardDebugger,
+)
 from bot.core.module_base import EventType, NexusModule
 from bot.core.prefix_parser import prefix_parser
 from shared.database import AsyncSessionLocal
@@ -378,63 +385,102 @@ class MiddlewarePipeline:
 
         Returns True if the update was handled, False otherwise.
         """
-        logger.debug(f"process_update called, modules loaded: {len(self._modules)}")
-        
-        # Handle private chat slash commands without requiring DB
-        if update.message and update.message.chat.type == "private":
-            logger.info(f"Routing to private command handler for chat {update.message.chat.id}")
-            result = await self._handle_private_command(bot, update)
-            logger.info(f"Private command handler result: {result}")
-            return result
+        # Capture full Telegram context for debugging
+        tg_context = DebugTelegramContext.from_update(update, bot)
 
-        # Handle private chat callback queries (button clicks)
-        if update.callback_query and update.callback_query.message and update.callback_query.message.chat.type == "private":
-            logger.info(f"Routing to private callback handler for chat {update.callback_query.message.chat.id}")
-            result = await self._handle_private_callback(bot, update)
-            if result:
-                logger.info(f"Private callback handler handled: {update.callback_query.data}")
+        with DebugContext("process_update", "middleware") as dbg_ctx:
+            dbg_ctx.add_data("update_id", update.update_id)
+            dbg_ctx.add_data("telegram_context", tg_context.to_dict())
+            dbg_ctx.add_data("modules_loaded", len(self._modules))
+
+            logger.debug(f"process_update called, modules loaded: {len(self._modules)}")
+            debug.trace("Processing update", "middleware", update_id=update.update_id)
+
+            # Handle private chat slash commands without requiring DB
+            if update.message and update.message.chat.type == "private":
+                debug.info("Routing to private command handler", "middleware",
+                          chat_id=update.message.chat.id, user_id=tg_context.user_id)
+                CommandDebugger.log_command_received(
+                    type('obj', (object,), {'user': None, 'group': None, 'message': update.message})(),
+                    tg_context.command or "unknown",
+                    update.message.text.split()[1:] if update.message.text else []
+                )
+                logger.info(f"Routing to private command handler for chat {update.message.chat.id}")
+                result = await self._handle_private_command(bot, update)
+                logger.info(f"Private command handler result: {result}")
+                dbg_ctx.add_data("result", result)
                 return result
-            logger.info(f"Private callback not handled, checking modules...")
-            # Fall through to module routing for unhandled private callbacks
-            
-        # Handle callback queries in groups (for inline buttons like captcha verify)
-        if update.callback_query:
-            logger.info(f"Processing callback query in group context: {update.callback_query.data}")
-            # These will be routed to modules in _route_to_modules
 
-        # Create database session for group updates
-        try:
-            logger.debug("Creating database session for group update")
-            async with AsyncSessionLocal() as session:
-                # Build context
-                ctx = await self._build_context(session, bot, bot_identity, update)
+            # Handle private chat callback queries (button clicks)
+            if update.callback_query and update.callback_query.message and update.callback_query.message.chat.type == "private":
+                debug.info("Routing to private callback handler", "middleware",
+                          chat_id=update.callback_query.message.chat.id,
+                          callback_data=update.callback_query.data)
+                KeyboardDebugger.log_callback_received(update.callback_query)
+                logger.info(f"Routing to private callback handler for chat {update.callback_query.message.chat.id}")
+                result = await self._handle_private_callback(bot, update)
+                if result:
+                    logger.info(f"Private callback handler handled: {update.callback_query.data}")
+                    dbg_ctx.add_data("result", result)
+                    return result
+                logger.info(f"Private callback not handled, checking modules...")
+                # Fall through to module routing for unhandled private callbacks
 
-                if not ctx:
-                    logger.warning("Failed to build context - ctx is None")
-                    return False
+            # Handle callback queries in groups (for inline buttons like captcha verify)
+            if update.callback_query:
+                debug.info("Processing callback query in group context", "middleware",
+                          callback_data=update.callback_query.data)
+                KeyboardDebugger.log_callback_received(update.callback_query)
+                logger.info(f"Processing callback query in group context: {update.callback_query.data}")
+                # These will be routed to modules in _route_to_modules
 
-                logger.debug(f"Context built: group={ctx.group.id if ctx.group else None}, user={ctx.user.telegram_id if ctx.user else None}")
+            # Create database session for group updates
+            try:
+                debug.debug("Creating database session for group update", "middleware")
+                logger.debug("Creating database session for group update")
+                async with AsyncSessionLocal() as session:
+                    # Build context
+                    ctx = await self._build_context(session, bot, bot_identity, update)
 
-                # Run middleware pipeline
-                for i, middleware in enumerate(self._middlewares):
-                    try:
-                        logger.debug(f"Running middleware {i}: {middleware.__name__ if hasattr(middleware, '__name__') else 'unknown'}")
-                        should_continue = await middleware(ctx)
-                        if not should_continue:
-                            logger.info(f"Middleware {i} returned False, stopping pipeline")
-                            return False
-                    except Exception as e:
-                        logger.error(f"Middleware error: {e}")
-                        continue
+                    if not ctx:
+                        debug.warn("Failed to build context - ctx is None", "middleware",
+                                  telegram_context=tg_context.to_dict())
+                        logger.warning("Failed to build context - ctx is None")
+                        dbg_ctx.add_data("result", False)
+                        return False
 
-                # Route to modules
-                logger.debug(f"Routing to modules ({len(self._modules)} modules loaded)")
-                result = await self._route_to_modules(ctx)
-                logger.debug(f"Module routing result: {result}")
-                return result
-        except Exception as e:
-            logger.exception(f"Pipeline error: {e}")
-            return False
+                    dbg_ctx.add_data("context_group_id", ctx.group.id if ctx.group else None)
+                    dbg_ctx.add_data("context_user_id", ctx.user.telegram_id if ctx.user else None)
+                    logger.debug(f"Context built: group={ctx.group.id if ctx.group else None}, user={ctx.user.telegram_id if ctx.user else None}")
+
+                    # Run middleware pipeline
+                    for i, middleware in enumerate(self._middlewares):
+                        try:
+                            debug.trace(f"Running middleware {i}", "middleware",
+                                       middleware_name=middleware.__name__ if hasattr(middleware, '__name__') else 'unknown')
+                            logger.debug(f"Running middleware {i}: {middleware.__name__ if hasattr(middleware, '__name__') else 'unknown'}")
+                            should_continue = await middleware(ctx)
+                            if not should_continue:
+                                debug.info(f"Middleware {i} stopped pipeline", "middleware")
+                                logger.info(f"Middleware {i} returned False, stopping pipeline")
+                                dbg_ctx.add_data("stopped_at_middleware", i)
+                                return False
+                        except Exception as e:
+                            debug.error(f"Middleware {i} error", e, "middleware")
+                            logger.error(f"Middleware error: {e}")
+                            continue
+
+                    # Route to modules
+                    debug.debug(f"Routing to modules", "middleware", module_count=len(self._modules))
+                    logger.debug(f"Routing to modules ({len(self._modules)} modules loaded)")
+                    result = await self._route_to_modules(ctx)
+                    logger.debug(f"Module routing result: {result}")
+                    dbg_ctx.add_data("result", result)
+                    return result
+            except Exception as e:
+                debug.error("Pipeline error", e, "middleware", telegram_context=tg_context.to_dict())
+                logger.exception(f"Pipeline error: {e}")
+                return False
 
     async def _build_context(
         self,

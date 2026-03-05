@@ -4,13 +4,24 @@ import { useAuthStore } from './stores/authStore'
 import { useGroupStore } from './stores/groupStore'
 import { telegramAuth } from './api/auth'
 import { getGroupByTelegramId, getGroupStatsByTelegramId } from './api/groups'
-import { 
-  debugLog, 
-  LogCategory, 
+
+// Enhanced Debug System - Import both old and new for compatibility
+import {
+  enhancedDebug,
+  telegramDebug,
+  InitDataValidator,
+  ErrorAnalyzer,
+  ErrorCode,
+  LogCategory,
   LogLevel,
-  logInitData, 
+} from './utils/enhancedDebug'
+
+// Backward compatibility imports
+import {
+  debugLog,
+  logInitData,
   logAuthState,
-  logTelegramEvent 
+  logTelegramEvent
 } from './utils/debug'
 
 // Layouts
@@ -63,174 +74,218 @@ function App() {
 
   useEffect(() => {
     const init = async () => {
-      debugLog(LogCategory.INIT, '=== APP INITIALIZATION START ===', null);
-      setLoading(true)
-      logAuthState('initializing');
+      // Use enhanced debug system with full diagnostics
+      await enhancedDebug.withContext('App Initialization', LogCategory.INIT, async (ctx) => {
+        ctx.log('Starting app initialization');
+        setLoading(true);
+        telegramDebug.logAuthEvent('initializing');
 
-      // Get Telegram init data
-      const tg = (window as any).Telegram?.WebApp
-      
-      // Log Telegram WebApp object
-      debugLog(LogCategory.TELEGRAM, 'Telegram WebApp object:', tg ? 'Found' : 'NOT FOUND', tg ? LogLevel.INFO : LogLevel.ERROR);
-      
-      // Full init data dump
-      logInitData(tg);
+        // Get Telegram WebApp object
+        const tg = (window as any).Telegram?.WebApp;
 
-      // Configure Telegram WebApp theme to match our dark theme
-      if (tg) {
-        // Version check: color functions require WebApp 6.1+
-        const version = parseFloat(tg.version || '6.0')
-        debugLog(LogCategory.TELEGRAM, `WebApp version: ${version}`, null);
-        
-        if (version >= 6.1) {
-          try {
-            // Set header color to match our dark background
-            tg.setHeaderColor('#020617')
-            // Set bottom bar color to match our dark background
-            tg.setBottomBarColor('#020617')
-            // Set background color for the main content area
-            tg.setBackgroundColor('#020617')
-            debugLog(LogCategory.TELEGRAM, 'Theme colors set successfully', null);
-          } catch (e) {
-            debugLog(LogCategory.TELEGRAM, 'Color settings not supported', e, LogLevel.WARN);
-          }
-        } else {
-          // For older versions, try color_key syntax
-          try {
-            tg.setHeaderColor({ color_key: 'bg_color' })
-            debugLog(LogCategory.TELEGRAM, 'Header color set via color_key', null);
-          } catch (e) {
-            debugLog(LogCategory.TELEGRAM, 'Header color not supported in version', tg.version, LogLevel.WARN);
+        // Enhanced Telegram diagnostics
+        telegramDebug.logInitData((window as any).Telegram);
+
+        // Validate initData with detailed diagnostics
+        const botToken = import.meta.env.VITE_BOT_TOKEN || ''; // Only for client-side diagnostics
+        const validationResult = InitDataValidator.validate(tg?.initData, botToken);
+
+        if (!validationResult.valid) {
+          enhancedDebug.warn('initData validation issues detected', LogCategory.INIT, validationResult);
+
+          // Check for specific private chat issue
+          if (!validationResult.initDataPresent) {
+            const diagnosis = InitDataValidator.diagnoseMissingInitData((window as any).Telegram);
+            enhancedDebug.warn('Missing initData diagnosis', LogCategory.TELEGRAM, diagnosis);
+
+            // Provide actionable guidance to user
+            if (diagnosis.inTelegram && diagnosis.chatType === 'private') {
+              setError('Open from Group');
+              setErrorDetail('The Mini App works best when opened from a group. Please:\n1. Add the bot to a group\n2. Open the Mini App from that group\n\nReason: Telegram does not provide group context in private chats.');
+              setAuthAttempted(true);
+              setLoading(false);
+              return;
+            }
           }
         }
-        // Expand the web app to full height
-        debugLog(LogCategory.TELEGRAM, 'Calling tg.expand()', null);
-        tg.expand()
-        
-        // Set up event listeners for Telegram events
-        tg.onEvent('viewportChanged', (data: any) => {
-          logTelegramEvent('viewportChanged', data);
+
+        // Configure Telegram WebApp theme to match our dark theme
+        if (tg) {
+          const version = parseFloat(tg.version || '6.0');
+          enhancedDebug.debug(`WebApp version: ${version}`, LogCategory.TELEGRAM);
+
+          if (version >= 6.1) {
+            try {
+              tg.setHeaderColor('#020617');
+              tg.setBottomBarColor('#020617');
+              tg.setBackgroundColor('#020617');
+              enhancedDebug.success('Theme colors set successfully', LogCategory.TELEGRAM);
+            } catch (e) {
+              enhancedDebug.warn('Color settings not supported', LogCategory.TELEGRAM, e);
+            }
+          }
+
+          tg.expand();
+
+          // Set up event listeners
+          tg.onEvent('viewportChanged', (data: any) => {
+            telegramDebug.logWebSocketEvent('viewportChanged', data);
+          });
+          tg.onEvent('themeChanged', () => {
+            telegramDebug.logWebSocketEvent('themeChanged', { colorScheme: tg.colorScheme });
+          });
+        }
+
+        // Wait for initData with enhanced logging
+        let initDataRaw = tg?.initData || '';
+        let attempts = 0;
+        const maxAttempts = 20;
+
+        enhancedDebug.debug(`Starting initData wait loop. Initial: ${initDataRaw ? 'Present' : 'Empty'}`, LogCategory.INIT);
+
+        while (!initDataRaw && tg && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          initDataRaw = tg?.initData || '';
+          attempts++;
+          if (initDataRaw) {
+            ctx.log(`initData became available after ${attempts} attempts`);
+            telegramDebug.logInitData((window as any).Telegram);
+          }
+        }
+
+        enhancedDebug.debug(`Wait loop complete. attempts=${attempts}, hasInitData=${!!initDataRaw}`, LogCategory.INIT);
+        setInitData(initDataRaw);
+
+        if (!initDataRaw) {
+          enhancedDebug.warn('No initData available after waiting', LogCategory.INIT);
+
+          const storedToken = localStorage.getItem('nexus_token');
+          enhancedDebug.debug('Checking for stored token', LogCategory.TOKEN, { found: !!storedToken });
+
+          if (storedToken) {
+            enhancedDebug.success('Found stored token, allowing access', LogCategory.AUTH);
+            telegramDebug.logAuthEvent('restored_from_storage');
+            setAuthAttempted(true);
+            setLoading(false);
+            return;
+          }
+
+          // Enhanced error message with fix suggestion
+          const diagnosis = InitDataValidator.diagnoseMissingInitData((window as any).Telegram);
+          enhancedDebug.error(
+            'Authentication Failed - No initData',
+            new Error(ErrorCode.MISSING_INIT_DATA),
+            LogCategory.AUTH,
+            diagnosis
+          );
+
+          setError('Authentication Failed');
+          setErrorDetail(`No Telegram authentication data available.\n\n${diagnosis.explanation}\n\nTo fix:\n${diagnosis.workarounds.join('\n')}`);
+          setAuthAttempted(true);
+          setLoading(false);
+          return;
+        }
+
+        // Get Telegram Chat ID from start_param or chat
+        // IMPORTANT: Keep as string to avoid JavaScript number precision loss
+        // Telegram IDs can exceed Number.MAX_SAFE_INTEGER (2^53-1)
+        const startParam = tg?.initDataUnsafe?.start_param;
+        const chatId = tg?.initDataUnsafe?.chat?.id;
+        const groupIdStr = startParam ? String(startParam) : (chatId ? String(chatId) : null);
+        const telegramChatId = groupIdStr ? Number(groupIdStr) : null;
+
+        enhancedDebug.debug(`Extracted IDs`, LogCategory.GROUPS, {
+          startParam,
+          chatId,
+          telegramChatId,
+          chatType: tg?.initDataUnsafe?.chat?.type,
         });
-        tg.onEvent('themeChanged', () => {
-          logTelegramEvent('themeChanged', { colorScheme: tg.colorScheme });
-        });
-      }
 
-      // Wait for initData to be available (it can take a moment in private chats)
-      let initDataRaw = tg?.initData || ''
-      let attempts = 0
-      const maxAttempts = 20 // Wait up to 2 seconds
+        try {
+          // Authenticate with backend
+          enhancedDebug.info('Starting authentication with backend', LogCategory.AUTH);
+          telegramDebug.logAuthEvent('authenticating');
 
-      debugLog(LogCategory.INIT, `Starting initData wait loop. Initial value: ${initDataRaw ? 'Present' : 'Empty'}`, null);
+          enhancedDebug.debug('Init data being sent', LogCategory.AUTH, {
+            length: initDataRaw.length,
+            preview: initDataRaw.substring(0, 200),
+          });
 
-      while (!initDataRaw && tg && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-        initDataRaw = tg?.initData || ''
-        attempts++
-        if (initDataRaw) {
-          debugLog(LogCategory.INIT, `initData became available after ${attempts} attempts`, null);
-          logInitData(tg);
-        }
-      }
+          const authData = await telegramAuth(initDataRaw);
 
-      debugLog(LogCategory.INIT, `Wait loop complete. attempts=${attempts}, hasInitData=${!!initDataRaw}`, null);
-      setInitData(initDataRaw)
+          enhancedDebug.success('Authentication successful!', LogCategory.AUTH, {
+            userId: authData.user?.id,
+            username: authData.user?.username,
+          });
+          telegramDebug.logAuthEvent('authenticated');
 
-      if (!initDataRaw) {
-        // Not running in Telegram context or initData not available
-        debugLog(LogCategory.INIT, 'No initData available after waiting', null, LogLevel.WARN);
+          enhancedDebug.debug('Received access token', LogCategory.TOKEN, {
+            preview: authData.access_token?.substring(0, 30),
+          });
 
-        // Check if we have a stored token from previous session
-        const storedToken = localStorage.getItem('nexus_token')
-        debugLog(LogCategory.TOKEN, 'Checking for stored token:', storedToken ? 'Found' : 'Not found');
-        
-        if (storedToken) {
-          debugLog(LogCategory.AUTH, 'Found stored token, allowing access with existing session', null);
-          logAuthState('restored_from_storage');
-          setAuthAttempted(true)
-          setLoading(false)
-          return
-        }
+          setAuth(authData.access_token, authData.user);
+          enhancedDebug.debug('Auth state set in store', LogCategory.AUTH);
 
-        debugLog(LogCategory.AUTH, 'Not in Telegram context and no stored token', null, LogLevel.ERROR);
-        logAuthState('no_auth_available');
-        setAuthAttempted(true)
-        setLoading(false)
-        return
-      }
-
-      // Get Telegram Chat ID from start_param or chat
-      // IMPORTANT: Keep as string to avoid JavaScript number precision loss
-      // Telegram IDs can exceed Number.MAX_SAFE_INTEGER (2^53-1)
-      const startParam = tg?.initDataUnsafe?.start_param
-      const chatId = tg?.initDataUnsafe?.chat?.id
-      const groupIdStr = startParam ? String(startParam) : (chatId ? String(chatId) : null)
-      const telegramChatId = groupIdStr ? Number(groupIdStr) : null
-
-      debugLog(LogCategory.GROUPS, `Extracted IDs - startParam: ${startParam}, chatId: ${chatId}, telegramChatId: ${telegramChatId}`, null);
-
-      // No more localStorage! Backend handles bot token lookup based on user membership
-      // The bot knows which groups the user is in and finds the right token automatically
-
-      try {
-        // Authenticate with backend
-        // Backend finds bots based on user's group memberships (database-driven)
-        debugLog(LogCategory.AUTH, 'Starting authentication with backend...', null);
-        logAuthState('authenticating');
-        
-        debugLog(LogCategory.AUTH, 'Init data being sent (first 200 chars):', initDataRaw.substring(0, 200));
-        debugLog(LogCategory.HASH, 'initData hash from initDataUnsafe:', tg?.initDataUnsafe?.hash);
-        
-        const authData = await telegramAuth(initDataRaw)
-        debugLog(LogCategory.AUTH, 'Authentication successful!', { userId: authData.user?.id, username: authData.user?.username });
-        logAuthState('authenticated');
-        
-        debugLog(LogCategory.TOKEN, 'Received access token (first 30 chars):', authData.access_token?.substring(0, 30));
-        setAuth(authData.access_token, authData.user)
-        debugLog(LogCategory.AUTH, 'Auth state set in store', null);
-
-        // If we have a Telegram Chat ID, resolve it to Database Group ID
-        if (telegramChatId) {
-          try {
-            debugLog(LogCategory.GROUPS, `Resolving Telegram Chat ID ${telegramChatId} to Database Group ID...`, null);
-            const group = await getGroupByTelegramId(telegramChatId)
-            setDbGroupId(group.id)
-            setCurrentGroup(group)
-            debugLog(LogCategory.GROUPS, `Resolved to Database Group ID: ${group.id}`, { groupTitle: group.title });
-          } catch (e: any) {
-            debugLog(LogCategory.GROUPS, 'Failed to resolve Telegram Chat ID:', e?.response?.data || e.message, LogLevel.ERROR);
-            // Don't fail auth, just log it - user may need to add bot to group
+          // If we have a Telegram Chat ID, resolve it to Database Group ID
+          if (telegramChatId) {
+            try {
+              enhancedDebug.info(`Resolving Telegram Chat ID ${telegramChatId}`, LogCategory.GROUPS);
+              const group = await getGroupByTelegramId(telegramChatId);
+              setDbGroupId(group.id);
+              setCurrentGroup(group);
+              enhancedDebug.success(`Resolved to Database Group ID: ${group.id}`, LogCategory.GROUPS, {
+                groupTitle: group.title,
+              });
+            } catch (e: any) {
+              const errorAnalysis = ErrorAnalyzer.analyze(e, { telegramChatId });
+              enhancedDebug.error(
+                'Failed to resolve Telegram Chat ID',
+                e,
+                LogCategory.GROUPS,
+                { analysis: errorAnalysis, telegramChatId }
+              );
+              // Don't fail auth, just log it
+            }
+          } else {
+            enhancedDebug.warn('No telegramChatId available, skipping group resolution', LogCategory.GROUPS);
           }
-        } else {
-          debugLog(LogCategory.GROUPS, 'No telegramChatId available, skipping group resolution', null);
+        } catch (err: any) {
+          const errorAnalysis = ErrorAnalyzer.analyze(err, { initDataLength: initDataRaw.length });
+          enhancedDebug.error('Authentication error', err, LogCategory.AUTH, {
+            analysis: errorAnalysis,
+            responseData: err.response?.data,
+            status: err.response?.status,
+          });
+          telegramDebug.logAuthError(err, { initDataLength: initDataRaw.length });
+
+          const detail = err.response?.data?.detail || 'Authentication failed';
+          setError('Authentication Failed');
+          setErrorDetail(`${detail}\n\n${errorAnalysis.fix}`);
         }
-      } catch (err: any) {
-        debugLog(LogCategory.AUTH, 'Authentication error:', err, LogLevel.ERROR);
-        debugLog(LogCategory.AUTH, 'Error response data:', err.response?.data, LogLevel.ERROR);
-        logAuthState('failed', { detail: err.response?.data?.detail });
-        
-        const detail = err.response?.data?.detail || 'Authentication failed'
-        setError('Authentication Failed')
-        setErrorDetail(detail)
-      }
 
-      setAuthAttempted(true)
-      setLoading(false)
-      debugLog(LogCategory.INIT, '=== APP INITIALIZATION COMPLETE ===', { authAttempted: true, isLoading: false });
-    }
+        setAuthAttempted(true);
+        setLoading(false);
+        enhancedDebug.info('=== APP INITIALIZATION COMPLETE ===', LogCategory.INIT, {
+          authAttempted: true,
+          isLoading: false,
+          isAuthenticated: useAuthStore.getState().isAuthenticated,
+        });
+      });
+    };
 
-    init()
-  }, [setAuth, setLoading, setError])
+    init();
+  }, [setAuth, setLoading, setError]);
 
   if (isLoading) {
-    return <Loading />
+    return <Loading />;
   }
 
   // Show error if authentication failed
   if (error) {
     // Check if the error is about not being in any groups
-    const isGroupMembershipError = errorDetail?.includes('not currently a member of any groups')
-    const isInitDataError = errorDetail?.includes('Chat ID not found in initData')
+    const isGroupMembershipError = errorDetail?.includes('not currently a member of any groups');
+    const isInitDataError = errorDetail?.includes('Chat ID not found in initData') ||
+                            errorDetail?.includes('No Telegram authentication');
 
     return (
       <div className="flex items-center justify-center h-screen">
@@ -259,9 +314,15 @@ function App() {
                 <li>Click the menu button (⋮ or ⋯)</li>
                 <li>Select "Mini App" or "🚀 Mini App"</li>
               </ol>
+              <p className="text-dark-500 text-xs mt-2">
+                Note: Telegram doesn&apos;t provide full authentication data in private chats.
+              </p>
             </div>
           ) : errorDetail ? (
-            <p className="text-dark-500 text-sm mb-4 font-mono text-xs break-all">{errorDetail}</p>
+            <div className="bg-dark-800 rounded-lg p-4 mb-4 text-left">
+              <p className="text-dark-300 text-sm mb-2">Error details:</p>
+              <pre className="text-dark-400 text-xs font-mono whitespace-pre-wrap">{errorDetail}</pre>
+            </div>
           ) : null}
 
           <button
@@ -270,9 +331,23 @@ function App() {
           >
             Retry
           </button>
+
+          {/* Debug Export Button - Only in development */}
+          {import.meta.env.DEV && (
+            <button
+              onClick={() => {
+                const report = enhancedDebug.generateReport();
+                console.log(report);
+                alert('Debug report printed to console');
+              }}
+              className="mt-4 ml-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg text-sm transition-colors"
+            >
+              Debug Report
+            </button>
+          )}
         </div>
       </div>
-    )
+    );
   }
 
   // Check if opened from a specific group
@@ -296,7 +371,7 @@ function App() {
                     <li>Open the Mini App from the group menu</li>
                   </ol>
                 </div>
-                <p className="text-dark-500 text-xs">Or check that your session hasn't expired</p>
+                <p className="text-dark-500 text-xs">Or check that your session hasn&apos;t expired</p>
               </div>
             </div>
           )
@@ -350,7 +425,7 @@ function App() {
         <Route path="/admin/:groupId/automation-enhanced" element={<AutomationCenterEnhanced />} />
       </Routes>
     </MainLayout>
-  )
+  );
 }
 
 export default App

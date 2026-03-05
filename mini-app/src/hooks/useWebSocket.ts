@@ -1,12 +1,24 @@
 /**
  * WebSocket Hook - Real-time connection to Nexus backend.
- * 
+ *
  * Provides a React hook for connecting to the WebSocket server
  * and receiving real-time events.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { debugLog, LogCategory, LogLevel, logWebSocket } from '../utils/debug';
+
+// Enhanced debug system
+import {
+  enhancedDebug,
+  telegramDebug,
+  ErrorAnalyzer,
+  ErrorCode,
+  LogCategory,
+  LogLevel,
+} from '../utils/enhancedDebug';
+
+// Backward compatibility
+import { debugLog, logWebSocket } from '../utils/debug';
 
 // Event types matching the backend EventType enum
 export const EventTypes = {
@@ -160,19 +172,20 @@ export function useWebSocket(options: UseWebSocketOptions) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     let url = `${protocol}//${host}/ws/${groupId}`;
-    
+
     const params = new URLSearchParams();
     if (userId) params.set('user_id', userId.toString());
     if (telegramId) params.set('telegram_id', telegramId.toString());
     if (username) params.set('username', username);
     if (token) params.set('token', token);
-    
+
     const queryString = params.toString();
     if (queryString) {
       url += `?${queryString}`;
     }
-    
-    debugLog(LogCategory.WEBSOCKET, 'WebSocket URL built:', {
+
+    // Enhanced debug logging
+    enhancedDebug.debug('WebSocket URL built', LogCategory.WEBSOCKET, {
       url: url.replace(token || '', token ? '***token***' : ''),
       protocol,
       host,
@@ -182,124 +195,174 @@ export function useWebSocket(options: UseWebSocketOptions) {
       hasUsername: !!username,
       hasToken: !!token,
     });
-    
+
+    // Backward compatibility
+    debugLog(LogCategory.WEBSOCKET, 'WebSocket URL built:', {
+      url: url.replace(token || '', token ? '***token***' : ''),
+      protocol,
+      host,
+      groupId,
+    });
+
     return url;
   }, [groupId, userId, telegramId, username, token]);
-  
+
   // Connect to WebSocket
   const connect = useCallback(() => {
-    debugLog(LogCategory.WEBSOCKET, '=== WebSocket connect() called ===', null);
-    
+    enhancedDebug.info('=== WebSocket connect() called ===', LogCategory.WEBSOCKET);
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      debugLog(LogCategory.WEBSOCKET, 'WebSocket already connected, skipping');
+      enhancedDebug.debug('WebSocket already connected, skipping', LogCategory.WEBSOCKET);
       return;
     }
-    
+
     setState(prev => ({ ...prev, connecting: true, error: null }));
-    logWebSocket('connecting');
-    
+    telegramDebug.logWebSocketEvent('connecting');
+
     try {
       const url = getWebSocketUrl();
-      debugLog(LogCategory.WEBSOCKET, 'Creating new WebSocket connection...', null);
-      
+      enhancedDebug.info('Creating new WebSocket connection...', LogCategory.WEBSOCKET, { url });
+
       const ws = new WebSocket(url);
       wsRef.current = ws;
-      
+
       ws.onopen = () => {
-        debugLog(LogCategory.WEBSOCKET, 'WebSocket connected successfully', null);
+        enhancedDebug.success('WebSocket connected successfully', LogCategory.WEBSOCKET);
         setState(prev => ({ ...prev, connected: true, connecting: false, error: null }));
-        logWebSocket('connected');
-        
+        telegramDebug.logWebSocketEvent('connected');
+
         // Subscribe to specific events if provided
         if (subscribedEvents && subscribedEvents.length > 0) {
-          debugLog(LogCategory.WEBSOCKET, 'Subscribing to events:', subscribedEvents);
+          enhancedDebug.debug('Subscribing to events', LogCategory.WEBSOCKET, { events: subscribedEvents });
           ws.send(JSON.stringify({
             type: 'subscribe',
             data: { events: subscribedEvents }
           }));
         }
-        
+
         // Start ping interval
-        debugLog(LogCategory.WEBSOCKET, 'Starting ping interval (30s)');
+        enhancedDebug.debug('Starting ping interval (30s)', LogCategory.WEBSOCKET);
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            debugLog(LogCategory.WEBSOCKET, 'Sending ping', null);
+            enhancedDebug.trace('Sending ping', LogCategory.WEBSOCKET);
             ws.send(JSON.stringify({ type: 'ping' }));
           }
-        }, 30000); // Ping every 30 seconds
-        
+        }, 30000);
+
         onConnect?.();
       };
       
       ws.onmessage = (event) => {
         try {
           const message: WSMessage = JSON.parse(event.data);
-          debugLog(LogCategory.WEBSOCKET, 'Message received:', { type: message.type });
-          
+          enhancedDebug.debug('WebSocket message received', LogCategory.WEBSOCKET, { type: message.type });
+
           if (message.type === 'event' && message.data) {
             const nexusEvent = message.data as NexusEvent;
-            debugLog(LogCategory.WEBSOCKET, 'Event received:', {
+            enhancedDebug.info('Event received', LogCategory.WEBSOCKET, {
               eventType: nexusEvent.event_type,
               groupId: nexusEvent.group_id,
               actorName: nexusEvent.actor_name,
             });
-            
+
             setState(prev => ({
               ...prev,
               lastEvent: nexusEvent,
-              eventHistory: [nexusEvent, ...prev.eventHistory].slice(0, 100), // Keep last 100 events
+              eventHistory: [nexusEvent, ...prev.eventHistory].slice(0, 100),
             }));
-            
+
             onEvent?.(nexusEvent);
           } else if (message.type === 'error') {
             const errorMsg = (message.data as any)?.message || 'Unknown error';
-            debugLog(LogCategory.WEBSOCKET, 'Error message received:', errorMsg, LogLevel.ERROR);
+            const analysis = ErrorAnalyzer.analyze(new Error(errorMsg), { source: 'websocket' });
+            enhancedDebug.error('WebSocket error message', new Error(errorMsg), LogCategory.WEBSOCKET, {
+              analysis,
+              message: errorMsg,
+            });
             setState(prev => ({ ...prev, error: errorMsg }));
             onError?.(errorMsg);
           } else if (message.type === 'pong') {
-            debugLog(LogCategory.WEBSOCKET, 'Pong received', null);
+            enhancedDebug.trace('Pong received', LogCategory.WEBSOCKET);
           }
         } catch (err) {
-          debugLog(LogCategory.WEBSOCKET, 'Failed to parse WebSocket message:', err, LogLevel.ERROR);
+          enhancedDebug.error('Failed to parse WebSocket message', err, LogCategory.WEBSOCKET, {
+            rawData: event.data?.substring(0, 200),
+          });
         }
       };
-      
+
       ws.onclose = (event) => {
-        debugLog(LogCategory.WEBSOCKET, 'WebSocket closed:', {
+        const closeReasons: Record<number, string> = {
+          1000: 'Normal closure',
+          1001: 'Going away',
+          1006: 'Abnormal closure',
+          1008: 'Policy violation',
+          1011: 'Server error',
+          1015: 'TLS handshake failure',
+        };
+
+        enhancedDebug.info('WebSocket closed', LogCategory.WEBSOCKET, {
           code: event.code,
-          reason: event.reason,
+          reason: event.reason || closeReasons[event.code] || 'Unknown',
           wasClean: event.wasClean,
         });
-        logWebSocket('disconnected', { code: event.code });
-        
+
         setState(prev => ({ ...prev, connected: false, connecting: false }));
-        
+
         if (pingIntervalRef.current) {
           clearInterval(pingIntervalRef.current);
           pingIntervalRef.current = null;
         }
-        
+
         onDisconnect?.();
-        
+
         // Auto-reconnect after 5 seconds
-        if (event.code !== 1000) { // Don't reconnect on normal close
-          debugLog(LogCategory.WEBSOCKET, 'Scheduling reconnect in 5s...');
+        if (event.code !== 1000) {
+          enhancedDebug.warn('Scheduling WebSocket reconnect', LogCategory.WEBSOCKET, {
+            code: event.code,
+            reason: closeReasons[event.code] || event.reason,
+            fix: event.code === 1006
+              ? 'Abnormal closure - check network and server'
+              : event.code === 1011
+              ? 'Server error - check server logs'
+              : 'Will retry automatically',
+          });
           reconnectTimeoutRef.current = setTimeout(() => {
-            debugLog(LogCategory.WEBSOCKET, 'Attempting reconnect...');
+            enhancedDebug.info('Attempting WebSocket reconnect', LogCategory.WEBSOCKET);
             connect();
           }, 5000);
         }
       };
-      
+
       ws.onerror = (error) => {
-        debugLog(LogCategory.WEBSOCKET, 'WebSocket error:', error, LogLevel.ERROR);
-        logWebSocket('error', error);
+        const analysis = ErrorAnalyzer.analyze(new Error('WebSocket error'), { source: 'websocket' });
+        enhancedDebug.error(
+          'WebSocket error',
+          error instanceof Error ? error : new Error('WebSocket error'),
+          LogCategory.WEBSOCKET,
+          {
+            analysis,
+            fix: 'Check WebSocket server status and network connection',
+            possibleCauses: [
+              'Server is down',
+              'Network blocked WebSocket',
+              'Authentication token invalid',
+              'Wrong WebSocket URL',
+            ],
+          }
+        );
         setState(prev => ({ ...prev, error: 'WebSocket connection error', connecting: false }));
         onError?.('WebSocket connection error');
       };
-      
+
     } catch (err: any) {
-      debugLog(LogCategory.WEBSOCKET, 'WebSocket connection error:', err.message, LogLevel.ERROR);
+      const analysis = ErrorAnalyzer.analyze(err, { source: 'websocket_connect' });
+      enhancedDebug.error(
+        'WebSocket connection error',
+        err,
+        LogCategory.WEBSOCKET,
+        { analysis, message: err.message }
+      );
       setState(prev => ({ ...prev, error: err.message, connecting: false }));
       onError?.(err.message);
     }

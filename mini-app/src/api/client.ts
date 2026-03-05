@@ -1,12 +1,20 @@
 import axios from 'axios'
-import { 
-  debugLog, 
-  LogCategory, 
+
+// Import both debug systems for enhanced logging
+import {
+  enhancedDebug,
+  telegramDebug,
+  ErrorAnalyzer,
+  LogCategory,
   LogLevel,
-  logApiRequest, 
+} from '../utils/enhancedDebug'
+
+// Backward compatibility
+import {
+  debugLog,
+  logApiRequest,
   logApiResponse,
   logToken,
-  logTelegramEvent
 } from '../utils/debug'
 
 // Production API URL - Your Render deployment
@@ -17,20 +25,19 @@ let hasHandled401 = false
 
 // Detect the API URL based on environment
 const getApiUrl = (): string => {
-  debugLog(LogCategory.API, '=== API URL DETECTION START ===', null);
-  
+  enhancedDebug.debug('API URL Detection Start', LogCategory.API);
+
   // Check for environment variable (set at build time)
   if (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== 'http://localhost:8000') {
-    debugLog(LogCategory.API, 'Using VITE_API_URL:', import.meta.env.VITE_API_URL);
+    enhancedDebug.debug('Using VITE_API_URL', LogCategory.API, { url: import.meta.env.VITE_API_URL });
     return import.meta.env.VITE_API_URL
   }
 
   // If running in browser, use the same origin as the current page
-  // This ensures the mini-app and API are always on the same domain
   if (typeof window !== 'undefined' && window.location.origin) {
     const origin = window.location.origin
-    debugLog(LogCategory.API, 'Using window.location.origin:', origin);
-    
+    enhancedDebug.debug('Using window.location.origin', LogCategory.API, { origin });
+
     // Don't use file:// or invalid origins
     if (origin !== 'file://' && origin.startsWith('http')) {
       return origin
@@ -38,13 +45,13 @@ const getApiUrl = (): string => {
   }
 
   // Default to production API URL
-  debugLog(LogCategory.API, 'Using default PRODUCTION_API_URL:', PRODUCTION_API_URL);
+  enhancedDebug.debug('Using default PRODUCTION_API_URL', LogCategory.API, { url: PRODUCTION_API_URL });
   return PRODUCTION_API_URL
 }
 
 const API_BASE_URL = getApiUrl()
 
-debugLog(LogCategory.API, 'API Client initialized with base URL:', `${API_BASE_URL}/api/v1`);
+enhancedDebug.info('API Client initialized', LogCategory.API, { baseUrl: `${API_BASE_URL}/api/v1` });
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
@@ -55,96 +62,146 @@ const api = axios.create({
 
 // Add auth token to requests
 api.interceptors.request.use((config) => {
-  debugLog(LogCategory.API, `=== OUTGOING REQUEST: ${config.method?.toUpperCase()} ${config.url} ===`, null);
-  
+  telegramDebug.logApiCall(config.method?.toUpperCase() || 'GET', config.url || '', config.data);
+
   // Always read fresh from localStorage to avoid stale closures
   const token = localStorage.getItem('nexus_token')
-  
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
-    logToken('added_to_request', token);
-    debugLog(LogCategory.API, `Token added to ${config.url}`, token.substring(0, 20) + '...');
+    enhancedDebug.debug('Token added to request', LogCategory.TOKEN, {
+      url: config.url,
+      tokenPreview: token.substring(0, 20) + '...',
+    });
   } else {
-    debugLog(LogCategory.TOKEN, `No token found for request to ${config.url}`, null, LogLevel.WARN);
-    
-    // Debug: Check if we're in Telegram context
+    enhancedDebug.warn(`No token found for request to ${config.url}`, LogCategory.TOKEN);
+
+    // Enhanced debug: Check Telegram context
     const tg = (window as any).Telegram?.WebApp
     if (!tg) {
-      debugLog(LogCategory.TELEGRAM, 'Not running in Telegram WebApp context', null, LogLevel.WARN);
+      enhancedDebug.warn('Not running in Telegram WebApp context', LogCategory.TELEGRAM);
     } else if (!tg.initData) {
-      debugLog(LogCategory.TELEGRAM, 'Telegram WebApp exists but no initData (may be in private chat or loading)', null, LogLevel.WARN);
+      enhancedDebug.warn('Telegram WebApp exists but no initData', LogCategory.TELEGRAM, {
+        explanation: 'May be in private chat or still loading',
+        workarounds: ['Wait for initData', 'Open from a group instead'],
+      });
     } else {
-      debugLog(LogCategory.TELEGRAM, 'initData exists but no token - auth may be in progress', null);
+      enhancedDebug.debug('initData exists but no token - auth may be in progress', LogCategory.TELEGRAM);
     }
   }
-  
-  // Log full request details
+
+  // Log full request details (backward compatibility)
   logApiRequest(
     config.method?.toUpperCase() || 'GET',
     config.url || '',
     config.data,
     config.headers as any
   );
-  
+
   return config
 })
 
 // Handle response errors
 api.interceptors.response.use(
   (response) => {
-    debugLog(LogCategory.API, `=== INCOMING RESPONSE: ${response.config.method?.toUpperCase()} ${response.config.url} - Status: ${response.status} ===`, null);
+    telegramDebug.logApiResponse(
+      response.config.method?.toUpperCase() || 'GET',
+      response.config.url || '',
+      response.status,
+      response.data
+    );
+
+    // Backward compatibility
     logApiResponse(
       response.config.method?.toUpperCase() || 'GET',
       response.config.url || '',
       response.status,
       response.data
     );
+
     return response
   },
   (error) => {
     const status = error.response?.status
     const url = error.config?.url
     const method = error.config?.method?.toUpperCase()
-    
-    debugLog(LogCategory.API, `=== RESPONSE ERROR: ${method} ${url} - Status: ${status} ===`, null, LogLevel.ERROR);
-    debugLog(LogCategory.API, 'Error response data:', error.response?.data, LogLevel.ERROR);
-    debugLog(LogCategory.API, 'Error message:', error.message, LogLevel.ERROR);
-    
+
+    // Analyze the error for better diagnostics
+    const errorAnalysis = ErrorAnalyzer.analyze(error, { url, method, status });
+
+    enhancedDebug.error(
+      `API Error: ${method} ${url} - ${status}`,
+      error,
+      LogCategory.API,
+      {
+        status,
+        url,
+        method,
+        errorData: error.response?.data,
+        analysis: errorAnalysis,
+      }
+    );
+
     if (status === 401) {
-      // Only handle 401 once to prevent reload loops
       if (hasHandled401) {
-        debugLog(LogCategory.AUTH, '401 already handled, skipping reload', null);
+        enhancedDebug.debug('401 already handled, skipping reload', LogCategory.AUTH);
         return Promise.reject(error)
       }
-      
+
       hasHandled401 = true
-      debugLog(LogCategory.AUTH, '401 received, clearing token', null);
+      enhancedDebug.warn('401 received, clearing token', LogCategory.AUTH);
       localStorage.removeItem('nexus_token')
-      logToken('cleared_due_to_401');
-      
-      // Check if we have valid Telegram initData - if not, we can't re-auth
+
+      // Check if we have valid Telegram initData
       const tg = (window as any).Telegram?.WebApp
       const hasValidInitData = tg?.initData && tg?.initData.length > 0
-      
+
       if (!hasValidInitData) {
-        // Not in Telegram context - can't re-authenticate, show error
-        debugLog(LogCategory.AUTH, 'Not in Telegram context, cannot re-authenticate', null, LogLevel.ERROR);
-        // Dispatch a custom event so the app can show appropriate error
-        window.dispatchEvent(new CustomEvent('nexus:authFailed', { 
-          detail: { reason: 'not_in_telegram' } 
+        enhancedDebug.error(
+          'Cannot re-authenticate: Not in Telegram context',
+          new Error('No initData available'),
+          LogCategory.AUTH,
+          {
+            fix: 'Reload the page in Telegram WebApp context or log in again',
+            workarounds: [
+              'Open Mini App from Telegram group',
+              'Check if session expired',
+              'Clear browser storage and retry',
+            ],
+          }
+        );
+
+        window.dispatchEvent(new CustomEvent('nexus:authFailed', {
+          detail: {
+            reason: 'not_in_telegram',
+            fix: 'Open Mini App from a Telegram group',
+          }
         }))
       } else {
-        debugLog(LogCategory.AUTH, 'Valid initData found, scheduling reload', null);
-        // Delay reload slightly to prevent rapid loops
+        enhancedDebug.info('Valid initData found, scheduling reload', LogCategory.AUTH);
         setTimeout(() => {
-          // Only reload if not already on auth page to avoid loops
           if (!window.location.pathname.includes('/auth')) {
-            debugLog(LogCategory.AUTH, 'Reloading page due to 401', null);
+            enhancedDebug.info('Reloading page due to 401', LogCategory.AUTH);
             window.location.reload()
           }
         }, 500)
       }
     }
+
+    // Network errors
+    if (!error.response) {
+      enhancedDebug.error(
+        'Network error - no response received',
+        error,
+        LogCategory.NETWORK,
+        {
+          fix: 'Check internet connection and API server status',
+          url,
+          method,
+        }
+      );
+    }
+
     return Promise.reject(error)
   }
 )
