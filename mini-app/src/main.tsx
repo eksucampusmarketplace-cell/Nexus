@@ -10,10 +10,25 @@ const tg = (window as any).Telegram?.WebApp
 if (tg) {
   tg.ready()
   tg.expand()
-  // Set theme colors to match our dark theme
-  tg.setHeaderColor('#020617')
-  tg.setBottomBarColor('#020617')
-  tg.setBackgroundColor('#020617')
+  // Set theme colors to match our dark theme (only if supported)
+  // Version check: setHeaderColor with color_key requires 6.1+, setBackgroundColor requires 6.1+
+  const version = parseFloat(tg.version || '6.0')
+  if (version >= 6.1) {
+    try {
+      tg.setHeaderColor('#020617')
+      tg.setBottomBarColor('#020617')
+      tg.setBackgroundColor('#020617')
+    } catch (e) {
+      console.log('[Telegram] Color settings not supported in this version')
+    }
+  } else {
+    // For older versions, use color_key syntax if available
+    try {
+      tg.setHeaderColor({ color_key: 'bg_color' })
+    } catch (e) {
+      console.log('[Telegram] Header color not supported in version', tg.version)
+    }
+  }
 }
 
 // Get the base path from the document base or use default

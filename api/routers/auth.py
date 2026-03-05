@@ -399,6 +399,7 @@ async def create_token(
 
     # Collect error messages for debugging
     validation_errors = []
+    user_bot_tokens = []  # Track tokens from user's group memberships
 
     # Try 1: Get user from initData, then find bots based on user's group memberships
     # This is the database-driven approach - no localStorage needed
@@ -425,6 +426,10 @@ async def create_token(
                     f"User's bot @{bot_info.get('username')}: hash mismatch"
                 )
                 logger.debug(f"Bot @{bot_info.get('username')} validation failed")
+
+    # Note: If user is not in any groups yet (new user or private chat open),
+    # user_bot_tokens will be empty. In this case, we fall through to try the
+    # main bot token or all registered bot instances below.
 
     # Try 2: Custom bot token from request (fallback - deprecated, prefer database)
     # Strip whitespace from custom bot token as well
@@ -498,10 +503,18 @@ async def create_token(
 
     # Provide more helpful error message for common issues
     if chat_id is None and not request.bot_token:
-        error_detail += (
-            ". Chat ID not found in initData and no custom bot token provided. "
-        )
-        error_detail += "Ensure BOT_TOKEN environment variable matches the bot that opened the Mini App."
+        if telegram_user_id and not user_bot_tokens:
+            # User opened from private chat but isn't in any groups with the bot
+            error_detail += (
+                ". You are not currently a member of any groups with this bot. "
+                "Please add the bot to a group first, then open the Mini App from there. "
+                "The Mini App works best when opened directly from a group."
+            )
+        else:
+            error_detail += (
+                ". Chat ID not found in initData and no custom bot token provided. "
+            )
+            error_detail += "Ensure BOT_TOKEN environment variable matches the bot that opened the Mini App."
 
     # Development bypass: Allow authentication without hash validation in development
     # This is useful for testing the Mini App in a browser without Telegram
