@@ -16,9 +16,23 @@ if (tg) {
   tg.setBackgroundColor('#020617')
 }
 
+// Get the base path from the document base or use default
+// This handles both /mini-app/ (when served from API) and / (when served from static site)
+const getBasename = () => {
+  const baseTag = document.querySelector('base')
+  if (baseTag) {
+    return baseTag.getAttribute('href') || '/mini-app'
+  }
+  // Check if we're at the root path
+  if (window.location.pathname.startsWith('/mini-app')) {
+    return '/mini-app'
+  }
+  return '/'
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter basename="/mini-app">
+    <BrowserRouter basename={getBasename()}>
       <App />
       <Toaster
         position="top-center"

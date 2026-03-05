@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: standard
     pythonVersion: 3.12.2
-    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt && cd mini-app && npm install && npm run build
+    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt && cd mini-app && VITE_BASE_PATH=/mini-app/ npm install && npm run build
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: CARGO_HOME
@@ -56,64 +56,72 @@ services:
         value: "5"
       - key: DATABASE_MAX_OVERFLOW
         value: "5"
-      - key: BOT_USERNAME
-        sync: false
 
-  - type: web
-    name: nexus-bot
-    runtime: python
-    plan: standard
-    pythonVersion: 3.12.2
-    buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt
-    startCommand: python -m bot.core
-    envVars:
-      - key: CARGO_HOME
-        value: /opt/render/project/.cargo
-      - key: RUSTUP_HOME
-        value: /opt/render/project/.rustup
-      - key: DATABASE_URL
-        fromDatabase:
-          name: nexus-db
-          property: connectionString
-      - key: DATABASE_USE_PGBOUNCER
-        value: "true"
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: nexus-redis
-          property: connectionString
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: redis
-          name: nexus-redis
-          property: connectionString
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: redis
-          name: nexus-redis
-          property: connectionString
-      - key: BOT_TOKEN
-        sync: false
-      - key: WEBHOOK_SECRET
-        sync: false
-      - key: WEBHOOK_URL
-        value: https://nexus-4uxn.onrender.com/webhook
-      - key: MINI_APP_URL
-        value: https://nexus-4uxn.onrender.com/mini-app
-      - key: ENCRYPTION_KEY
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: BOT_USERNAME
-        sync: false
-      - key: ENVIRONMENT
-        value: production
-      - key: PYTHONPATH
-        value: /opt/render/project
-      - key: DATABASE_POOL_SIZE
-        value: "5"
-      - key: DATABASE_MAX_OVERFLOW
-        value: "5"
+  # Note: nexus-bot service is disabled because the nexus-api service
+  # handles all Telegram webhook processing. Having both services set
+  # webhooks causes conflicts. The bot's __main__.py can still be run
+  # for development with long-polling when WEBHOOK_URL is not set.
+  #
+  # If you need to run the bot service separately (e.g., for long-polling
+  # in development), comment out WEBHOOK_URL in nexus-api env vars
+  # and uncomment this service:
+  #
+  # - type: web
+  #   name: nexus-bot
+  #   runtime: python
+  #   plan: standard
+  #   pythonVersion: 3.12.2
+  #   buildCommand: pip install --upgrade pip --no-cache-dir && pip install --prefer-binary --no-cache-dir -r requirements.txt
+  #   startCommand: python -m bot.core
+  #   envVars:
+  #     - key: CARGO_HOME
+  #       value: /opt/render/project/.cargo
+  #     - key: RUSTUP_HOME
+  #       value: /opt/render/project/.rustup
+  #     - key: DATABASE_URL
+  #       fromDatabase:
+  #         name: nexus-db
+  #         property: connectionString
+  #     - key: DATABASE_USE_PGBOUNCER
+  #       value: "true"
+  #     - key: REDIS_URL
+  #       fromService:
+  #         type: redis
+  #         name: nexus-redis
+  #         property: connectionString
+  #     - key: CELERY_BROKER_URL
+  #       fromService:
+  #         type: redis
+  #         name: nexus-redis
+  #         property: connectionString
+  #     - key: CELERY_RESULT_BACKEND
+  #       fromService:
+  #         type: redis
+  #         name: nexus-redis
+  #         property: connectionString
+  #     - key: BOT_TOKEN
+  #       sync: false
+  #     - key: WEBHOOK_SECRET
+  #       sync: false
+  #     # Uncomment to use this service instead of API for webhooks:
+  #     # - key: WEBHOOK_URL
+  #     #   value: https://nexus-4uxn.onrender.com/webhook
+  #     - key: MINI_APP_URL
+  #       value: https://nexus-4uxn.onrender.com/mini-app
+  #     - key: ENCRYPTION_KEY
+  #       sync: false
+  #     - key: OPENAI_API_KEY
+  #       sync: false
+  #     - key: BOT_USERNAME
+  #       sync: false
+  #     - key: ENVIRONMENT
+  #       value: production
+  #     - key: PYTHONPATH
+  #       value: /opt/render/project
+  #     - key: DATABASE_POOL_SIZE
+  #       value: "5"
+  #     - key: DATABASE_MAX_OVERFLOW
+  #       value: "5"
 
   - type: worker
     name: nexus-worker
@@ -222,7 +230,7 @@ services:
   - type: static
     name: nexus-mini-app
     runtime: static
-    buildCommand: cd mini-app && npm install && npm run build
+    buildCommand: cd mini-app && VITE_BASE_PATH=/ npm install && npm run build
     staticPublishPath: ./mini-app/dist
     envVars:
       - key: VITE_API_URL
@@ -230,7 +238,8 @@ services:
 
 # Note: MINI_APP_URL should be set to the URL of the static site above
 # Render will assign a URL like: https://nexus-mini-app.onrender.com
-# Or if using the API service to serve the mini-app, use: https://nexus-4uxn.onrender.com
+# This is automatically set via the render.com dashboard for the service
+# The API service serves the mini-app at /mini-app endpoint for backward compatibility
 
 databases:
   - name: nexus-db

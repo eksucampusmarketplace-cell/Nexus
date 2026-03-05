@@ -30,15 +30,17 @@ logger = logging.getLogger(__name__)
 
 def get_mini_app_url():
     """Get Mini App URL from environment or fallback to production."""
-    mini_app_url = os.getenv("MINI_APP_URL", "")
+    mini_app_url = os.getenv("MINI_APP_URL", "").strip()
     if mini_app_url and mini_app_url != "http://localhost:3000":
-        return mini_app_url
+        # Ensure no trailing slash for consistency
+        return mini_app_url.rstrip('/')
     # Fallback to webhook URL base domain or production URL
-    webhook_url = os.getenv("WEBHOOK_URL", "")
+    webhook_url = os.getenv("WEBHOOK_URL", "").strip()
     if webhook_url:
-        return webhook_url.split("/webhook")[0]
+        base = webhook_url.split("/webhook")[0].rstrip('/')
+        return f"{base}/mini-app"
     # Final fallback to production URL
-    return "https://nexus-4uxn.onrender.com"
+    return "https://nexus-4uxn.onrender.com/mini-app"
 
 
 def get_mini_app_button():
@@ -389,8 +391,16 @@ class MiddlewarePipeline:
         if update.callback_query and update.callback_query.message and update.callback_query.message.chat.type == "private":
             logger.info(f"Routing to private callback handler for chat {update.callback_query.message.chat.id}")
             result = await self._handle_private_callback(bot, update)
-            logger.info(f"Private callback handler result: {result}")
-            return result
+            if result:
+                logger.info(f"Private callback handler handled: {update.callback_query.data}")
+                return result
+            logger.info(f"Private callback not handled, checking modules...")
+            # Fall through to module routing for unhandled private callbacks
+            
+        # Handle callback queries in groups (for inline buttons like captcha verify)
+        if update.callback_query:
+            logger.info(f"Processing callback query in group context: {update.callback_query.data}")
+            # These will be routed to modules in _route_to_modules
 
         # Create database session for group updates
         try:
@@ -441,14 +451,19 @@ class MiddlewarePipeline:
         if update.message:
             telegram_user = update.message.from_user
             telegram_chat = update.message.chat
+            logger.debug(f"Building context from message: user={telegram_user.id}, chat={telegram_chat.id}")
         elif update.callback_query:
             telegram_user = update.callback_query.from_user
             # Try to get chat from the message first, then fall back to the chat property
             if update.callback_query.message:
                 telegram_chat = update.callback_query.message.chat
+                logger.debug(f"Building context from callback (with message): user={telegram_user.id}, chat={telegram_chat.id}")
             elif hasattr(update.callback_query, 'chat') and update.callback_query.chat:
                 # For inline keyboards, the chat property gives us the chat where it was used
                 telegram_chat = update.callback_query.chat
+                logger.debug(f"Building context from callback (via chat property): user={telegram_user.id}, chat={telegram_chat.id}")
+            else:
+                logger.warning(f"Callback query has no chat info: user={telegram_user.id}")
         elif update.inline_query:
             telegram_user = update.inline_query.from_user
         elif update.edited_message:
