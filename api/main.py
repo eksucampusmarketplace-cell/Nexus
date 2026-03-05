@@ -247,11 +247,15 @@ dist_path = os.path.join(os.getcwd(), "mini-app", "dist")
 
 # Check for dist folder
 if os.path.exists(dist_path):
-    # Mount assets folder
+    # Mount assets folder at /mini-app/assets (for consistency with base path)
     assets_path = os.path.join(dist_path, "assets")
     if os.path.exists(assets_path):
-        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
-        logger.info(f"Mini App assets mounted from: {assets_path}")
+        app.mount("/mini-app/assets", StaticFiles(directory=assets_path), name="mini-app-assets")
+        logger.info(f"Mini App assets mounted at /mini-app/assets from: {assets_path}")
+
+    # Also mount at root for backward compatibility
+    app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+    logger.info(f"Mini App assets mounted at /assets from: {assets_path}")
 
     # Mount root-level static files (manifest.json, favicon, etc.) at /static
     # This ensures manifest.json is accessible at /static/manifest.json
@@ -264,6 +268,7 @@ else:
 
 
 @app.get("/vite.svg", include_in_schema=False)
+@app.get("/mini-app/vite.svg", include_in_schema=False)
 async def serve_vite_svg():
     """Serve vite.svg favicon."""
     vite_svg_path = os.path.join(os.getcwd(), "mini-app", "dist", "vite.svg")
@@ -282,6 +287,7 @@ async def serve_vite_svg():
 
 
 @app.get("/manifest.json", include_in_schema=False)
+@app.get("/mini-app/manifest.json", include_in_schema=False)
 async def serve_manifest():
     """Serve manifest.json for PWA."""
     manifest_path = os.path.join(os.getcwd(), "mini-app", "dist", "manifest.json")

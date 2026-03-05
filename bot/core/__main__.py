@@ -34,15 +34,17 @@ logger = logging.getLogger(__name__)
 
 def get_mini_app_url():
     """Get Mini App URL from environment or fallback to production."""
-    mini_app_url = os.getenv("MINI_APP_URL", "")
+    mini_app_url = os.getenv("MINI_APP_URL", "").strip()
     if mini_app_url and mini_app_url != "http://localhost:3000":
-        return mini_app_url
+        # Ensure no trailing slash for consistency
+        return mini_app_url.rstrip('/')
     # Fallback to webhook URL base domain or production URL
-    webhook_url = os.getenv("WEBHOOK_URL", "")
+    webhook_url = os.getenv("WEBHOOK_URL", "").strip()
     if webhook_url:
-        return webhook_url.split("/webhook")[0]
+        base = webhook_url.split("/webhook")[0].rstrip('/')
+        return f"{base}/mini-app"
     # Final fallback to production URL
-    return "https://nexus-4uxn.onrender.com"
+    return "https://nexus-4uxn.onrender.com/mini-app"
 
 
 def get_mini_app_keyboard():

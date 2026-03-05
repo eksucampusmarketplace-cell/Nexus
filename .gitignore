@@ -70,6 +70,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Mini App build (rebuilt on deploy)
+mini-app/dist/
+
 # Misc
 .DS_Store
 *.pem
