@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from bot.modules.button_decorations.module import apply_button_decoration, get_decoration_module
+from bot.modules.button_decorations.module import apply_button_decoration
 
 
 class DecoratedInlineKeyboardBuilder(InlineKeyboardBuilder):
@@ -21,27 +21,17 @@ class DecoratedInlineKeyboardBuilder(InlineKeyboardBuilder):
         # Text becomes: "🌸 Click Me 🌺" if nature:flowers is set
     """
     
-    def __init__(
-        self,
-        group_id: int,
-        enabled: bool = True,
-        apply_animation: bool = True,
-        user_id: Optional[int] = None
-    ):
+    def __init__(self, group_id: int, enabled: bool = True):
         """
         Initialize the decorated keyboard builder.
         
         Args:
             group_id: The group ID for fetching decoration settings
             enabled: Whether to apply decorations (default: True)
-            apply_animation: Whether to apply animations (default: True)
-            user_id: Optional user ID for user-specific preferences
         """
         super().__init__()
         self.group_id = group_id
         self.enabled = enabled
-        self.apply_animation = apply_animation
-        self.user_id = user_id
     
     def button(
         self,
@@ -62,13 +52,7 @@ class DecoratedInlineKeyboardBuilder(InlineKeyboardBuilder):
             **kwargs: Additional aiogram button parameters
         """
         if self.enabled and not skip_decoration:
-            text = apply_button_decoration(text, self.group_id, self.user_id)
-            
-            # Apply animation if enabled
-            if self.apply_animation:
-                module = get_decoration_module()
-                if module:
-                    text = module.apply_animation(text, self.group_id)
+            text = apply_button_decoration(text, self.group_id)
         
         super().button(
             text=text,

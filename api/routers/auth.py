@@ -136,10 +136,15 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     """
     import urllib.parse
 
+    logger.debug("[HASH] Starting hash validation...")
+    
     received_hash = raw_params.get("hash", "")
     if not received_hash:
-        logger.warning("Missing hash in init data")
+        logger.warning("[HASH] Missing hash in init data")
         return False
+
+    logger.debug(f"[HASH] Received hash (first 30 chars): {received_hash[:30]}...")
+    logger.debug(f"[HASH] Bot token (first 10 chars): {bot_token[:10]!r}...")
 
     # Validate auth_date to prevent replay attacks (24 hour window)
     auth_date = raw_params.get("auth_date")
@@ -148,9 +153,12 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
 
         auth_timestamp = int(auth_date)
         current_time = int(time.time())
-        if current_time - auth_timestamp > 86400:  # 24 hours
+        time_diff = current_time - auth_timestamp
+        logger.debug(f"[HASH] Auth date check: timestamp={auth_timestamp}, current={current_time}, diff={time_diff}s")
+        
+        if time_diff > 86400:  # 24 hours
             logger.warning(
-                f"Init data expired: auth_date={auth_timestamp}, current={current_time}"
+                f"[HASH] Init data expired: auth_date={auth_timestamp}, current={current_time}, diff={time_diff}s"
             )
             return False
 
@@ -165,10 +173,13 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
     # Also remove 'signature' if present — it's not part of the legacy hash check
     parsed.pop("signature", None)
 
+    logger.debug(f"[HASH] Params for hash computation: {list(parsed.keys())}")
+
     # Build the data_check_string: sorted keys alphabetically, joined by \n
     # Use the raw URL-encoded values as per Telegram's algorithm
     # This is critical - Telegram uses the URL-encoded values directly
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+    logger.debug(f"[HASH] Data check string (first 200 chars): {data_check_string[:200]!r}...")
 
     # Step 1: Derive secret key using "WebAppData" as the HMAC key
     # CRITICAL: key=b"WebAppData", msg=bot_token — NOT the other way around
@@ -177,6 +188,7 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
         msg=bot_token.encode("utf-8"),
         digestmod=hashlib.sha256,
     ).digest()
+    logger.debug(f"[HASH] Secret key derived (hex): {secret_key.hex()[:32]}...")
 
     # Step 2: Compute the final hash using the derived secret key
     # Use the raw data_check_string bytes directly
@@ -185,6 +197,7 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
         msg=data_check_string.encode("utf-8"),
         digestmod=hashlib.sha256,
     ).hexdigest()
+    logger.debug(f"[HASH] Computed hash (URL-encoded data): {computed_hash}")
 
     # Also try with the URL-decoded values as a fallback
     # Some implementations may use URL-decoded values
@@ -196,28 +209,24 @@ def validate_init_data_hash(raw_params: dict, bot_token: str) -> bool:
         msg=data_check_string_decoded.encode("utf-8"),
         digestmod=hashlib.sha256,
     ).hexdigest()
+    logger.debug(f"[HASH] Computed hash (URL-decoded data): {computed_hash_decoded}")
 
     # Use constant-time comparison to prevent timing attacks
     if hmac.compare_digest(computed_hash, received_hash):
+        logger.debug("[HASH] Hash validated using URL-encoded data")
         return True
 
     # Try decoded version as fallback
     if hmac.compare_digest(computed_hash_decoded, received_hash):
-        logger.info("Hash validated using URL-decoded values (fallback)")
+        logger.info("[HASH] Hash validated using URL-decoded values (fallback)")
         return True
 
     # Log detailed debug info for diagnosis
     logger.warning(
-        f"Hash mismatch: computed={computed_hash}, received={received_hash}"
+        f"[HASH] MISMATCH: computed={computed_hash}, received={received_hash}"
     )
-    logger.info(f"Data check string (URL-encoded, full): {data_check_string!r}")
-    logger.info(f"Data check string (URL-decoded, full): {data_check_string_decoded!r}")
-    logger.info("Parsed params keys and values (URL-encoded):")
-    for key in sorted(parsed.keys()):
-        val = parsed[key]
-        logger.info(f"  {key}={val!r}")
-    logger.info(f"Bot token (first 10 chars): {bot_token[:10]!r}...")
-    logger.info(f"Secret key (hex): {secret_key.hex()}")
+    logger.debug(f"[HASH] Data check string (URL-encoded, first 300): {data_check_string[:300]!r}")
+    logger.debug(f"[HASH] Data check string (URL-decoded, first 300): {data_check_string_decoded[:300]!r}")
     return False
 
 
@@ -376,38 +385,61 @@ async def create_token(
     # IMPORTANT: Strip whitespace from bot token to handle potential environment variable formatting issues
     main_bot_token = os.getenv("BOT_TOKEN", "").strip()
 
+    # ========== EXTENSIVE DEBUG LOGGING ==========
+    logger.info("=" * 60)
+    logger.info("AUTH TOKEN REQUEST - EXTENSIVE DEBUG")
+    logger.info("=" * 60)
+    
     # Log the incoming request for debugging
-    logger.info(
-        f"Auth token request received. init_data length: {len(request.init_data) if request.init_data else 0}"
-    )
-    logger.debug(
-        f"init_data (first 200 chars): {request.init_data[:200]!r}..."
-        if request.init_data
-        else "empty"
-    )
-    logger.debug(f"Custom bot token provided: {bool(request.bot_token)}")
-    logger.debug(f"Main bot token configured: {bool(main_bot_token)}")
+    init_data_len = len(request.init_data) if request.init_data else 0
+    logger.info(f"[AUTH] init_data length: {init_data_len}")
+    logger.info(f"[AUTH] init_data (first 300 chars): {request.init_data[:300]!r}..." if request.init_data else "[AUTH] init_data: EMPTY")
+    logger.info(f"[AUTH] Custom bot token provided: {bool(request.bot_token)}")
+    logger.info(f"[AUTH] Main bot token configured: {bool(main_bot_token)}")
+    
     if main_bot_token:
-        logger.info(
-            f"Main BOT_TOKEN loaded: {main_bot_token[:10]}...{main_bot_token[-5:]}, length: {len(main_bot_token)}"
-        )
+        logger.info(f"[AUTH] Main BOT_TOKEN: {main_bot_token[:10]}...{main_bot_token[-5:]}, length: {len(main_bot_token)}")
     else:
-        logger.error("BOT_TOKEN environment variable is EMPTY or not set!")
+        logger.error("[AUTH] BOT_TOKEN environment variable is EMPTY or not set!")
 
     # Parse init data first to extract chat info
     raw_params, parsed_data, received_hash = parse_init_data(request.init_data)
 
     if not received_hash:
+        logger.error("[AUTH] Missing hash in init data!")
         raise HTTPException(status_code=401, detail="Invalid init data: Missing hash")
 
     # Log parsed data for debugging
-    logger.debug(f"Raw params keys: {list(raw_params.keys())}")
-    logger.debug(f"Parsed data keys: {list(parsed_data.keys())}")
-    logger.debug(
-        f"User ID: {parsed_data.get('user', {}).get('id') if parsed_data.get('user') else None}"
-    )
-    logger.debug(f"Chat from parsed_data: {parsed_data.get('chat')}")
-    logger.debug(f"Start param: {parsed_data.get('start_param')}")
+    logger.info(f"[AUTH] Raw params keys: {list(raw_params.keys())}")
+    logger.info(f"[AUTH] Parsed data keys: {list(parsed_data.keys())}")
+    
+    # User info
+    user_data = parsed_data.get('user', {})
+    if user_data:
+        logger.info(f"[AUTH] User from init_data:")
+        logger.info(f"  - ID: {user_data.get('id')}")
+        logger.info(f"  - Username: {user_data.get('username')}")
+        logger.info(f"  - First name: {user_data.get('first_name')}")
+        logger.info(f"  - Last name: {user_data.get('last_name')}")
+        logger.info(f"  - Language: {user_data.get('language_code')}")
+        logger.info(f"  - Is premium: {user_data.get('is_premium')}")
+    else:
+        logger.warning("[AUTH] No user data in init_data!")
+    
+    # Chat info
+    chat_data = parsed_data.get('chat', {})
+    if chat_data:
+        logger.info(f"[AUTH] Chat from init_data:")
+        logger.info(f"  - ID: {chat_data.get('id')}")
+        logger.info(f"  - Type: {chat_data.get('type')}")
+        logger.info(f"  - Title: {chat_data.get('title')}")
+        logger.info(f"  - Username: {chat_data.get('username')}")
+    else:
+        logger.info("[AUTH] No chat data in init_data (may be private chat)")
+    
+    logger.info(f"[AUTH] Start param: {parsed_data.get('start_param')}")
+    logger.info(f"[AUTH] Auth date: {parsed_data.get('auth_date')}")
+    logger.info(f"[AUTH] Hash (first 20 chars): {received_hash[:20]}...")
 
     # Extract chat/telegram ID for bot token lookup
     chat_id = None
@@ -417,7 +449,9 @@ async def create_token(
         # Try to parse start_param as group ID
         try:
             chat_id = int(parsed_data["start_param"])
+            logger.info(f"[AUTH] Parsed chat_id from start_param: {chat_id}")
         except (ValueError, TypeError):
+            logger.warning(f"[AUTH] Failed to parse start_param as int: {parsed_data.get('start_param')}")
             pass
 
     # Collect error messages for debugging
@@ -428,27 +462,30 @@ async def create_token(
     # This is the database-driven approach - no localStorage needed
     telegram_user_data = parsed_data.get("user", {})
     telegram_user_id = telegram_user_data.get("id")
+    
+    logger.info(f"[AUTH] Starting token validation attempts for user_id: {telegram_user_id}")
 
     if telegram_user_id:
         # Get all bot tokens for groups where this user is a member
+        logger.info(f"[AUTH] Attempt 1: Looking up bot tokens for user {telegram_user_id}...")
         user_bot_tokens = await _get_bot_tokens_for_user(db, telegram_user_id)
+        logger.info(f"[AUTH] Found {len(user_bot_tokens)} bot tokens from user's group memberships")
+        
         for bot_info in user_bot_tokens:
-            logger.info(
-                f"Trying bot @{bot_info.get('username')} from user membership (group_id: {bot_info.get('group_id')})"
-            )
-            if validate_init_data_hash(raw_params, bot_info["token"]):
-                logger.info(
-                    f"Validation successful with user's bot @{bot_info.get('username')}"
-                )
-                telegram_user = verify_telegram_init_data(
-                    request.init_data, bot_info["token"]
-                )
+            bot_username = bot_info.get('username', 'unknown')
+            group_id = bot_info.get('group_id')
+            logger.info(f"[AUTH] Trying bot @{bot_username} from user membership (group_id: {group_id})")
+            
+            is_valid = validate_init_data_hash(raw_params, bot_info["token"])
+            logger.info(f"[AUTH] Bot @{bot_username} hash validation: {'SUCCESS' if is_valid else 'FAILED'}")
+            
+            if is_valid:
+                logger.info(f"[AUTH] Validation successful with user's bot @{bot_username}")
+                telegram_user = verify_telegram_init_data(request.init_data, bot_info["token"])
                 return await _create_user_token(telegram_user, db)
             else:
-                validation_errors.append(
-                    f"User's bot @{bot_info.get('username')}: hash mismatch"
-                )
-                logger.debug(f"Bot @{bot_info.get('username')} validation failed")
+                validation_errors.append(f"User's bot @{bot_username}: hash mismatch")
+                logger.debug(f"Bot @{bot_username} validation failed")
 
     # Note: If user is not in any groups yet (new user or private chat open),
     # user_bot_tokens will be empty. In this case, we fall through to try the
@@ -458,68 +495,79 @@ async def create_token(
     # Strip whitespace from custom bot token as well
     custom_bot_token = request.bot_token.strip() if request.bot_token else None
     if custom_bot_token:
-        logger.info(
-            f"Trying custom bot token from request (length: {len(custom_bot_token)})"
-        )
-        if validate_init_data_hash(raw_params, custom_bot_token):
-            logger.info("Validation successful with custom bot token from request")
-            telegram_user = verify_telegram_init_data(
-                request.init_data, custom_bot_token
-            )
+        logger.info(f"[AUTH] Attempt 2: Trying custom bot token from request (length: {len(custom_bot_token)})")
+        is_valid = validate_init_data_hash(raw_params, custom_bot_token)
+        logger.info(f"[AUTH] Custom bot token hash validation: {'SUCCESS' if is_valid else 'FAILED'}")
+        
+        if is_valid:
+            logger.info("[AUTH] Validation successful with custom bot token from request")
+            telegram_user = verify_telegram_init_data(request.init_data, custom_bot_token)
             return await _create_user_token(telegram_user, db)
         else:
             validation_errors.append("Custom bot token: hash mismatch")
-            logger.warning("Custom bot token validation failed")
+            logger.warning("[AUTH] Custom bot token validation failed")
 
-    # Try 2: Look up bot token from BotInstance table by chat ID
+    # Try 3: Look up bot token from BotInstance table by chat ID
     if chat_id:
-        logger.info(f"Looking up bot token for chat_id: {chat_id}")
+        logger.info(f"[AUTH] Attempt 3: Looking up bot token for chat_id: {chat_id}")
         bot_instance = await _get_bot_token_for_chat(db, chat_id)
         if bot_instance:
-            logger.info(
-                f"Found bot instance for chat {chat_id}: @{bot_instance.get('username', 'unknown')}"
-            )
-            if validate_init_data_hash(raw_params, bot_instance["token"]):
-                logger.info(f"Validation successful with bot token for chat {chat_id}")
-                telegram_user = verify_telegram_init_data(
-                    request.init_data, bot_instance["token"]
-                )
+            bot_username = bot_instance.get('username', 'unknown')
+            logger.info(f"[AUTH] Found bot instance for chat {chat_id}: @{bot_username}")
+            
+            is_valid = validate_init_data_hash(raw_params, bot_instance["token"])
+            logger.info(f"[AUTH] Chat bot token hash validation: {'SUCCESS' if is_valid else 'FAILED'}")
+            
+            if is_valid:
+                logger.info(f"[AUTH] Validation successful with bot token for chat {chat_id}")
+                telegram_user = verify_telegram_init_data(request.init_data, bot_instance["token"])
                 return await _create_user_token(telegram_user, db)
             else:
                 validation_errors.append(f"Bot token for chat {chat_id}: hash mismatch")
-                logger.warning(f"Bot token for chat {chat_id} validation failed")
+                logger.warning(f"[AUTH] Bot token for chat {chat_id} validation failed")
+        else:
+            logger.info(f"[AUTH] No bot instance found for chat_id: {chat_id}")
 
-    # Try 2b: Try ALL bot instances from database (for private chat opens where no chat_id available)
+    # Try 4: Try ALL bot instances from database (for private chat opens where no chat_id available)
     # This allows white-label/clone bots to authenticate from private chats
+    logger.info("[AUTH] Attempt 4: Trying ALL bot instances from database...")
     all_bot_tokens = await _get_all_bot_tokens(db)
+    logger.info(f"[AUTH] Found {len(all_bot_tokens)} total bot instances to try")
+    
     for bot_info in all_bot_tokens:
-        logger.info(
-            f"Trying bot instance @{bot_info.get('username', 'unknown')} (group_id: {bot_info.get('group_id')})"
-        )
-        if validate_init_data_hash(raw_params, bot_info["token"]):
-            logger.info(
-                f"Validation successful with bot @{bot_info.get('username')} (group_id: {bot_info.get('group_id')})"
-            )
-            telegram_user = verify_telegram_init_data(
-                request.init_data, bot_info["token"]
-            )
+        bot_username = bot_info.get('username', 'unknown')
+        group_id = bot_info.get('group_id')
+        logger.info(f"[AUTH] Trying bot instance @{bot_username} (group_id: {group_id})")
+        
+        is_valid = validate_init_data_hash(raw_params, bot_info["token"])
+        logger.info(f"[AUTH] Bot @{bot_username} hash validation: {'SUCCESS' if is_valid else 'FAILED'}")
+        
+        if is_valid:
+            logger.info(f"[AUTH] Validation successful with bot @{bot_username} (group_id: {group_id})")
+            telegram_user = verify_telegram_init_data(request.init_data, bot_info["token"])
             return await _create_user_token(telegram_user, db)
         else:
-            validation_errors.append(f"Bot @{bot_info.get('username')}: hash mismatch")
-            logger.debug(f"Bot @{bot_info.get('username')} validation failed")
+            validation_errors.append(f"Bot @{bot_username}: hash mismatch")
+            logger.debug(f"Bot @{bot_username} validation failed")
 
-    # Try 3: Main bot token from environment
+    # Try 5: Main bot token from environment
     if main_bot_token:
-        logger.info("Trying main BOT_TOKEN from environment")
-        if validate_init_data_hash(raw_params, main_bot_token):
-            logger.info("Validation successful with main BOT_TOKEN")
+        logger.info("[AUTH] Attempt 5: Trying main BOT_TOKEN from environment")
+        is_valid = validate_init_data_hash(raw_params, main_bot_token)
+        logger.info(f"[AUTH] Main BOT_TOKEN hash validation: {'SUCCESS' if is_valid else 'FAILED'}")
+        
+        if is_valid:
+            logger.info("[AUTH] Validation successful with main BOT_TOKEN")
             telegram_user = verify_telegram_init_data(request.init_data, main_bot_token)
             return await _create_user_token(telegram_user, db)
         else:
             validation_errors.append("Main BOT_TOKEN: hash mismatch")
-            logger.warning("Main BOT_TOKEN validation failed")
+            logger.warning("[AUTH] Main BOT_TOKEN validation failed")
 
     # All validation attempts failed
+    logger.error("[AUTH] ALL VALIDATION ATTEMPTS FAILED")
+    logger.error(f"[AUTH] Validation errors: {validation_errors}")
+    
     error_detail = "Invalid init data: Hash mismatch"
     if validation_errors:
         error_detail += f" (tried: {', '.join(validation_errors)})"
@@ -548,14 +596,15 @@ async def create_token(
     )
     if dev_bypass and _environment == "development":
         logger.warning(
-            f"DEVELOPMENT MODE: Bypassing hash validation for user {parsed_data.get('user', {}).get('id')}"
+            f"[AUTH] DEVELOPMENT MODE: Bypassing hash validation for user {parsed_data.get('user', {}).get('id')}"
         )
         if parsed_data.get("user"):
             return await _create_user_token(parsed_data["user"], db)
 
     logger.error(
-        f"All validation attempts failed. Chat ID: {chat_id}, Raw params keys: {list(raw_params.keys())}, Errors: {validation_errors}"
+        f"[AUTH] Final error - Chat ID: {chat_id}, Raw params keys: {list(raw_params.keys())}, Errors: {validation_errors}"
     )
+    logger.info("=" * 60)
     raise HTTPException(status_code=401, detail=error_detail)
 
 

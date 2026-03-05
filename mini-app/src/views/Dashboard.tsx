@@ -16,6 +16,7 @@ import ModuleToggleManager from '../components/Modules/ModuleToggleManager'
 import GroupsManager from '../components/Groups/GroupsManager'
 import QuickActionsPanel from '../components/Moderation/QuickActionsPanel'
 import toast from 'react-hot-toast'
+import { debugLog, LogCategory, LogLevel } from '../utils/debug'
 
 type ViewMode = 'groups' | 'manage' | 'quick-actions'
 
@@ -29,47 +30,80 @@ export default function Dashboard() {
   const hasLoadedGroups = useRef(false)
 
   const loadGroups = async (isRetry = false) => {
+    debugLog(LogCategory.GROUPS, '=== Dashboard.loadGroups() called ===', { isRetry });
+    
     // Wait for auth to be fully ready (rehydrated + not loading)
     if (!isAuthReady()) {
-      console.log('Skipping group load - auth not ready')
+      debugLog(LogCategory.GROUPS, 'Dashboard: Skipping group load - auth not ready', {
+        isRehydrated: useAuthStore.getState().isRehydrated,
+        isLoading: useAuthStore.getState().isLoading,
+      });
       return
     }
 
     // Check if we have a stored token that indicates user was previously authenticated
     const wasAuthenticated = hasStoredToken()
+    debugLog(LogCategory.GROUPS, 'Dashboard: Auth check', { isAuthenticated, wasAuthenticated });
 
     if (!isAuthenticated && !wasAuthenticated) {
-      console.log('Skipping group load - not authenticated and no stored token')
+      debugLog(LogCategory.GROUPS, 'Dashboard: Skipping group load - not authenticated and no stored token');
       return
     }
 
     // Prevent double-loading unless it's a retry
     if (hasLoadedGroups.current && !isRetry) {
-      console.log('Skipping group load - already loaded')
+      debugLog(LogCategory.GROUPS, 'Dashboard: Skipping group load - already loaded');
       return
     }
 
     // Check if Telegram WebApp is available but initData is not (private chat mode)
     const tg = (window as any).Telegram?.WebApp
+    const hasTelegram = !!tg
+    const hasInitData = !!tg?.initData
+    
+    debugLog(LogCategory.GROUPS, 'Dashboard: Telegram context check', { 
+      hasTelegram, 
+      hasInitData, 
+      wasAuthenticated 
+    });
+    
     if (tg && !tg.initData && !wasAuthenticated) {
-      console.log('Skipping group load - in Telegram but no initData yet (private chat)')
+      debugLog(LogCategory.GROUPS, 'Dashboard: Skipping group load - in Telegram but no initData yet (private chat)');
       return
     }
 
-    console.log('Loading groups...', { isAuthenticated, wasAuthenticated })
+    debugLog(LogCategory.GROUPS, 'Dashboard: Loading groups...');
     hasLoadedGroups.current = true
     setLoadError(null)
     setLoading(true)
+    
     try {
+      debugLog(LogCategory.API, 'Dashboard: Calling listGroups()');
+      const startTime = Date.now();
+      
       const data = await listGroups()
+      const duration = Date.now() - startTime;
+      
+      debugLog(LogCategory.API, `Dashboard: Groups loaded in ${duration}ms`, {
+        groupCount: data?.length || 0,
+        groups: data?.map((g: any) => ({ id: g.id, title: g.title })),
+      });
+      
       setGroups(data)
+      debugLog(LogCategory.GROUPS, 'Dashboard: Groups state updated', { count: data?.length });
     } catch (error: any) {
-      console.error('Failed to load groups:', error)
+      debugLog(LogCategory.GROUPS, 'Dashboard: Failed to load groups', {
+        status: error?.response?.status,
+        detail: error?.response?.data?.detail,
+        message: error?.message,
+      }, LogLevel.ERROR);
+      
       const errorMessage = error?.response?.data?.detail || 'Failed to load groups'
       setLoadError(errorMessage)
       hasLoadedGroups.current = false // Allow retry on error
     } finally {
       setLoading(false)
+      debugLog(LogCategory.GROUPS, '=== Dashboard.loadGroups() complete ===');
     }
   }
 

@@ -9,6 +9,7 @@ import api from '../../api/client'
 import { getAddToGroupUrl } from '../../api/config'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../../stores/authStore'
+import { debugLog, LogCategory, LogLevel, logTelegramEvent } from '../../utils/debug'
 
 interface ManagedGroup {
   id: number
@@ -41,47 +42,80 @@ export default function GroupsManager({ onSelectGroup, selectedGroupId }: Groups
   const hasLoadedGroups = useRef(false)
 
   const loadGroups = async (isRetry = false) => {
+    debugLog(LogCategory.GROUPS, '=== GroupsManager.loadGroups() called ===', { isRetry });
+    
     // Wait for auth to be fully ready (rehydrated + not loading)
     if (!isAuthReady()) {
-      console.log('GroupsManager: Auth not ready, skipping load')
+      debugLog(LogCategory.GROUPS, 'GroupsManager: Auth not ready, skipping load', {
+        isRehydrated: useAuthStore.getState().isRehydrated,
+        isLoading: useAuthStore.getState().isLoading,
+      });
       return
     }
 
     // Check both isAuthenticated and hasStoredToken
     const wasAuthenticated = hasStoredToken()
+    debugLog(LogCategory.GROUPS, 'GroupsManager: Auth check', { isAuthenticated, wasAuthenticated });
+    
     if (!isAuthenticated && !wasAuthenticated) {
-      console.log('GroupsManager: Not authenticated, skipping load')
+      debugLog(LogCategory.GROUPS, 'GroupsManager: Not authenticated, skipping load');
       return
     }
 
     // Check if Telegram WebApp is available but initData is not (private chat mode)
     const tg = (window as any).Telegram?.WebApp
+    const hasTelegram = !!tg
+    const hasInitData = !!tg?.initData
+    
+    debugLog(LogCategory.GROUPS, 'GroupsManager: Telegram context check', { 
+      hasTelegram, 
+      hasInitData, 
+      wasAuthenticated 
+    });
+    
     if (tg && !tg.initData && !wasAuthenticated) {
-      console.log('GroupsManager: In Telegram but no initData yet, skipping load')
+      debugLog(LogCategory.GROUPS, 'GroupsManager: In Telegram but no initData yet, skipping load');
       return
     }
 
     // Prevent double-loading unless it's a retry
     if (hasLoadedGroups.current && !isRetry) {
-      console.log('GroupsManager: Already loaded, skipping')
+      debugLog(LogCategory.GROUPS, 'GroupsManager: Already loaded, skipping');
       return
     }
 
-    console.log('GroupsManager: Loading groups...', { isAuthenticated, wasAuthenticated })
+    debugLog(LogCategory.GROUPS, 'GroupsManager: Loading groups from API...');
     hasLoadedGroups.current = true
     setError(null)
 
     try {
       setLoading(true)
+      debugLog(LogCategory.API, 'GroupsManager: Calling GET /groups/my-groups');
+      
+      const startTime = Date.now();
       const response = await api.get('/groups/my-groups')
+      const duration = Date.now() - startTime;
+      
+      debugLog(LogCategory.API, `GroupsManager: Groups loaded in ${duration}ms`, {
+        groupCount: response.data?.length || 0,
+        groups: response.data?.map((g: any) => ({ id: g.id, title: g.title })),
+      });
+      
       setGroups(response.data)
+      debugLog(LogCategory.GROUPS, 'GroupsManager: Groups state updated', { count: response.data?.length });
     } catch (err: any) {
-      console.error('Failed to load groups:', err)
+      debugLog(LogCategory.GROUPS, 'GroupsManager: Failed to load groups', {
+        status: err.response?.status,
+        detail: err.response?.data?.detail,
+        message: err.message,
+      }, LogLevel.ERROR);
+      
       const errorMessage = err.response?.data?.detail || 'Failed to load groups'
       setError(errorMessage)
       hasLoadedGroups.current = false // Allow retry on error
     } finally {
       setLoading(false)
+      debugLog(LogCategory.GROUPS, '=== GroupsManager.loadGroups() complete ===');
     }
   }
 
