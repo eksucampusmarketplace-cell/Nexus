@@ -230,11 +230,8 @@ services:
   - type: static
     name: nexus-mini-app
     runtime: static
-    buildCommand: cd mini-app && VITE_BASE_PATH=/ npm install && npm run build
+    buildCommand: cd mini-app && VITE_BASE_PATH=/ VITE_API_URL=https://nexus-4uxn.onrender.com npm install && npm run build
     staticPublishPath: ./mini-app/dist
-    envVars:
-      - key: VITE_API_URL
-        value: https://nexus-4uxn.onrender.com
 
 # Note: MINI_APP_URL should be set to the URL of the static site above
 # Render will assign a URL like: https://nexus-mini-app.onrender.com
