@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from bot.core.middleware import pipeline, setup_pipeline
 from bot.core.module_registry import module_registry
 from shared.database import init_db
-from shared.redis_client import close_redis, get_redis
+from shared.redis_client import close_redis, get_redis, is_redis_available
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,14 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     logger.info("Connecting to Redis...")
-    await get_redis()
+    try:
+        if await is_redis_available():
+            await get_redis()
+            logger.info("Redis connected successfully")
+        else:
+            logger.warning("Redis is not available. Redis-dependent features will be disabled.")
+    except Exception as e:
+        logger.warning(f"Redis connection failed: {e}. Redis features will be disabled.")
 
     # Set up middleware pipeline
     logger.info("Setting up middleware pipeline...")
