@@ -1,10 +1,13 @@
 """Redis client with automatic group namespacing."""
 
 import json
+import logging
 import os
 from typing import Any, Optional, Union
 
 import redis.asyncio as aioredis
+
+logger = logging.getLogger(__name__)
 
 # In production, REDIS_URL must be explicitly set
 _env_redis_url = os.getenv("REDIS_URL")
@@ -13,9 +16,10 @@ _environment = os.getenv("ENVIRONMENT", "development")
 if _env_redis_url:
     REDIS_URL = _env_redis_url
 elif _environment == "production":
-    raise RuntimeError(
-        "REDIS_URL environment variable is required in production. "
-        "Please configure a Redis service and set REDIS_URL."
+    # In production without REDIS_URL, we'll use a placeholder and handle errors gracefully
+    REDIS_URL = None
+    logger.warning(
+        "REDIS_URL not set in production. Redis-dependent features will be disabled."
     )
 else:
     # Development fallback
@@ -193,12 +197,36 @@ class GroupScopedRedis:
 
 # Global Redis connection pool
 _redis_pool: Optional[aioredis.Redis] = None
+_redis_available: Optional[bool] = None
+
+
+async def is_redis_available() -> bool:
+    """Check if Redis is available and properly configured."""
+    global _redis_available
+    if _redis_available is not None:
+        return _redis_available
+    
+    if REDIS_URL is None:
+        _redis_available = False
+        return False
+    
+    try:
+        redis = await get_redis()
+        await redis.ping()
+        _redis_available = True
+        return True
+    except Exception as e:
+        logger.warning(f"Redis unavailable: {e}")
+        _redis_available = False
+        return False
 
 
 async def get_redis() -> aioredis.Redis:
     """Get or create global Redis connection."""
     global _redis_pool
     if _redis_pool is None:
+        if REDIS_URL is None:
+            raise RuntimeError("Redis is not configured. Set REDIS_URL environment variable.")
         _redis_pool = aioredis.from_url(
             REDIS_URL,
             encoding="utf-8",
@@ -207,10 +235,19 @@ async def get_redis() -> aioredis.Redis:
     return _redis_pool
 
 
-async def get_group_redis(group_id: int) -> GroupScopedRedis:
-    """Get group-scoped Redis client."""
-    redis = await get_redis()
-    return GroupScopedRedis(redis, group_id)
+async def get_group_redis(group_id: int) -> Optional[GroupScopedRedis]:
+    """Get group-scoped Redis client.
+    
+    Returns None if Redis is not available, allowing graceful degradation.
+    """
+    if not await is_redis_available():
+        return None
+    try:
+        redis = await get_redis()
+        return GroupScopedRedis(redis, group_id)
+    except Exception as e:
+        logger.warning(f"Failed to create group Redis client: {e}")
+        return None
 
 
 async def close_redis() -> None:

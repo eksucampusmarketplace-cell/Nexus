@@ -12,36 +12,46 @@ from bot.core.module_base import CommandDef, ModuleCategory, NexusModule
 
 def get_mini_app_url():
     """Get Mini App URL from environment or fallback to production."""
-    mini_app_url = os.getenv("MINI_APP_URL", "")
+    mini_app_url = os.getenv("MINI_APP_URL", "").strip()
     if mini_app_url and mini_app_url != "http://localhost:3000":
-        return mini_app_url
+        return mini_app_url.rstrip('/')
     # Fallback to webhook URL base domain or production URL
-    webhook_url = os.getenv("WEBHOOK_URL", "")
+    webhook_url = os.getenv("WEBHOOK_URL", "").strip()
     if webhook_url:
-        return webhook_url.split("/webhook")[0]
-    # Final fallback to production URL
-    return "https://nexus-4uxn.onrender.com"
+        base = webhook_url.split("/webhook")[0].rstrip('/')
+        return f"{base}/mini-app"
+    # Final fallback to production URL - must always return a valid URL
+    return "https://nexus-4uxn.onrender.com/mini-app"
+
+
+def is_valid_mini_app_url(url: str) -> bool:
+    """Check if the URL is a valid Mini App URL (https only)."""
+    if not url:
+        return False
+    return url.startswith("https://")
 
 
 def get_mini_app_keyboard():
     """Get inline keyboard with Mini App button."""
     mini_app_url = get_mini_app_url()
-    if mini_app_url:
-        return InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="🚀 Open Mini App",
-                        web_app=WebAppInfo(url=mini_app_url)
-                    )
-                ],
-                [
-                    InlineKeyboardButton(text="📚 Help", callback_data="help"),
-                    InlineKeyboardButton(text="⚡ Commands", callback_data="commands")
-                ]
-            ]
-        )
-    return None
+    buttons = []
+    
+    # Add Mini App button only if URL is valid
+    if is_valid_mini_app_url(mini_app_url):
+        buttons.append([
+            InlineKeyboardButton(
+                text="🚀 Open Mini App",
+                web_app=WebAppInfo(url=mini_app_url)
+            )
+        ])
+    
+    # Always add help and commands buttons
+    buttons.append([
+        InlineKeyboardButton(text="📚 Help", callback_data="help"),
+        InlineKeyboardButton(text="⚡ Commands", callback_data="commands")
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 COMMAND_DETAILS: Dict[str, Dict] = {

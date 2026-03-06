@@ -46,14 +46,21 @@ def get_mini_app_url():
     if webhook_url:
         base = webhook_url.split("/webhook")[0].rstrip('/')
         return f"{base}/mini-app"
-    # Final fallback to production URL
+    # Final fallback to production URL - must always return a valid URL
     return "https://nexus-4uxn.onrender.com/mini-app"
+
+
+def is_valid_mini_app_url(url: str) -> bool:
+    """Check if the URL is a valid Mini App URL (https only)."""
+    if not url:
+        return False
+    return url.startswith("https://")
 
 
 def get_mini_app_button():
     """Get Mini App button if URL is configured."""
     mini_app_url = get_mini_app_url()
-    if mini_app_url:
+    if is_valid_mini_app_url(mini_app_url):
         return InlineKeyboardButton(
             text="🚀 Open Mini App",
             web_app=WebAppInfo(url=mini_app_url)
@@ -64,22 +71,24 @@ def get_mini_app_button():
 def get_mini_app_keyboard():
     """Get inline keyboard with Mini App button."""
     mini_app_url = get_mini_app_url()
-    if mini_app_url:
-        return InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="🚀 Open Mini App",
-                        web_app=WebAppInfo(url=mini_app_url)
-                    )
-                ],
-                [
-                    InlineKeyboardButton(text="📚 Help", callback_data="help"),
-                    InlineKeyboardButton(text="⚡ Commands", callback_data="commands")
-                ]
-            ]
-        )
-    return None
+    buttons = []
+    
+    # Add Mini App button only if URL is valid
+    if is_valid_mini_app_url(mini_app_url):
+        buttons.append([
+            InlineKeyboardButton(
+                text="🚀 Open Mini App",
+                web_app=WebAppInfo(url=mini_app_url)
+            )
+        ])
+    
+    # Always add help and commands buttons
+    buttons.append([
+        InlineKeyboardButton(text="📚 Help", callback_data="help"),
+        InlineKeyboardButton(text="⚡ Commands", callback_data="commands")
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 @dataclass
@@ -655,7 +664,11 @@ class MiddlewarePipeline:
         # Get cache
         cache = None
         if group:
-            cache = await get_group_redis(group.id)
+            try:
+                cache = await get_group_redis(group.id)
+            except Exception as e:
+                logger.warning(f"Redis cache unavailable for group {group.id}: {e}")
+                cache = None
 
         # Create context
         ctx = await NexusContext.create(

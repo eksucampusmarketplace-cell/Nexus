@@ -680,10 +680,15 @@ class KeyboardCallbackRouter:
 _state_managers: Dict[int, KeyboardStateManager] = {}
 
 
-async def get_keyboard_state_manager(group_id: int) -> KeyboardStateManager:
-    """Get or create a state manager for a group."""
+async def get_keyboard_state_manager(group_id: int) -> Optional[KeyboardStateManager]:
+    """Get or create a state manager for a group.
+    
+    Returns None if Redis is not available.
+    """
     if group_id not in _state_managers:
         redis = await get_group_redis(group_id)
+        if redis is None:
+            return None
         _state_managers[group_id] = KeyboardStateManager(redis)
     return _state_managers[group_id]
 

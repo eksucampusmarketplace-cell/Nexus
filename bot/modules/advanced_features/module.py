@@ -468,48 +468,75 @@ class AdvancedFeaturesModule(NexusModule):
     
     # Helper methods
     
-    async def _get_keyboard_router(self, group_id: int) -> KeyboardCallbackRouter:
-        """Get or create keyboard router for group."""
+    async def _get_keyboard_router(self, group_id: int) -> Optional[KeyboardCallbackRouter]:
+        """Get or create keyboard router for group.
+        
+        Returns None if Redis is not available.
+        """
         if group_id not in self._keyboard_routers:
             from bot.core.keyboard_state import get_keyboard_state_manager
             manager = await get_keyboard_state_manager(group_id)
+            if manager is None:
+                return None
             self._keyboard_routers[group_id] = KeyboardCallbackRouter(manager)
         return self._keyboard_routers[group_id]
     
-    async def _get_thread_manager(self, group_id: int) -> ThreadContextManager:
-        """Get or create thread manager for group."""
+    async def _get_thread_manager(self, group_id: int) -> Optional[ThreadContextManager]:
+        """Get or create thread manager for group.
+        
+        Returns None if Redis is not available.
+        """
         if group_id not in self._thread_managers:
             from shared.redis_client import get_group_redis
             redis = await get_group_redis(group_id)
+            if redis is None:
+                return None
             self._thread_managers[group_id] = ThreadContextManager(redis)
         return self._thread_managers[group_id]
     
-    async def _get_notification_manager(self, group_id: int):
-        """Get or create notification manager for group."""
+    async def _get_notification_manager(self, group_id: int) -> Optional[Any]:
+        """Get or create notification manager for group.
+        
+        Returns None if Redis is not available.
+        """
         if group_id not in self._notification_managers:
             self._notification_managers[group_id] = await get_notification_manager(group_id)
         return self._notification_managers[group_id]
     
-    async def _get_flow_engine(self, group_id: int) -> FlowEngine:
-        """Get or create flow engine for group."""
+    async def _get_flow_engine(self, group_id: int) -> Optional[FlowEngine]:
+        """Get or create flow engine for group.
+        
+        Returns None if Redis is not available.
+        """
         if group_id not in self._flow_engines:
             from shared.redis_client import get_group_redis
             redis = await get_group_redis(group_id)
+            if redis is None:
+                return None
             # Need to get bot from somewhere - in real implementation inject it
             self._flow_engines[group_id] = FlowEngine(redis, None)
         return self._flow_engines[group_id]
     
-    async def _get_content_pipeline(self, group_id: int) -> ContentPipeline:
-        """Get or create content pipeline for group."""
+    async def _get_content_pipeline(self, group_id: int) -> Optional[ContentPipeline]:
+        """Get or create content pipeline for group.
+        
+        Returns None if Redis is not available.
+        """
         if group_id not in self._content_pipelines:
             from shared.redis_client import get_group_redis
             redis = await get_group_redis(group_id)
+            if redis is None:
+                return None
             self._content_pipelines[group_id] = ContentPipeline(redis)
         return self._content_pipelines[group_id]
     
     async def _setup_default_notifications(self, group_id: int):
         """Set up default notification rules for a group."""
         manager = await self._get_notification_manager(group_id)
+        
+        # Skip if Redis is not available
+        if manager is None:
+            return
         
         # Critical moderation alerts
         critical_rule = NotificationRule(

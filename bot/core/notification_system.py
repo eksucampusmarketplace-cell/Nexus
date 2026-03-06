@@ -730,7 +730,12 @@ class NotificationDelivery:
 
 
 # Factory function for creating notification manager
-async def get_notification_manager(group_id: int) -> NotificationManager:
-    """Get notification manager for a group."""
+async def get_notification_manager(group_id: int) -> Optional[NotificationManager]:
+    """Get notification manager for a group.
+    
+    Returns None if Redis is not available.
+    """
     redis = await get_group_redis(group_id)
+    if redis is None:
+        return None
     return NotificationManager(redis)
