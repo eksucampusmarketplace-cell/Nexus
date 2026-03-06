@@ -27,8 +27,8 @@ let hasHandled401 = false
 const getApiUrl = (): string => {
   enhancedDebug.debug('API URL Detection Start', LogCategory.API);
 
-  // Check for environment variable (set at build time)
-  if (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== 'http://localhost:8000') {
+  // Check for environment variable (set at build time via .env or render.yaml)
+  if (import.meta.env.VITE_API_URL) {
     enhancedDebug.debug('Using VITE_API_URL', LogCategory.API, { url: import.meta.env.VITE_API_URL });
     return import.meta.env.VITE_API_URL
   }
