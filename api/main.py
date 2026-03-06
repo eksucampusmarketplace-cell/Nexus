@@ -366,6 +366,28 @@ async def api_status():
     }
 
 
+@app.get("/api/diagnostic")
+async def diagnostic_info():
+    """Public diagnostic endpoint for troubleshooting Mini App issues."""
+    import os
+    
+    bot_token_set = bool(os.getenv("BOT_TOKEN", "").strip())
+    environment = os.getenv("ENVIRONMENT", "unknown")
+    
+    return {
+        "status": "ok",
+        "bot_token_configured": bot_token_set,
+        "environment": environment,
+        "mini_app_url": os.getenv("MINI_APP_URL"),
+        "websocket_url": os.getenv("WEBHOOK_URL"),
+        "tips": {
+            "if_not_configured": "Make sure BOT_TOKEN is set in environment variables",
+            "if_auth_fails": "Ensure you're opening Mini App from a group with the bot installed",
+            "if_no_groups": "Add the bot to a Telegram group and send a message first"
+        }
+    }
+
+
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     """Health check endpoint."""

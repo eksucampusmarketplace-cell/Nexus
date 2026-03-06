@@ -199,12 +199,83 @@ async def get_redis() -> aioredis.Redis:
     """Get or create global Redis connection."""
     global _redis_pool
     if _redis_pool is None:
-        _redis_pool = aioredis.from_url(
-            REDIS_URL,
-            encoding="utf-8",
-            decode_responses=True,
-        )
+        try:
+            _redis_pool = aioredis.from_url(
+                REDIS_URL,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+            # Test the connection
+            await _redis_pool.ping()
+            logger.info("Redis connection established successfully")
+        except Exception as e:
+            logger.warning(f"Redis connection failed: {e}. Redis features will be disabled.")
+            # Create a mock redis object that logs but doesn't crash
+            _redis_pool = _create_mock_redis()
     return _redis_pool
+
+
+def _create_mock_redis() -> aioredis.Redis:
+    """Create a mock Redis client for when Redis is unavailable."""
+    import asyncio
+    
+    class MockRedis:
+        """Mock Redis client that gracefully handles unavailability."""
+        
+        async def ping(self):
+            return False
+            
+        async def publish(self, channel: str, message: str):
+            logger.debug(f"[Mock Redis] Would publish to {channel}: {message[:100]}...")
+            return 0
+            
+        async def subscribe(self, channel: str):
+            pass
+            
+        async def unsubscribe(self, channel: str):
+            pass
+            
+        async def close(self):
+            pass
+            
+        async def time(self):
+            return (int(asyncio.get_event_loop().time()), 0)
+        
+        async def get(self, key: str):
+            return None
+            
+        async def set(self, key: str, value: str, ex: int = None):
+            return False
+            
+        async def delete(self, key: str):
+            return 0
+            
+        async def exists(self, key: str):
+            return 0
+            
+        async def expire(self, key: str, seconds: int):
+            return False
+            
+        async def ttl(self, key: str):
+            return -2
+            
+        async def incr(self, key: str):
+            return 0
+            
+        async def decr(self, key: str):
+            return 0
+            
+        def pipeline(self):
+            return self.MockPipeline()
+            
+        class MockPipeline:
+            async def hgetall(self, key: str):
+                return {}
+                
+            async def execute(self):
+                return [{}]
+    
+    return MockRedis()  # type: ignore
 
 
 async def get_group_redis(group_id: int) -> GroupScopedRedis:

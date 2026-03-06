@@ -74,7 +74,11 @@ export default function EntrySelection({
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <p className="text-red-400 text-sm">{error}</p>
+                {error.includes('\n') ? (
+                  <div className="text-red-400 text-sm whitespace-pre-line">{error}</div>
+                ) : (
+                  <p className="text-red-400 text-sm">{error}</p>
+                )}
               </div>
             </div>
           </motion.div>
@@ -164,6 +168,25 @@ export default function EntrySelection({
                 <Info className="w-4 h-4" />
                 <span className="text-sm">What is this?</span>
               </button>
+
+              {/* Debug Button (development only) */}
+              {import.meta.env.DEV && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/diagnostic')
+                      const data = await response.json()
+                      alert(JSON.stringify(data, null, 2))
+                    } catch (e) {
+                      alert('Failed to get diagnostic info: ' + e)
+                    }
+                  }}
+                  className="w-full p-2 flex items-center justify-center gap-2 text-dark-500 hover:text-dark-300 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span className="text-xs">Debug Info (Dev)</span>
+                </button>
+              )}
             </motion.div>
           )}
 
@@ -300,9 +323,9 @@ export default function EntrySelection({
                       1
                     </div>
                     <div>
-                      <h3 className="font-medium text-white mb-1">Add Nexus to a Group</h3>
+                      <h3 className="font-medium text-white mb-1">Add Bot to Your Group</h3>
                       <p className="text-dark-400 text-sm">
-                        The Mini App works best when opened from a Telegram group. Add the bot to your group first.
+                        Open your Telegram group, click group name → Members → Add members, and search for <strong className="text-white">@NexusPowerfulbot</strong>.
                       </p>
                     </div>
                   </div>

@@ -567,25 +567,50 @@ async def create_token(
     # All validation attempts failed
     logger.error("[AUTH] ALL VALIDATION ATTEMPTS FAILED")
     logger.error(f"[AUTH] Validation errors: {validation_errors}")
-    
-    error_detail = "Invalid init data: Hash mismatch"
-    if validation_errors:
-        error_detail += f" (tried: {', '.join(validation_errors)})"
 
-    # Provide more helpful error message for common issues
+    # Build helpful error message based on the context
+    error_detail = "Authentication Failed"
+
+    # Check what the user was trying to do and provide specific guidance
     if chat_id is None and not request.bot_token:
         if telegram_user_id and not user_bot_tokens:
             # User opened from private chat but isn't in any groups with the bot
-            error_detail += (
-                ". You are not currently a member of any groups with this bot. "
-                "Please add the bot to a group first, then open the Mini App from there. "
-                "The Mini App works best when opened directly from a group."
+            error_detail = (
+                "You're not a member of any groups with Nexus yet. "
+                "To get started, either:\n\n"
+                "1. Add the bot to a group and send a message\n"
+                "2. Open the Mini App from that group (menu → Mini App)\n\n"
+                "Or use a custom bot token if you have your own bot from @BotFather."
+            )
+        elif telegram_user_id:
+            # User is in groups but hash validation still failed
+            error_detail = (
+                "We couldn't verify your Telegram data. This usually happens when:\n\n"
+                "• The Mini App was opened from a different bot than expected\n"
+                "• You need to refresh your session\n\n"
+                "Try opening the Mini App from a group where Nexus is installed, "
+                "or provide a custom bot token."
             )
         else:
-            error_detail += (
-                ". Chat ID not found in initData and no custom bot token provided. "
+            error_detail = (
+                "No Telegram user information found. "
+                "Please open the Mini App from Telegram (not a web browser)."
             )
-            error_detail += "Ensure BOT_TOKEN environment variable matches the bot that opened the Mini App."
+    elif not validation_errors:
+        # No validation errors occurred but still failed
+        error_detail = (
+            "Authentication failed unexpectedly. "
+            "Please try refreshing the page or open the Mini App again."
+        )
+    else:
+        # Show which bots were tried
+        error_detail = (
+            "Hash validation failed with all available bot tokens.\n\n"
+            f"Tried {len(validation_errors)} bot(s) but none matched your Telegram data.\n\n"
+            "This usually means you need to:\n"
+            "• Open the Mini App from a group where Nexus is installed\n"
+            "• Or provide the correct bot token for your group"
+        )
 
     # Development bypass: Allow authentication without hash validation in development
     # This is useful for testing the Mini App in a browser without Telegram
