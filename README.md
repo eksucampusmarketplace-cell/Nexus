@@ -381,6 +381,7 @@ alembic downgrade -1
 | [ADVANCED_FEATURES_GUIDE.md](ADVANCED_FEATURES_GUIDE.md) | Implementation guide |
 | [GROUP_INTELLIGENCE_GUIDE.md](GROUP_INTELLIGENCE_GUIDE.md) | AI intelligence features |
 | [MESSAGE_GRAVEYARD_IMPLEMENTATION.md](MESSAGE_GRAVEYARD_IMPLEMENTATION.md) | Deleted message recovery |
+| [NEXUS_CAPABILITIES_REPORT.md](NEXUS_CAPABILITIES_REPORT.md) | Detailed Bot vs. Mini App comparison |
 | [DEBUG_GUIDE.md](DEBUG_GUIDE.md) | Troubleshooting |
 
 ---
